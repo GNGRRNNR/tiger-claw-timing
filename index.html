@@ -120,6 +120,20 @@
       overflow: hidden;
       border-radius: 8px;
     }
+
+    /* Fix for black rectangle */
+#qr-reader__dashboard_section_csr {
+  background: transparent !important;
+}
+
+#qr-reader__scan_region {
+  background: transparent !important;
+}
+
+#qr-reader video {
+  max-height: 300px !important;
+  object-fit: cover !important;
+}
     
     /* Targeting overlay - adapt to the actual camera view */
     .targeting-overlay {
