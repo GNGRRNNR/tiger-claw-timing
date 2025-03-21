@@ -598,23 +598,33 @@
       console.log(message);
     }
     
-    // Initialize the application
-    function init() {
-      // Load data from localStorage
-      loadPendingScans();
-      loadRecentScans();
-      loadProcessedScans();
-      loadScanTimestamps();
-      loadUploadedScans();
-      
-      // Fetch runner data
-      fetchRunnerData();
-      
-      // Set up online/offline event listeners
-      window.addEventListener('online', handleOnlineStatusChange);
-      window.addEventListener('offline', handleOnlineStatusChange);
-    }
-    
+   // Initialize the application - UPDATED
+function init() {
+  // Load data from localStorage
+  loadPendingScans();
+  loadRecentScans();
+  loadProcessedScans();
+  loadScanTimestamps();
+  loadUploadedScans();
+  
+  // Set initial online status
+  isOnline = navigator.onLine;
+  
+  // Fetch runner data
+  fetchRunnerData();
+  
+  // Set up online/offline event listeners
+  window.addEventListener('online', handleOnlineStatusChange);
+  window.addEventListener('offline', handleOnlineStatusChange);
+  
+  // Check if we have pending uploads and we're online
+  if (isOnline && pendingUploads.length > 0) {
+    logDebug(`Found ${pendingUploads.length} pending uploads at startup - attempting to upload`);
+    setTimeout(() => {
+      uploadPendingScans(true);
+    }, 3000);
+  }
+}
     // Load uploaded scans from localStorage
     function loadUploadedScans() {
       try {
@@ -685,15 +695,24 @@
     }
     
     // Handle online/offline status changes
-    function handleOnlineStatusChange() {
-      isOnline = navigator.onLine;
-      updateConnectionStatus();
-      
-      // If we're back online and have offline entries, try to sync them
-      if (isOnline && pendingUploads.length > 0) {
-        uploadPendingScans();
-      }
-    }
+   function handleOnlineStatusChange() {
+  const wasOnline = isOnline;
+  isOnline = navigator.onLine;
+  
+  // Log the status change
+  logDebug(`Connection status changed: ${wasOnline ? 'online' : 'offline'} -> ${isOnline ? 'online' : 'offline'}`);
+  
+  updateConnectionStatus();
+  
+  // If we're back online (and weren't before) and have pending uploads, try to sync them
+  if (isOnline && !wasOnline && pendingUploads.length > 0) {
+    logDebug("Connection restored - attempting to upload pending scans");
+    // Short delay to ensure network is stable
+    setTimeout(() => {
+      uploadPendingScans(true); // Force upload
+    }, 2000);
+  }
+}
     
     // Load pending scans from localStorage
     function loadPendingScans() {
@@ -822,32 +841,21 @@
       }
     }
     
-    // Update connection status UI
-    function updateConnectionStatus() {
-      if (isOnline) {
-        statusIcon.classList.add('status-connected');
-        statusIcon.classList.remove('status-disconnected');
-        statusText.textContent = 'CONNECTED';
-        statusText.classList.add('status-connected');
-        statusText.classList.remove('status-disconnected');
-        
-        // Try to upload pending scans
-        if (pendingUploads.length > 0) {
-          // Only attempt upload if it's been more than 5 seconds since last attempt
-          const now = Date.now();
-          if (now - lastUploadAttempt > 5000) {
-            lastUploadAttempt = now;
-            uploadPendingScans();
-          }
-        }
-      } else {
-        statusIcon.classList.add('status-disconnected');
-        statusIcon.classList.remove('status-connected');
-        statusText.textContent = 'NO SERVICE';
-        statusText.classList.add('status-disconnected');
-        statusText.classList.remove('status-connected');
-      }
-    }
+function updateConnectionStatus() {
+  if (isOnline) {
+    statusIcon.classList.add('status-connected');
+    statusIcon.classList.remove('status-disconnected');
+    statusText.textContent = 'CONNECTED';
+    statusText.classList.add('status-connected');
+    statusText.classList.remove('status-disconnected');
+  } else {
+    statusIcon.classList.add('status-disconnected');
+    statusIcon.classList.remove('status-connected');
+    statusText.textContent = 'NO SERVICE';
+    statusText.classList.add('status-disconnected');
+    statusText.classList.remove('status-connected');
+  }
+}
     
     // Check if user is already logged in
     function checkLoginStatus() {
