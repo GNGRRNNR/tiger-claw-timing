@@ -364,6 +364,27 @@
     animation: spin 1s ease-in-out infinite;
     margin-bottom: 10px;
   }
+
+  /* Center connection status and refresh button */
+.connection-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 15px;
+}
+
+#refresh-button {
+  background-color: #28a745;
+  margin: 5px auto;
+  display: block;
+  width: auto;
+  font-size: 12px;
+  padding: 5px 10px;
+  max-width: 200px;
+}
+
+  
 </style>
 </head>
 <body>
@@ -418,14 +439,14 @@
     <div class="app-header">
       <h1>TIGER CLAW TIMING</h1>
       <div id="checkpoint-display" style="font-weight: bold; font-size: 18px; margin: 10px 0;"></div>
-      <div id="connection-status" class="connection-status">
-        <span id="status-icon" class="status-icon">●</span>
-        <span id="status-text">CHECKING CONNECTION...</span>
-        <!-- Add this button right after the connection status display in your HTML -->
-<button id="refresh-button" style="background-color: #28a745; margin: 5px auto; display: block; width: auto; font-size: 12px; padding: 5px 10px;">
-  Refresh Connection
-</button>
-      </div>
+      <!-- Replace your existing connection status div with this -->
+<div class="connection-container">
+  <div id="connection-status" class="connection-status">
+    <span id="status-icon" class="status-icon">●</span>
+    <span id="status-text">CHECKING CONNECTION...</span>
+  </div>
+  <button id="refresh-button">Refresh Connection</button>
+</div>
     </div>
     
     <button id="scan-button" class="scan-button">START SCANNING</button>
@@ -852,15 +873,19 @@ function handleOnlineStatusChange() {
       });
     }
     
-    // Update pending uploads UI
-    function updatePendingUploadsUI() {
-      if (pendingUploads.length > 0) {
-        pendingUploadsContainer.classList.remove('hidden');
-        pendingUploadsContainer.textContent = `${pendingUploads.length} scan${pendingUploads.length > 1 ? 's' : ''} pending upload. Data will be uploaded automatically when connection is restored.`;
-      } else {
-        pendingUploadsContainer.classList.add('hidden');
-      }
-    }
+    // Update pending uploads UI - IMPROVED VERSION
+function updatePendingUploadsUI() {
+  if (pendingUploads.length > 0) {
+    pendingUploadsContainer.classList.remove('hidden');
+    pendingUploadsContainer.textContent = `${pendingUploads.length} scan${pendingUploads.length > 1 ? 's' : ''} pending upload. Data will be uploaded automatically when connection is restored.`;
+  } else {
+    pendingUploadsContainer.classList.add('hidden');
+    pendingUploadsContainer.textContent = '';
+  }
+  
+  // Log the current state for debugging
+  logDebug(`Pending uploads UI updated: ${pendingUploads.length} scans pending`);
+}
     
 function updateConnectionStatus() {
   if (isOnline) {
@@ -1495,8 +1520,7 @@ function submitScanToSheet(scanData) {
   });
 }
     
- // Upload pending scans - UPDATED WITH VISUAL INDICATOR
-// Upload pending scans - COMPLETELY REVISED VERSION
+// Upload pending scans - FIXED VERSION
 function uploadPendingScans(forceUpload = false) {
   if (pendingUploads.length === 0 || (!isOnline && !forceUpload) || isUploadingPendingScans) {
     return;
@@ -1508,9 +1532,12 @@ function uploadPendingScans(forceUpload = false) {
   
   logDebug(`Attempting to upload ${pendingUploads.length} pending scans`);
   
-  // Process scans one by one instead of all at once
+  // Create a copy of the pending uploads
+  const uploadsToProcess = [...pendingUploads];
+  
+  // Process scans one by one
   function processNextScan(index, successCount, failCount) {
-    if (index >= pendingUploads.length) {
+    if (index >= uploadsToProcess.length) {
       // All scans processed
       logDebug(`Upload complete: ${successCount} successful, ${failCount} failed`);
       
@@ -1523,8 +1550,15 @@ function uploadPendingScans(forceUpload = false) {
         }
       }
       
-      // Remove successful uploads from pendingUploads
-      pendingUploads = pendingUploads.filter((_, i) => !uploadedIndexes.includes(i));
+      // IMPORTANT: Clear the pendingUploads array completely if all uploads were successful
+      if (failCount === 0 && successCount > 0) {
+        pendingUploads = [];
+      } else {
+        // Otherwise, keep only the failed uploads
+        pendingUploads = uploadsToProcess.filter((_, i) => !successfulIndexes.includes(i));
+      }
+      
+      // Update localStorage and UI
       localStorage.setItem('pendingUploads', JSON.stringify(pendingUploads));
       updatePendingUploadsUI();
       
@@ -1534,12 +1568,13 @@ function uploadPendingScans(forceUpload = false) {
       return;
     }
     
-    const scanData = pendingUploads[index];
+    const scanData = uploadsToProcess[index];
     
     // Skip if already uploaded
     if (hasBeenUploaded(scanData)) {
       logDebug(`Skipping already uploaded scan: ${scanData.bib} at ${scanData.checkpoint}`);
-      processNextScan(index + 1, successCount, failCount);
+      successfulIndexes.push(index); // Count as successful
+      processNextScan(index + 1, successCount + 1, failCount);
       return;
     }
     
@@ -1548,22 +1583,22 @@ function uploadPendingScans(forceUpload = false) {
         if (success) {
           // Mark as uploaded
           markScanAsUploaded(scanData);
-          uploadedIndexes.push(index);
-          logDebug(`Successfully uploaded scan ${index + 1}/${pendingUploads.length}`);
+          successfulIndexes.push(index);
+          logDebug(`Successfully uploaded scan ${index + 1}/${uploadsToProcess.length}`);
           processNextScan(index + 1, successCount + 1, failCount);
         } else {
-          logDebug(`Failed to upload scan ${index + 1}/${pendingUploads.length}`);
+          logDebug(`Failed to upload scan ${index + 1}/${uploadsToProcess.length}`);
           processNextScan(index + 1, successCount, failCount + 1);
         }
       })
       .catch(error => {
-        logDebug(`Error uploading scan ${index + 1}/${pendingUploads.length}: ${error}`);
+        logDebug(`Error uploading scan ${index + 1}/${uploadsToProcess.length}: ${error}`);
         processNextScan(index + 1, successCount, failCount + 1);
       });
   }
   
   // Track which indexes were successfully uploaded
-  const uploadedIndexes = [];
+  const successfulIndexes = [];
   
   // Start processing scans
   processNextScan(0, 0, 0);
