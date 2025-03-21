@@ -908,22 +908,53 @@
         }
       });
       
-      // Start QR scanner with back camera - SIMPLIFIED VERSION
-      function startScanner() {
+      // Start QR scanner with back camera - FIXED VERSION
+function startScanner() {
+  try {
+    // First, make sure any existing scanner is stopped
+    if (html5QrCode) {
+      try {
+        html5QrCode.stop().catch(() => {});
+        html5QrCode = null;
+      } catch (e) {
+        logDebug("Error stopping existing scanner: " + e);
+      }
+    }
+    
+    // Show the scanner container with loading indicator
+    scannerContainer.classList.remove('hidden');
+    cameraLoading.classList.remove('hidden');
+    nativeCameraContainer.classList.add('hidden');
+    
+    // Create a new instance of the QR scanner
+    html5QrCode = new Html5Qrcode("qr-reader");
+    
+    // Simple configuration that works reliably
+    const config = {
+      fps: 10,
+      qrbox: { width: 250, height: 250 },
+      rememberLastUsedCamera: true,
+      aspectRatio: 1.0
+    };
+    
+    // Set a timeout to detect if camera doesn't start
+    if (cameraStartTimeout) {
+      clearTimeout(cameraStartTimeout);
+    }
+    
+    cameraStartTimeout = setTimeout(() => {
+      logDebug("Camera start timeout - trying fallback");
+      if (html5QrCode) {
         try {
-          // Make sure the scanner container is visible
-          scannerContainer.classList.remove('hidden');
-          nativeCameraContainer.classList.add('hidden');
-          
-          // Create a new instance of the QR scanner
-          html5QrCode = new Html5Qrcode("qr-reader");
-          
-          // Simple configuration that works reliably
-          // Removed fixed aspect ratio to let the camera use its natural ratio
-          const config = {
-            fps: 10,
-            qrbox: { width: 250, height: 250 }
-          };
+          html5QrCode.stop().catch(() => {});
+        } catch (e) {}
+      }
+      
+      // Try with simpler configuration
+      tryFallbackCamera();
+    }, 10000); // 10 seconds timeout
+    
+    // Rest of your existing function...
           
           // Try to get the back camera
           Html5Qrcode.getCameras().then(devices => {
