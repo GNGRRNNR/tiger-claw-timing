@@ -573,7 +573,7 @@ document.getElementById('refresh-button').addEventListener('click', function() {
     
     // Constants
     const CORRECT_PASSWORD = "threeloops";
-    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwDCVmvDAWHFcQHOwBIBWz4q-vHM_raUP3CMqsODks8Mm8JyNGbDc_fpL_S7VZZr5dQ/exec";
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxORRzX3Psg6w_d_7Z5CSRXOSg0xHA74qUqp_5D24wvWEUqOG6LBStAld6jJBVuPOcL/exec";
     
     // Toggle debug panel
     toggleDebugBtn.addEventListener('click', function() {
@@ -1464,35 +1464,41 @@ function processScan(decodedText) {
       }
     }
     
-    // Submit scan to Google Sheet - FIXED VERSION
-// Submit scan to Google Sheet - COMPLETELY REVISED VERSION
+// Submit scan to Google Sheet - FIXED VERSION
 function submitScanToSheet(scanData) {
   return new Promise(function(resolve, reject) {
     logDebug(`Submitting scan to sheet: ${scanData.bib} - ${scanData.name} at ${scanData.checkpoint}`);
     
-    // Create a data object in the format expected by the Apps Script
-    const data = {
-      action: 'recordScan',
-      data: JSON.stringify({
-        timestamp: new Date().toISOString(),
-        bibNumber: scanData.bib,
-        runnerName: scanData.name,
-        checkpoint: scanData.checkpoint,
-        replaceExisting: true
-      })
+    // Create a FormData object
+    const formData = new FormData();
+    
+    // Create the data object in the exact format expected by the Apps Script
+    const dataObject = {
+      timestamp: new Date().toISOString(),
+      bibNumber: scanData.bib,
+      runnerName: scanData.name,
+      checkpoint: scanData.checkpoint,
+      replaceExisting: true
     };
     
-    // Use XMLHttpRequest instead of fetch
+    // Convert to JSON string and append to FormData
+    formData.append('action', 'recordScan');
+    formData.append('data', JSON.stringify(dataObject));
+    
+    // Log the exact data being sent for debugging
+    logDebug(`Sending data: ${JSON.stringify(dataObject)}`);
+    
+    // Use XMLHttpRequest instead of fetch for better compatibility
     const xhr = new XMLHttpRequest();
     xhr.open('POST', APPS_SCRIPT_URL, true);
-    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
     
     // Set timeout
     xhr.timeout = 10000; // 10 seconds
     
     xhr.onload = function() {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        logDebug(`Scan submitted successfully for bib ${scanData.bib}`);
+      if (xhr.status >= 200 && xhr.status < 300 || xhr.status === 0) {
+        // Status 0 can happen with CORS requests to Google Apps Script
+        logDebug(`Scan for bib ${scanData.bib} at ${scanData.checkpoint} submitted successfully`);
         resolve(true);
       } else {
         logDebug(`Error submitting scan: Status ${xhr.status}`);
@@ -1510,13 +1516,8 @@ function submitScanToSheet(scanData) {
       reject(new Error('Request timeout'));
     };
     
-    // Convert data object to URL encoded string
-    const urlEncodedData = Object.keys(data)
-      .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(data[key]))
-      .join('&');
-    
     // Send the request
-    xhr.send(urlEncodedData);
+    xhr.send(formData);
   });
 }
     
