@@ -1249,99 +1249,83 @@
     }
     
     // Process scan data - UPDATED TO HANDLE QR CODE URLS
-    function processScan(decodedText) {
-      // Check if the scanned text is a URL
-      let cleanBib;
-      if (decodedText.startsWith('http')) {
-        // Try to extract bib number from URL
-        logDebug(`Scanned URL: ${decodedText}`);
-        
-        try {
-          const url = new URL(decodedText);
-          const params = new URLSearchParams(url.search);
-          
-          // Check for data parameter (used in your QR codes)
-          if (params.has('data')) {
-            cleanBib = params.get('data').replace(/\D/g, '');
-            logDebug(`Extracted bib from data parameter: ${cleanBib}`);
-          } else if (params.has('bib')) {
-            cleanBib = params.get('bib').replace(/\D/g, '');
-            logDebug(`Extracted bib from bib parameter: ${cleanBib}`);
-          } else {
-            // If no specific parameter, try to extract from the last part of the URL
-            const pathParts = url.pathname.split('/');
-            const lastPart = pathParts[pathParts.length - 1];
-            cleanBib = lastPart.replace(/\D/g, '');
-            logDebug(`Extracted bib from URL path: ${cleanBib}`);
-          }
-        } catch (e) {
-          // If URL parsing fails, just clean the whole text
-          logDebug(`URL parsing failed: ${e}`);
-          cleanBib = decodedText.replace(/\D/g, '');
+// Process scan data - UPDATED TO HANDLE "BibNumber, RunnerName" FORMAT
+function processScan(decodedText) {
+  // Log the raw scanned text for debugging
+  logDebug(`Raw QR scan result: ${decodedText}`);
+  
+  // Extract the bib number from the scanned text
+  let cleanBib;
+  
+  // Check if the text contains a comma (BibNumber, RunnerName format)
+  if (decodedText.includes(',')) {
+    // Split by comma and take the first part as the bib number
+    const parts = decodedText.split(',');
+    cleanBib = parts[0].trim().replace(/\D/g, '');
+    logDebug(`Extracted bib from comma-separated format: ${cleanBib}`);
+  } else {
+    // If no comma, just clean the whole text
+    cleanBib = decodedText.toString().replace(/\D/g, '');
+    logDebug(`No comma found, cleaned bib: ${cleanBib}`);
+  }
+  
+  // If no bib number could be extracted, show error
+  if (!cleanBib) {
+    showMessage(`Could not extract bib number from scan`, true);
+    return;
+  }
+  
+  logDebug(`Processing scan for bib: ${cleanBib}`);
+  
+  // Find runner in our loaded data
+  const runnerName = runnersData[cleanBib];
+  
+  if (!runnerName) {
+    showMessage(`No runner found with bib ${cleanBib}`, true);
+    return;
+  }
+  
+  // Check if we should process this scan (not a duplicate or is newer)
+  if (!shouldProcessScan(cleanBib, checkpoint)) {
+    showMessage(`Already recorded: ${runnerName} (${cleanBib})`, false);
+    return;
+  }
+  
+  const scanData = {
+    timestamp: new Date().toISOString(),
+    bib: cleanBib,
+    name: runnerName,
+    checkpoint: checkpoint
+  };
+  
+  // Mark as processed to prevent duplicates
+  markScanAsProcessed(cleanBib, checkpoint);
+  
+  // Add to recent scans
+  storeRecentScan(scanData);
+  
+  if (isOnline) {
+    submitScanToSheet(scanData)
+      .then(function(success) {
+        if (success) {
+          // Mark as uploaded to prevent duplicates
+          markScanAsUploaded(scanData);
+          showMessage(`Recorded: ${runnerName} (${cleanBib})`);
+        } else {
+          showMessage('Error submitting scan. Storing offline.', true);
+          storeScanOffline(scanData);
         }
-      } else {
-        // Not a URL, just clean the bib number
-        cleanBib = decodedText.toString().replace(/\D/g, '');
-        logDebug(`Not a URL, cleaned bib: ${cleanBib}`);
-      }
-      
-      // If no bib number could be extracted, show error
-      if (!cleanBib) {
-        showMessage(`Could not extract bib number from scan`, true);
-        return;
-      }
-      
-      logDebug(`Processing scan for bib: ${cleanBib}`);
-      
-      // Find runner in our loaded data
-      const runnerName = runnersData[cleanBib];
-      
-      if (!runnerName) {
-        showMessage(`No runner found with bib ${cleanBib}`, true);
-        return;
-      }
-      
-      // Check if we should process this scan (not a duplicate or is newer)
-      if (!shouldProcessScan(cleanBib, checkpoint)) {
-        showMessage(`Already recorded: ${runnerName} (${cleanBib})`, false);
-        return;
-      }
-      
-      const scanData = {
-        timestamp: new Date().toISOString(),
-        bib: cleanBib,
-        name: runnerName,
-        checkpoint: checkpoint
-      };
-      
-      // Mark as processed to prevent duplicates
-      markScanAsProcessed(cleanBib, checkpoint);
-      
-      // Add to recent scans
-      storeRecentScan(scanData);
-      
-      if (isOnline) {
-        submitScanToSheet(scanData)
-          .then(function(success) {
-            if (success) {
-              // Mark as uploaded to prevent duplicates
-              markScanAsUploaded(scanData);
-              showMessage(`Recorded: ${runnerName} (${cleanBib})`);
-            } else {
-              showMessage('Error submitting scan. Storing offline.', true);
-              storeScanOffline(scanData);
-            }
-          })
-          .catch(function(error) {
-            logDebug('Error submitting scan: ' + error);
-            showMessage('Error submitting scan. Storing offline.', true);
-            storeScanOffline(scanData);
-          });
-      } else {
+      })
+      .catch(function(error) {
+        logDebug('Error submitting scan: ' + error);
+        showMessage('Error submitting scan. Storing offline.', true);
         storeScanOffline(scanData);
-        showMessage(`Stored offline: ${runnerName} (${cleanBib})`);
-      }
-    }
+      });
+  } else {
+    storeScanOffline(scanData);
+    showMessage(`Stored offline: ${runnerName} (${cleanBib})`);
+  }
+}
     
     // Check if scan is a duplicate and if it's the most recent
     function shouldProcessScan(bib, checkpoint) {
