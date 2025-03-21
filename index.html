@@ -421,6 +421,10 @@
       <div id="connection-status" class="connection-status">
         <span id="status-icon" class="status-icon">●</span>
         <span id="status-text">CHECKING CONNECTION...</span>
+        <!-- Add this button right after the connection status display in your HTML -->
+<button id="refresh-button" style="background-color: #28a745; margin: 5px auto; display: block; width: auto; font-size: 12px; padding: 5px 10px;">
+  Refresh Connection
+</button>
       </div>
     </div>
     
@@ -481,6 +485,21 @@
 
 <script>
   // Main application code
+  // Add this event listener with your other event listeners
+document.getElementById('refresh-button').addEventListener('click', function() {
+  logDebug('Manual connection refresh requested');
+  
+  // Check connection
+  const currentOnlineStatus = navigator.onLine;
+  logDebug(`Current connection status: ${currentOnlineStatus ? 'online' : 'offline'}`);
+  
+  if (currentOnlineStatus) {
+    showMessage('Checking for pending uploads...');
+    uploadPendingScans(true);
+  } else {
+    showMessage('No internet connection available', true);
+  }
+});
   document.addEventListener('DOMContentLoaded', function() {
     // DOM Elements
     const loadingScreen = document.getElementById('loading-screen');
@@ -694,23 +713,25 @@ function init() {
       }
     }
     
-    // Handle online/offline status changes
-   function handleOnlineStatusChange() {
+// Handle online/offline status changes - COMPLETELY REVISED VERSION
+function handleOnlineStatusChange() {
   const wasOnline = isOnline;
   isOnline = navigator.onLine;
   
-  // Log the status change
   logDebug(`Connection status changed: ${wasOnline ? 'online' : 'offline'} -> ${isOnline ? 'online' : 'offline'}`);
   
   updateConnectionStatus();
   
-  // If we're back online (and weren't before) and have pending uploads, try to sync them
+  // If we're back online and have pending uploads
   if (isOnline && !wasOnline && pendingUploads.length > 0) {
-    logDebug("Connection restored - attempting to upload pending scans");
-    // Short delay to ensure network is stable
+    logDebug(`Connection restored with ${pendingUploads.length} pending uploads - attempting to upload`);
+    
+    // Wait a bit to ensure connection is stable
     setTimeout(() => {
-      uploadPendingScans(true); // Force upload
-    }, 2000);
+      if (navigator.onLine) {  // Double-check we're still online
+        uploadPendingScans(true);
+      }
+    }, 3000);
   }
 }
     
@@ -1419,48 +1440,67 @@ function processScan(decodedText) {
     }
     
     // Submit scan to Google Sheet - FIXED VERSION
+// Submit scan to Google Sheet - COMPLETELY REVISED VERSION
 function submitScanToSheet(scanData) {
   return new Promise(function(resolve, reject) {
-    // Format data for the script
-    const formData = new FormData();
-    formData.append('action', 'recordScan');
+    logDebug(`Submitting scan to sheet: ${scanData.bib} - ${scanData.name} at ${scanData.checkpoint}`);
     
     // Create a data object in the format expected by the Apps Script
     const data = {
-      timestamp: new Date().toISOString(),
-      bibNumber: scanData.bib,
-      runnerName: scanData.name,
-      checkpoint: scanData.checkpoint,
-      replaceExisting: true // Tell the server to replace any existing entry
+      action: 'recordScan',
+      data: JSON.stringify({
+        timestamp: new Date().toISOString(),
+        bibNumber: scanData.bib,
+        runnerName: scanData.name,
+        checkpoint: scanData.checkpoint,
+        replaceExisting: true
+      })
     };
     
-    // Append the data as a JSON string
-    formData.append('data', JSON.stringify(data));
+    // Use XMLHttpRequest instead of fetch
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', APPS_SCRIPT_URL, true);
+    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
     
-    logDebug(`Submitting scan to sheet: ${scanData.bib} - ${scanData.name} at ${scanData.checkpoint}`);
+    // Set timeout
+    xhr.timeout = 10000; // 10 seconds
     
-    // Send data to the Google Apps Script
-    fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      body: formData,
-      mode: 'no-cors', // Changed back to 'no-cors' which is required for Google Apps Script
-    })
-    .then(response => {
-      // Since we're using no-cors, we can't actually check the response
-      // We'll just assume it worked if we got any response
-      logDebug('Scan submitted successfully');
-      resolve(true);
-    })
-    .catch(error => {
-      logDebug('Error submitting scan: ' + error);
-      reject(error);
-    });
+    xhr.onload = function() {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        logDebug(`Scan submitted successfully for bib ${scanData.bib}`);
+        resolve(true);
+      } else {
+        logDebug(`Error submitting scan: Status ${xhr.status}`);
+        reject(new Error(`HTTP error ${xhr.status}`));
+      }
+    };
+    
+    xhr.onerror = function() {
+      logDebug('Network error submitting scan');
+      reject(new Error('Network error'));
+    };
+    
+    xhr.ontimeout = function() {
+      logDebug('Timeout submitting scan');
+      reject(new Error('Request timeout'));
+    };
+    
+    // Convert data object to URL encoded string
+    const urlEncodedData = Object.keys(data)
+      .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(data[key]))
+      .join('&');
+    
+    // Send the request
+    xhr.send(urlEncodedData);
   });
 }
     
  // Upload pending scans - UPDATED WITH VISUAL INDICATOR
+// Upload pending scans - COMPLETELY REVISED VERSION
 function uploadPendingScans(forceUpload = false) {
-  if (pendingUploads.length === 0 || (!isOnline && !forceUpload) || isUploadingPendingScans) return;
+  if (pendingUploads.length === 0 || (!isOnline && !forceUpload) || isUploadingPendingScans) {
+    return;
+  }
   
   isUploadingPendingScans = true;
   // Show uploading status
@@ -1468,66 +1508,65 @@ function uploadPendingScans(forceUpload = false) {
   
   logDebug(`Attempting to upload ${pendingUploads.length} pending scans`);
   
-  // Create a copy of the pending uploads to process
-  const uploadsToProcess = [...pendingUploads];
-  let successCount = 0;
-  let failCount = 0;
-  
-  // Process each scan
-  const promises = uploadsToProcess.map(scanData => {
+  // Process scans one by one instead of all at once
+  function processNextScan(index, successCount, failCount) {
+    if (index >= pendingUploads.length) {
+      // All scans processed
+      logDebug(`Upload complete: ${successCount} successful, ${failCount} failed`);
+      
+      // Update UI
+      if (successCount > 0) {
+        if (failCount > 0) {
+          showMessage(`Uploaded ${successCount} scans, ${failCount} failed and will retry later.`);
+        } else {
+          showMessage(`All ${successCount} pending scans uploaded successfully!`);
+        }
+      }
+      
+      // Remove successful uploads from pendingUploads
+      pendingUploads = pendingUploads.filter((_, i) => !uploadedIndexes.includes(i));
+      localStorage.setItem('pendingUploads', JSON.stringify(pendingUploads));
+      updatePendingUploadsUI();
+      
+      // Reset status
+      statusText.textContent = isOnline ? 'CONNECTED' : 'NO SERVICE';
+      isUploadingPendingScans = false;
+      return;
+    }
+    
+    const scanData = pendingUploads[index];
+    
     // Skip if already uploaded
     if (hasBeenUploaded(scanData)) {
       logDebug(`Skipping already uploaded scan: ${scanData.bib} at ${scanData.checkpoint}`);
-      return Promise.resolve({ success: true, data: scanData, skipped: true });
+      processNextScan(index + 1, successCount, failCount);
+      return;
     }
     
-    return submitScanToSheet(scanData)
+    submitScanToSheet(scanData)
       .then(success => {
         if (success) {
-          successCount++;
-          // Mark as uploaded to prevent duplicates
+          // Mark as uploaded
           markScanAsUploaded(scanData);
-          return { success: true, data: scanData };
+          uploadedIndexes.push(index);
+          logDebug(`Successfully uploaded scan ${index + 1}/${pendingUploads.length}`);
+          processNextScan(index + 1, successCount + 1, failCount);
         } else {
-          failCount++;
-          return { success: false, data: scanData };
+          logDebug(`Failed to upload scan ${index + 1}/${pendingUploads.length}`);
+          processNextScan(index + 1, successCount, failCount + 1);
         }
       })
-      .catch(() => {
-        failCount++;
-        return { success: false, data: scanData };
+      .catch(error => {
+        logDebug(`Error uploading scan ${index + 1}/${pendingUploads.length}: ${error}`);
+        processNextScan(index + 1, successCount, failCount + 1);
       });
-  });
+  }
   
-  Promise.all(promises).then(results => {
-    // Filter out successful uploads
-    const failedUploads = results
-      .filter(result => !result.success)
-      .map(result => result.data);
-    
-    // Update pendingUploads with only failed uploads
-    pendingUploads = failedUploads;
-    localStorage.setItem('pendingUploads', JSON.stringify(pendingUploads));
-    updatePendingUploadsUI();
-    
-    if (successCount > 0) {
-      if (failCount > 0) {
-        showMessage(`Uploaded ${successCount} scans, ${failCount} failed and will retry later.`);
-      } else {
-        showMessage(`All ${successCount} pending scans uploaded successfully!`);
-      }
-    }
-    
-    logDebug(`Upload complete: ${successCount} successful, ${failCount} failed`);
-    // Reset status text
-    statusText.textContent = isOnline ? 'CONNECTED' : 'NO SERVICE';
-    isUploadingPendingScans = false;
-  }).catch(error => {
-    logDebug(`Error in upload process: ${error}`);
-    // Reset status text
-    statusText.textContent = isOnline ? 'CONNECTED' : 'NO SERVICE';
-    isUploadingPendingScans = false;
-  });
+  // Track which indexes were successfully uploaded
+  const uploadedIndexes = [];
+  
+  // Start processing scans
+  processNextScan(0, 0, 0);
 }
     
     // Handle manual bib submission
