@@ -734,25 +734,21 @@ function init() {
       }
     }
     
-// Handle online/offline status changes - COMPLETELY REVISED VERSION
+// Handle online/offline status changes
 function handleOnlineStatusChange() {
   const wasOnline = isOnline;
   isOnline = navigator.onLine;
   
   logDebug(`Connection status changed: ${wasOnline ? 'online' : 'offline'} -> ${isOnline ? 'online' : 'offline'}`);
-  
   updateConnectionStatus();
   
-  // If we're back online and have pending uploads
+  // If we're back online and have offline entries, try to sync them
   if (isOnline && !wasOnline && pendingUploads.length > 0) {
-    logDebug(`Connection restored with ${pendingUploads.length} pending uploads - attempting to upload`);
-    
-    // Wait a bit to ensure connection is stable
+    logDebug('Connection restored - attempting to upload pending scans');
+    // Wait a moment for the connection to stabilize
     setTimeout(() => {
-      if (navigator.onLine) {  // Double-check we're still online
-        uploadPendingScans(true);
-      }
-    }, 3000);
+      uploadPendingScans(true);
+    }, 2000);
   }
 }
     
@@ -1467,7 +1463,7 @@ function processScan(decodedText) {
 // Submit scan to Google Sheet
 function submitScanToSheet(scanData) {
   return new Promise(function(resolve, reject) {
-    // Format data for the script - IMPORTANT: This matches the expected format in the Apps Script
+    // Format data for the script
     const formData = new FormData();
     formData.append('action', 'recordScan');
     
@@ -1477,7 +1473,7 @@ function submitScanToSheet(scanData) {
       bibNumber: scanData.bib,
       runnerName: scanData.name,
       checkpoint: scanData.checkpoint,
-      replaceExisting: true // Tell the server to replace any existing entry
+      replaceExisting: true
     };
     
     // Append the data as a JSON string
@@ -1485,110 +1481,82 @@ function submitScanToSheet(scanData) {
     
     logDebug(`Submitting scan to sheet: ${scanData.bib} - ${scanData.name} at ${scanData.checkpoint}`);
     
-    // Use XMLHttpRequest instead of fetch for better compatibility with Google Apps Script
+    // Use XMLHttpRequest instead of fetch
     const xhr = new XMLHttpRequest();
     xhr.open('POST', APPS_SCRIPT_URL, true);
     
     // Set up event handlers
     xhr.onload = function() {
-      // Since we're using no-cors, we can't actually check the response
-      // We'll just assume it worked
+      // With no-cors, we can't check status, so assume success if we get here
       logDebug('Scan submitted successfully');
       resolve(true);
     };
     
     xhr.onerror = function() {
-      logDebug('Error submitting scan');
-      resolve(false); // Resolve with false instead of rejecting
+      logDebug('Network error when submitting scan');
+      resolve(false);
     };
     
     // Send the request
     xhr.send(formData);
+    
+    // Set a timeout to resolve as success after 3 seconds
+    // This is because Google Apps Script often returns success but the response
+    // might not make it back to the client due to CORS issues
+    setTimeout(() => {
+      logDebug('Assuming success due to timeout');
+      resolve(true);
+    }, 3000);
   });
 }
     
-// Upload pending scans - FIXED VERSION
+// Upload pending scans
 function uploadPendingScans(forceUpload = false) {
-  if (pendingUploads.length === 0 || (!isOnline && !forceUpload) || isUploadingPendingScans) {
-    return;
-  }
+  if (pendingUploads.length === 0 || (!isOnline && !forceUpload) || isUploadingPendingScans) return;
   
   isUploadingPendingScans = true;
-  // Show uploading status
-  statusText.textContent = 'UPLOADING...';
-  
   logDebug(`Attempting to upload ${pendingUploads.length} pending scans`);
   
-  // Create a copy of the pending uploads
-  const uploadsToProcess = [...pendingUploads];
+  // Process each scan one at a time
+  uploadNextScan(0);
   
-  // Process scans one by one
-  function processNextScan(index, successCount, failCount) {
-    if (index >= uploadsToProcess.length) {
-      // All scans processed
-      logDebug(`Upload complete: ${successCount} successful, ${failCount} failed`);
-      
-      // Update UI
-      if (successCount > 0) {
-        if (failCount > 0) {
-          showMessage(`Uploaded ${successCount} scans, ${failCount} failed and will retry later.`);
-        } else {
-          showMessage(`All ${successCount} pending scans uploaded successfully!`);
-        }
-      }
-      
-      // IMPORTANT: Clear the pendingUploads array completely if all uploads were successful
-      if (failCount === 0 && successCount > 0) {
-        pendingUploads = [];
-      } else {
-        // Otherwise, keep only the failed uploads
-        pendingUploads = uploadsToProcess.filter((_, i) => !successfulIndexes.includes(i));
-      }
-      
-      // Update localStorage and UI
-      localStorage.setItem('pendingUploads', JSON.stringify(pendingUploads));
-      updatePendingUploadsUI();
-      
-      // Reset status
-      statusText.textContent = isOnline ? 'CONNECTED' : 'NO SERVICE';
+  function uploadNextScan(index) {
+    if (index >= pendingUploads.length) {
+      // All done
+      logDebug('Finished uploading pending scans');
       isUploadingPendingScans = false;
       return;
     }
     
-    const scanData = uploadsToProcess[index];
-    
-    // Skip if already uploaded
-    if (hasBeenUploaded(scanData)) {
-      logDebug(`Skipping already uploaded scan: ${scanData.bib} at ${scanData.checkpoint}`);
-      successfulIndexes.push(index); // Count as successful
-      processNextScan(index + 1, successCount + 1, failCount);
-      return;
-    }
+    const scanData = pendingUploads[index];
+    logDebug(`Uploading pending scan ${index + 1}/${pendingUploads.length}: ${scanData.bib} at ${scanData.checkpoint}`);
     
     submitScanToSheet(scanData)
       .then(success => {
         if (success) {
-          // Mark as uploaded
-          markScanAsUploaded(scanData);
-          successfulIndexes.push(index);
-          logDebug(`Successfully uploaded scan ${index + 1}/${uploadsToProcess.length}`);
-          processNextScan(index + 1, successCount + 1, failCount);
+          logDebug(`Successfully uploaded scan: ${scanData.bib} at ${scanData.checkpoint}`);
+          
+          // Remove this scan from pendingUploads
+          pendingUploads.splice(index, 1);
+          
+          // Update localStorage
+          localStorage.setItem('pendingUploads', JSON.stringify(pendingUploads));
+          updatePendingUploadsUI();
+          
+          // Continue with the next scan (same index since we removed one)
+          setTimeout(() => uploadNextScan(index), 1000);
         } else {
-          logDebug(`Failed to upload scan ${index + 1}/${uploadsToProcess.length}`);
-          processNextScan(index + 1, successCount, failCount + 1);
+          logDebug(`Failed to upload scan: ${scanData.bib} at ${scanData.checkpoint}`);
+          // Move to the next scan
+          setTimeout(() => uploadNextScan(index + 1), 1000);
         }
       })
       .catch(error => {
-        logDebug(`Error uploading scan ${index + 1}/${uploadsToProcess.length}: ${error}`);
-        processNextScan(index + 1, successCount, failCount + 1);
+        logDebug(`Error uploading scan: ${error}`);
+        // Move to the next scan
+        setTimeout(() => uploadNextScan(index + 1), 1000);
       });
   }
-  
-  // Track which indexes were successfully uploaded
-  const successfulIndexes = [];
-  
-  // Start processing scans
-  processNextScan(0, 0, 0);
 }
     
     // Handle manual bib submission
