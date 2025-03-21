@@ -1418,110 +1418,117 @@ function processScan(decodedText) {
       }
     }
     
-    // Submit scan to Google Sheet
-    function submitScanToSheet(scanData) {
-      return new Promise(function(resolve, reject) {
-        // Format data for the script - IMPORTANT: This matches the expected format in the Apps Script
-        const formData = new FormData();
-        formData.append('action', 'recordScan');
-        
-        // Create a data object in the format expected by the Apps Script
-        const data = {
-          timestamp: new Date().toISOString(),
-          bibNumber: scanData.bib,
-          runnerName: scanData.name,
-          checkpoint: scanData.checkpoint,
-          replaceExisting: true // Tell the server to replace any existing entry
-        };
-        
-        // Append the data as a JSON string
-        formData.append('data', JSON.stringify(data));
-        
-        logDebug(`Submitting scan to sheet: ${scanData.bib} - ${scanData.name} at ${scanData.checkpoint}`);
-        
-        // Send data to the Google Apps Script
-        fetch(APPS_SCRIPT_URL, {
-          method: 'POST',
-          body: formData,
-          mode: 'cors', // Changed from 'no-cors' to 'cors'
-        })
-        .then(() => {
-          // Since we're using no-cors, we can't actually check the response
-          // We'll just assume it worked
-          logDebug('Scan submitted successfully');
-          resolve(true);
-        })
-        .catch(error => {
-          logDebug('Error submitting scan: ' + error);
-          reject(error);
-        });
-      });
+    // Submit scan to Google Sheet - FIXED VERSION
+function submitScanToSheet(scanData) {
+  return new Promise(function(resolve, reject) {
+    // Format data for the script
+    const formData = new FormData();
+    formData.append('action', 'recordScan');
+    
+    // Create a data object in the format expected by the Apps Script
+    const data = {
+      timestamp: new Date().toISOString(),
+      bibNumber: scanData.bib,
+      runnerName: scanData.name,
+      checkpoint: scanData.checkpoint,
+      replaceExisting: true // Tell the server to replace any existing entry
+    };
+    
+    // Append the data as a JSON string
+    formData.append('data', JSON.stringify(data));
+    
+    logDebug(`Submitting scan to sheet: ${scanData.bib} - ${scanData.name} at ${scanData.checkpoint}`);
+    
+    // Send data to the Google Apps Script
+    fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: formData,
+      mode: 'no-cors', // Changed back to 'no-cors' which is required for Google Apps Script
+    })
+    .then(response => {
+      // Since we're using no-cors, we can't actually check the response
+      // We'll just assume it worked if we got any response
+      logDebug('Scan submitted successfully');
+      resolve(true);
+    })
+    .catch(error => {
+      logDebug('Error submitting scan: ' + error);
+      reject(error);
+    });
+  });
+}
+    
+ // Upload pending scans - UPDATED WITH VISUAL INDICATOR
+function uploadPendingScans(forceUpload = false) {
+  if (pendingUploads.length === 0 || (!isOnline && !forceUpload) || isUploadingPendingScans) return;
+  
+  isUploadingPendingScans = true;
+  // Show uploading status
+  statusText.textContent = 'UPLOADING...';
+  
+  logDebug(`Attempting to upload ${pendingUploads.length} pending scans`);
+  
+  // Create a copy of the pending uploads to process
+  const uploadsToProcess = [...pendingUploads];
+  let successCount = 0;
+  let failCount = 0;
+  
+  // Process each scan
+  const promises = uploadsToProcess.map(scanData => {
+    // Skip if already uploaded
+    if (hasBeenUploaded(scanData)) {
+      logDebug(`Skipping already uploaded scan: ${scanData.bib} at ${scanData.checkpoint}`);
+      return Promise.resolve({ success: true, data: scanData, skipped: true });
     }
     
-    // Upload pending scans
-    function uploadPendingScans(forceUpload = false) {
-      if (pendingUploads.length === 0 || (!isOnline && !forceUpload) || isUploadingPendingScans) return;
-      
-      isUploadingPendingScans = true;
-      logDebug(`Attempting to upload ${pendingUploads.length} pending scans`);
-      
-      // Create a copy of the pending uploads to process
-      const uploadsToProcess = [...pendingUploads];
-      let successCount = 0;
-      let failCount = 0;
-      
-      // Process each scan
-      const promises = uploadsToProcess.map(scanData => {
-        // Skip if already uploaded
-        if (hasBeenUploaded(scanData)) {
-          logDebug(`Skipping already uploaded scan: ${scanData.bib} at ${scanData.checkpoint}`);
-          return Promise.resolve({ success: true, data: scanData, skipped: true });
+    return submitScanToSheet(scanData)
+      .then(success => {
+        if (success) {
+          successCount++;
+          // Mark as uploaded to prevent duplicates
+          markScanAsUploaded(scanData);
+          return { success: true, data: scanData };
+        } else {
+          failCount++;
+          return { success: false, data: scanData };
         }
-        
-        return submitScanToSheet(scanData)
-          .then(success => {
-            if (success) {
-              successCount++;
-              // Mark as uploaded to prevent duplicates
-              markScanAsUploaded(scanData);
-              return { success: true, data: scanData };
-            } else {
-              failCount++;
-              return { success: false, data: scanData };
-            }
-          })
-          .catch(() => {
-            failCount++;
-            return { success: false, data: scanData };
-          });
+      })
+      .catch(() => {
+        failCount++;
+        return { success: false, data: scanData };
       });
-      
-      Promise.all(promises).then(results => {
-        // Filter out successful uploads
-        const failedUploads = results
-          .filter(result => !result.success)
-          .map(result => result.data);
-        
-        // Update pendingUploads with only failed uploads
-        pendingUploads = failedUploads;
-        localStorage.setItem('pendingUploads', JSON.stringify(pendingUploads));
-        updatePendingUploadsUI();
-        
-        if (successCount > 0) {
-          if (failCount > 0) {
-            showMessage(`Uploaded ${successCount} scans, ${failCount} failed and will retry later.`);
-          } else {
-            showMessage(`All ${successCount} pending scans uploaded successfully!`);
-          }
-        }
-        
-        logDebug(`Upload complete: ${successCount} successful, ${failCount} failed`);
-        isUploadingPendingScans = false;
-      }).catch(error => {
-        logDebug(`Error in upload process: ${error}`);
-        isUploadingPendingScans = false;
-      });
+  });
+  
+  Promise.all(promises).then(results => {
+    // Filter out successful uploads
+    const failedUploads = results
+      .filter(result => !result.success)
+      .map(result => result.data);
+    
+    // Update pendingUploads with only failed uploads
+    pendingUploads = failedUploads;
+    localStorage.setItem('pendingUploads', JSON.stringify(pendingUploads));
+    updatePendingUploadsUI();
+    
+    if (successCount > 0) {
+      if (failCount > 0) {
+        showMessage(`Uploaded ${successCount} scans, ${failCount} failed and will retry later.`);
+      } else {
+        showMessage(`All ${successCount} pending scans uploaded successfully!`);
+      }
     }
+    
+    logDebug(`Upload complete: ${successCount} successful, ${failCount} failed`);
+    // Reset status text
+    statusText.textContent = isOnline ? 'CONNECTED' : 'NO SERVICE';
+    isUploadingPendingScans = false;
+  }).catch(error => {
+    logDebug(`Error in upload process: ${error}`);
+    // Reset status text
+    statusText.textContent = isOnline ? 'CONNECTED' : 'NO SERVICE';
+    isUploadingPendingScans = false;
+  });
+}
     
     // Handle manual bib submission
     manualSubmitButton.addEventListener('click', function() {
