@@ -883,19 +883,72 @@ function updatePendingUploadsUI() {
   logDebug(`Pending uploads UI updated: ${pendingUploads.length} scans pending`);
 }
     
+// Declare variables
+let isOnline;
+let pendingUploads = [];
+let lastUploadAttempt = 0;
+
+// Update connection status UI and check connectivity
 function updateConnectionStatus() {
+  // First check navigator.onLine
+  isOnline = navigator.onLine;
+
+  // If navigator.onLine says we're online, do an additional check
   if (isOnline) {
-    statusIcon.classList.add('status-connected');
-    statusIcon.classList.remove('status-disconnected');
-    statusText.textContent = 'CONNECTED';
-    statusText.classList.add('status-connected');
-    statusText.classList.remove('status-disconnected');
+    // Create a unique callback name
+    const callbackName = 'pingCallback_' + Date.now();
+    
+    // Define the callback function
+    window[callbackName] = function(response) {
+      // Clean up
+      document.body.removeChild(script);
+      delete window[callbackName];
+      
+      // If we get here, we're definitely online
+      isOnline = true;
+      updateConnectionStatusUI();
+      
+      // Try to upload pending scans if we have any
+      if (pendingUploads.length > 0) {
+        // Only attempt upload if it's been more than 5 seconds since last attempt
+        const now = Date.now();
+        if (now - lastUploadAttempt > 5000) {
+          lastUploadAttempt = now;
+          uploadPendingScans();
+        }
+      }
+    };
+    
+    // Create the script element for JSONP
+    const script = document.createElement('script');
+    script.src = `${APPS_SCRIPT_URL}?action=ping&callback=${callbackName}&nocache=${Date.now()}`;
+    
+    // Handle errors
+    script.onerror = function() {
+      // Clean up
+      delete window[callbackName];
+      document.body.removeChild(script);
+      
+      // If the fetch fails, we're offline despite what navigator.onLine says
+      isOnline = false;
+      updateConnectionStatusUI();
+    };
+    
+    // Add the script to the document
+    document.body.appendChild(script);
+    
+    // Set a timeout to handle case where script doesn't load or callback isn't called
+    setTimeout(() => {
+      if (window[callbackName]) {
+        delete window[callbackName];
+        // If we get here, the callback wasn't called, so we're offline
+        isOnline = false;
+        updateConnectionStatusUI();
+      }
+    }, 5000);
   } else {
-    statusIcon.classList.add('status-disconnected');
-    statusIcon.classList.remove('status-connected');
-    statusText.textContent = 'NO SERVICE';
-    statusText.classList.add('status-disconnected');
-    statusText.classList.remove('status-connected');
+    // We're definitely offline according to navigator.onLine
+    updateConnectionStatusUI();
   }
 }
     
