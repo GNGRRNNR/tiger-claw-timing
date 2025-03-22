@@ -573,7 +573,7 @@ document.getElementById('refresh-button').addEventListener('click', function() {
     
     // Constants
     const CORRECT_PASSWORD = "threeloops";
-    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyQaaZw_rnguJeHdU-hep2vfMJ9APzib-CkMvOAfELyk7x6LBuyNelfUh1GxGKR3_mr/exec";
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz1vMTB9jSG8E8GXyrVe_QcTKYaCGrxRxPBiE7QpBHsHVwVNjqhj8s9d1hprsupeOSO/exec";
     
     // Toggle debug panel
     toggleDebugBtn.addEventListener('click', function() {
@@ -782,69 +782,97 @@ function handleOnlineStatusChange() {
       }
     }
     
-    // Fetch runner data from Google Sheets
-    function fetchRunnerData() {
-      logDebug('Fetching runner data from Google Sheets...');
-      
-      // Try to load from localStorage first
-      try {
-        const storedData = localStorage.getItem('runnersData');
-        if (storedData) {
-          const parsedData = JSON.parse(storedData);
-          if (parsedData && Object.keys(parsedData).length > 0) {
-            runnersData = parsedData;
-            logDebug(`Loaded ${Object.keys(runnersData).length} runners from localStorage`);
-            loadingScreen.classList.add('hidden');
-            checkLoginStatus();
-            return;
-          }
-        }
-      } catch (error) {
-        logDebug('Error loading runners data from localStorage: ' + error);
+// Declare variables
+let logDebug;
+let runnersData;
+let loadingScreen;
+let checkLoginStatus;
+let APPS_SCRIPT_URL;
+
+// Fetch runner data from Google Sheets using JSONP
+function fetchRunnerData() {
+  logDebug('Fetching runner data from Google Sheets...');
+  
+  // Try to load from localStorage first
+  try {
+    const storedData = localStorage.getItem('runnersData');
+    if (storedData) {
+      const parsedData = JSON.parse(storedData);
+      if (parsedData && Object.keys(parsedData).length > 0) {
+        runnersData = parsedData;
+        logDebug(`Loaded ${Object.keys(runnersData).length} runners from localStorage`);
+        loadingScreen.classList.add('hidden');
+        checkLoginStatus();
+        return;
       }
-      
-      // Fetch from Google Sheets
-      fetch(`${APPS_SCRIPT_URL}?action=getRunnerData`)
-        .then(response => response.text())
-        .then(text => {
-          try {
-            // Handle JSONP-like response
-            const jsonStart = text.indexOf('{');
-            const jsonEnd = text.lastIndexOf('}') + 1;
-            if (jsonStart >= 0 && jsonEnd > 0) {
-              const jsonString = text.substring(jsonStart, jsonEnd);
-              const data = JSON.parse(jsonString);
-              
-              if (data.success && data.data) {
-                const runnerMap = {};
-                data.data.forEach(runner => {
-                  runnerMap[runner.bibNumber] = runner.name;
-                });
-                runnersData = runnerMap;
-                
-                // Store in localStorage for future use
-                localStorage.setItem('runnersData', JSON.stringify(runnersData));
-                
-                logDebug(`Loaded ${Object.keys(runnersData).length} runners from Google Sheets`);
-              } else {
-                logDebug('Invalid or empty runners data format from API');
-              }
-            } else {
-              logDebug('Invalid response from server');
-            }
-          } catch (error) {
-            logDebug('Error parsing runner data: ' + error);
-          }
-          
-          loadingScreen.classList.add('hidden');
-          checkLoginStatus();
-        })
-        .catch(error => {
-          logDebug('Error fetching runner data: ' + error);
-          loadingScreen.classList.add('hidden');
-          checkLoginStatus();
-        });
     }
+  } catch (error) {
+    logDebug('Error loading runners data from localStorage: ' + error);
+  }
+  
+  // Create a unique callback name
+  const callbackName = 'runnersCallback_' + Date.now();
+  
+  // Define the callback function
+  window[callbackName] = function(response) {
+    // Clean up
+    document.body.removeChild(script);
+    delete window[callbackName];
+    
+    logDebug('JSONP response received for runners data');
+    
+    try {
+      if (response && response.success && response.data) {
+        const runnerMap = {};
+        response.data.forEach(runner => {
+          runnerMap[runner.bibNumber] = runner.name;
+        });
+        runnersData = runnerMap;
+        
+        // Store in localStorage for future use
+        localStorage.setItem('runnersData', JSON.stringify(runnersData));
+        
+        logDebug(`Loaded ${Object.keys(runnersData).length} runners from Google Sheets`);
+      } else {
+        logDebug('Invalid or empty runners data format from API');
+      }
+    } catch (error) {
+      logDebug('Error processing runner data: ' + error);
+    }
+    
+    loadingScreen.classList.add('hidden');
+    checkLoginStatus();
+  };
+  
+  // Create the script element for JSONP
+  const script = document.createElement('script');
+  script.src = `${APPS_SCRIPT_URL}?action=getRunnerData&callback=${callbackName}&nocache=${Date.now()}`;
+  
+  // Handle errors
+  script.onerror = function() {
+    // Clean up
+    delete window[callbackName];
+    document.body.removeChild(script);
+    
+    logDebug('Error fetching runner data');
+    loadingScreen.classList.add('hidden');
+    checkLoginStatus();
+  };
+  
+  // Add the script to the document
+  document.body.appendChild(script);
+  
+  // Set a timeout to handle case where script doesn't load or callback isn't called
+  setTimeout(() => {
+    if (window[callbackName]) {
+      delete window[callbackName];
+      logDebug('Timeout fetching runner data');
+      loadingScreen.classList.add('hidden');
+      checkLoginStatus();
+    }
+  }, 10000); // 10 seconds timeout
+}
+    
     
     // Update recent scans UI
     function updateRecentScansUI() {
@@ -884,18 +912,11 @@ function updatePendingUploadsUI() {
 }
     
 // Declare variables
-let isOnline;
+let isOnline = navigator.onLine;
 let pendingUploads = [];
 let lastUploadAttempt = 0;
 
-// Declare variables
-let isOnline;
-let pendingUploads = [];
-let lastUploadAttempt = 0;
-
-// Declare APPS_SCRIPT_URL
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyQaaZw_rnguJeHdU-hep2vfMJ9APzib-CkMvOAfELyk7x6LBuyNelfUh1GxGKR3_mr/exec"; // Replace with your actual Apps Script URL
-
+    
 // Update connection status UI and check connectivity
 function updateConnectionStatus() {
   // First check navigator.onLine
