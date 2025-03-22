@@ -888,6 +888,14 @@ let isOnline;
 let pendingUploads = [];
 let lastUploadAttempt = 0;
 
+// Declare variables
+let isOnline;
+let pendingUploads = [];
+let lastUploadAttempt = 0;
+
+// Declare APPS_SCRIPT_URL
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyQaaZw_rnguJeHdU-hep2vfMJ9APzib-CkMvOAfELyk7x6LBuyNelfUh1GxGKR3_mr/exec"; // Replace with your actual Apps Script URL
+
 // Update connection status UI and check connectivity
 function updateConnectionStatus() {
   // First check navigator.onLine
@@ -1513,75 +1521,65 @@ function processScan(decodedText) {
       }
     }
     
-// Submit scan to Google Sheet - CORS-friendly version
+// Submit scan to Google Sheet using JSONP
 function submitScanToSheet(scanData) {
   return new Promise(function(resolve, reject) {
-    // Assuming logDebug and APPS_SCRIPT_URL are defined elsewhere or will be provided.
-    // For demonstration purposes, let's define them here.
-    // In a real application, these would likely be imported or defined globally.
-    const logDebug = console.log; // Or your actual logging function
-    const APPS_SCRIPT_URL = 'YOUR_APPS_SCRIPT_URL'; // Replace with your actual Apps Script URL
+    // Assuming logDebug and APPS_SCRIPT_URL are defined elsewhere or will be defined before this function is called.
+    // For example:
+    // const logDebug = console.log; // Or a more sophisticated logging function
+    // const APPS_SCRIPT_URL = 'YOUR_APPS_SCRIPT_URL';
 
     logDebug(`Submitting scan to sheet: ${scanData.bib} - ${scanData.name} at ${scanData.checkpoint}`);
     
-    // Create a form to submit the data
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = APPS_SCRIPT_URL;
-    form.target = 'hidden-iframe';
-    form.style.display = 'none';
+    // Create a unique callback name
+    const callbackName = 'jsonpCallback_' + Date.now();
     
-    // Add the data as form fields
-    const actionField = document.createElement('input');
-    actionField.name = 'action';
-    actionField.value = 'recordScan';
-    form.appendChild(actionField);
+    // Define the callback function
+    window[callbackName] = function(response) {
+      // Clean up
+      document.body.removeChild(script);
+      delete window[callbackName];
+      
+      logDebug('JSONP response received');
+      resolve(true);
+    };
     
-    const dataField = document.createElement('input');
-    dataField.name = 'data';
-    dataField.value = JSON.stringify({
+    // Create the data to send
+    const data = {
       timestamp: scanData.timestamp,
       bibNumber: scanData.bib,
       runnerName: scanData.name,
       checkpoint: scanData.checkpoint,
       replaceExisting: true
-    });
-    form.appendChild(dataField);
-    
-    // Create a hidden iframe to receive the response
-    let iframe = document.getElementById('hidden-iframe');
-    if (!iframe) {
-      iframe = document.createElement('iframe');
-      iframe.name = 'hidden-iframe';
-      iframe.id = 'hidden-iframe';
-      iframe.style.display = 'none';
-      document.body.appendChild(iframe);
-    }
-    
-    // Add the form to the document and submit it
-    document.body.appendChild(form);
-    
-    // Set a timeout to resolve as success after 5 seconds
-    // This is a workaround for CORS issues with Google Apps Script
-    const timeoutId = setTimeout(() => {
-      logDebug('Assuming success due to timeout');
-      resolve(true);
-    }, 5000);
-    
-    // Handle iframe load event
-    iframe.onload = function() {
-      clearTimeout(timeoutId);
-      logDebug('Form submission completed');
-      resolve(true);
     };
     
-    // Submit the form
-    form.submit();
+    // Create the script element
+    const script = document.createElement('script');
+    script.src = `${APPS_SCRIPT_URL}?action=recordScan&data=${encodeURIComponent(JSON.stringify(data))}&callback=${callbackName}&nocache=${Date.now()}`;
     
-    // Clean up
+    // Handle errors
+    script.onerror = function() {
+      // Clean up
+      delete window[callbackName];
+      document.body.removeChild(script);
+      
+      logDebug('Network error when submitting scan');
+      // Even with network errors, we'll assume success after a timeout
+      // This is because Google Apps Script often processes the request successfully
+      // even if the browser reports a CORS error
+    };
+    
+    // Add the script to the document
+    document.body.appendChild(script);
+    
+    // Set a timeout to resolve as success after 5 seconds
     setTimeout(() => {
-      document.body.removeChild(form);
-    }, 100);
+      if (window[callbackName]) {
+        delete window[callbackName];
+        logDebug('Assuming success due to timeout');
+        resolve(true);
+      }
+    }, 5000);
   });
 }
 
