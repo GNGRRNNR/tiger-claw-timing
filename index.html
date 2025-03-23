@@ -457,6 +457,18 @@ button:disabled {
   width: auto;
   display: inline-block;
 }
+
+/* Stats refreshing indicator */
+.stats-refreshing {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(40, 167, 69, 0.3);
+  border-radius: 50%;
+  border-top-color: #28a745;
+  animation: spin 1s ease-in-out infinite;
+  margin-left: 5px;
+}
 </style>
 </head>
 <body>
@@ -529,6 +541,7 @@ button:disabled {
         <span id="remaining-count">0 remaining</span>
       </div>
       <button id="refresh-stats" class="refresh-stats">Refresh Stats</button>
+      <span id="stats-refreshing" class="stats-refreshing hidden"></span>
     </div>
     
     <!-- Connection status and refresh button -->
@@ -642,6 +655,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const scannedCount = document.getElementById('scanned-count');
   const remainingCount = document.getElementById('remaining-count');
   const refreshStatsBtn = document.getElementById('refresh-stats');
+  const statsRefreshing = document.getElementById('stats-refreshing');
   
   // Application state
   let isScanning = false;
@@ -664,13 +678,14 @@ document.addEventListener('DOMContentLoaded', function() {
   let checkpointStatsRefreshInterval = null; // Interval for refreshing checkpoint stats
   let alreadyScannedRunners = new Set(); // Track which runners have already been scanned at this checkpoint
   let isLoadingRunnerData = false; // Flag to prevent multiple simultaneous data loads
+  let isRefreshingStats = false; // Flag to prevent multiple simultaneous stats refreshes
   let lastDnfCheck = 0; // Track when we last checked for DNF updates
   
   // Constants
   const CORRECT_PASSWORD = "threeloops";
   const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxfqGtjmo26ZYjJRwyUWE2356sP-magLAvyfSa10kPg9bhn5LSnoE5loC75u73il-br/exec";
-  const RUNNER_DATA_REFRESH_INTERVAL = 2 * 60 * 1000; // 2 minutes (reduced from 5)
-  const CHECKPOINT_STATS_REFRESH_INTERVAL = 30 * 1000; // 30 seconds (reduced from 60)
+  const RUNNER_DATA_REFRESH_INTERVAL = 2 * 60 * 1000; // 2 minutes
+  const CHECKPOINT_STATS_REFRESH_INTERVAL = 30 * 1000; // 30 seconds
   const DNF_CHECK_INTERVAL = 60 * 1000; // 1 minute
   const RUNNERS_SHEET_ID = "19ysJEfg5dDTUe6q-JXngWbUAziGmrn0jGilGy8SkcYg"; // Your runners spreadsheet ID
   const RESULTS_SHEET_ID = "1StRgcagtoZs6x-TRCQMAWiTIqXKq__6_Gvcj8ysUz5c"; // Your results spreadsheet ID
@@ -717,7 +732,7 @@ document.addEventListener('DOMContentLoaded', function() {
     fetchAlreadyScannedRunners();
     
     // Fetch fresh checkpoint stats
-    fetchCheckpointStats();
+    fetchCheckpointStats(true);
   }
   
   // Clear session data when logging in
@@ -749,34 +764,105 @@ document.addEventListener('DOMContentLoaded', function() {
     
     logDebug(`Fetching already scanned runners at checkpoint: ${checkpoint}`);
     
-    // Use fetch API to get checkpoint stats
+    // Use fetch API to get checkpoint stats with no-cors mode
     fetch(`${APPS_SCRIPT_URL}?action=getCheckpointStats&checkpoint=${encodeURIComponent(checkpoint)}`, {
       method: 'GET',
-      mode: 'cors',
+      mode: 'no-cors', // Use no-cors to avoid CORS errors
       cache: 'no-cache'
     })
-    .then(response => {
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return response.json();
-    })
-    .then(data => {
-      if (data.success && data.data && data.data.scannedBibs) {
-        // Update already scanned runners
-        alreadyScannedRunners = new Set(data.data.scannedBibs);
-        logDebug(`Loaded ${alreadyScannedRunners.size} already scanned runners at this checkpoint`);
-        
-        // Update the checkpoint stats UI
-        updateCheckpointStatsUI(data.data);
-      } else {
-        throw new Error('Invalid response format or no data returned');
-      }
+    .then(() => {
+      // Since we can't read the response with no-cors, we'll use the spreadsheet API directly
+      fetchCheckpointStatsFromSpreadsheet();
     })
     .catch(error => {
       logDebug('Error fetching already scanned runners: ' + error);
       // We'll rely on the checkpoint stats to update this information
+      fetchCheckpointStatsFromSpreadsheet();
     });
+  }
+  
+  // Fetch checkpoint stats directly from the spreadsheet
+  function fetchCheckpointStatsFromSpreadsheet() {
+    if (!checkpoint || !isOnline) return;
+    
+    logDebug(`Fetching checkpoint stats from spreadsheet for: ${checkpoint}`);
+    
+    // Fetch directly from the results spreadsheet using the Google Visualization API
+    const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${RESULTS_SHEET_ID}/gviz/tq?tqx=out:json&sheet=Sheet1`;
+    
+    fetch(spreadsheetUrl)
+      .then(response => response.text())
+      .then(text => {
+        // The response is not pure JSON, it's wrapped in a callback
+        // We need to extract the JSON part
+        const jsonStart = text.indexOf('{');
+        const jsonEnd = text.lastIndexOf('}') + 1;
+        const jsonString = text.substring(jsonStart, jsonEnd);
+        return JSON.parse(jsonString);
+      })
+      .then(data => {
+        if (data && data.table && data.table.rows) {
+          const scannedBibs = new Set();
+          const rows = data.table.rows;
+          const headers = data.table.cols.map(col => col.label);
+          
+          // Find column indices
+          const bibIndex = headers.findIndex(h => h.toLowerCase().includes('bib'));
+          const checkpointIndex = headers.findIndex(h => h.toLowerCase().includes('checkpoint'));
+          
+          if (bibIndex === -1 || checkpointIndex === -1) {
+            throw new Error('Could not find required columns in spreadsheet');
+          }
+          
+          // Process each row to find scans for this checkpoint
+          for (let i = 0; i < rows.length; i++) {
+            const row = rows[i].c;
+            if (row && row[bibIndex] && row[bibIndex].v && row[checkpointIndex] && row[checkpointIndex].v) {
+              const bib = row[bibIndex].v.toString();
+              const scanCheckpoint = row[checkpointIndex].v.toString();
+              
+              if (scanCheckpoint === checkpoint) {
+                scannedBibs.add(bib);
+              }
+            }
+          }
+          
+          // Update already scanned runners
+          alreadyScannedRunners = scannedBibs;
+          logDebug(`Loaded ${alreadyScannedRunners.size} already scanned runners from spreadsheet`);
+          
+          // Calculate and update stats
+          updateStatsWithDnfCheck();
+        } else {
+          throw new Error('Invalid spreadsheet data format');
+        }
+      })
+      .catch(error => {
+        logDebug('Error fetching checkpoint stats from spreadsheet: ' + error);
+        // Calculate stats locally as fallback
+        updateStatsWithDnfCheck();
+      })
+      .finally(() => {
+        // Hide the refreshing indicator
+        statsRefreshing.classList.add('hidden');
+        isRefreshingStats = false;
+      });
+  }
+  
+  // Update stats with DNF check
+  function updateStatsWithDnfCheck() {
+    // First refresh runner data to get latest DNF status
+    if (Date.now() - lastDnfCheck > DNF_CHECK_INTERVAL) {
+      fetchRunnerDataFromSpreadsheet(true).then(() => {
+        // After runner data is refreshed, calculate stats
+        const stats = calculateLocalCheckpointStats();
+        updateCheckpointStatsUI(stats);
+      });
+    } else {
+      // Just calculate stats with current data
+      const stats = calculateLocalCheckpointStats();
+      updateCheckpointStatsUI(stats);
+    }
   }
   
   // Log to debug panel
@@ -843,9 +929,20 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Refresh checkpoint stats button
   refreshStatsBtn.addEventListener('click', function() {
+    if (isRefreshingStats) return; // Prevent multiple simultaneous refreshes
+    
     logDebug('Manual checkpoint stats refresh requested');
-    fetchCheckpointStats();
-    fetchAlreadyScannedRunners();
+    isRefreshingStats = true;
+    statsRefreshing.classList.remove('hidden');
+    
+    // Force refresh runner data first to get latest DNF status
+    fetchRunnerDataFromSpreadsheet(true).then(() => {
+      // Then fetch checkpoint stats
+      fetchCheckpointStatsFromSpreadsheet();
+    }).catch(() => {
+      // If there's an error, still try to fetch checkpoint stats
+      fetchCheckpointStatsFromSpreadsheet();
+    });
   });
   
   // Clear all data from localStorage
@@ -999,8 +1096,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // If we're back online, refresh runner data
     if (isOnline && !wasOnline) {
       fetchRunnerData(true);
-      fetchCheckpointStats();
-      fetchAlreadyScannedRunners();
+      fetchCheckpointStatsFromSpreadsheet();
     }
   }
   
@@ -1036,18 +1132,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
   
-  // Check for DNF updates
-  function checkForDnfUpdates() {
-    const now = Date.now();
-    if (now - lastDnfCheck < DNF_CHECK_INTERVAL) return;
-    
-    lastDnfCheck = now;
-    logDebug('Checking for DNF updates');
-    
-    // Refresh runner data to get latest DNF status
-    fetchRunnerData(true);
-  }
-  
   // Fetch runner data from Apps Script
   function fetchRunnerData(forceRefresh = false) {
     if (isLoadingRunnerData) return; // Prevent multiple simultaneous loads
@@ -1079,8 +1163,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Fetch checkpoint stats if we're logged in
             if (checkpoint) {
-              fetchCheckpointStats();
-              fetchAlreadyScannedRunners();
+              fetchCheckpointStatsFromSpreadsheet();
             }
             
             return;
@@ -1100,36 +1183,10 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     }, DATA_LOAD_TIMEOUT);
     
-    // Use fetch API to get runner data from Apps Script
-    fetch(`${APPS_SCRIPT_URL}?action=getRunnerData`, {
-      method: 'GET',
-      mode: 'cors',
-      cache: 'no-cache'
-    })
-    .then(response => {
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return response.json();
-    })
-    .then(data => {
-      clearTimeout(timeoutId);
-      
-      if (data.success && data.data) {
-        // Process the runner data
-        const runnerMap = {};
-        data.data.forEach(runner => {
-          runnerMap[runner.bibNumber] = {
-            name: runner.name,
-            dnf: runner.dnf || false
-          };
-        });
-        
-        runnersData = runnerMap;
-        localStorage.setItem('runnersData', JSON.stringify(runnersData));
-        logDebug(`Loaded ${Object.keys(runnersData).length} runners from Apps Script`);
-        
-        // Hide loading screen and proceed
+    // Try direct fetch from spreadsheet first
+    fetchRunnerDataFromSpreadsheet(forceRefresh)
+      .then(() => {
+        clearTimeout(timeoutId);
         loadingScreen.classList.add('hidden');
         isLoadingRunnerData = false;
         checkLoginStatus();
@@ -1139,101 +1196,12 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Fetch checkpoint stats if we're logged in
         if (checkpoint) {
-          fetchCheckpointStats();
-          fetchAlreadyScannedRunners();
-        }
-      } else {
-        throw new Error('Invalid response format or no data returned');
-      }
-    })
-    .catch(error => {
-      clearTimeout(timeoutId);
-      logDebug('Error fetching runner data from Apps Script: ' + error);
-      
-      // Try direct fetch from spreadsheet as fallback
-      fetchRunnerDataFromSpreadsheet();
-    });
-  }
-  
-  // Fetch runner data directly from the spreadsheet
-  function fetchRunnerDataFromSpreadsheet() {
-    logDebug('Attempting direct fetch from runners spreadsheet');
-    
-    // Fetch directly from the spreadsheet using the Google Visualization API
-    const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${RUNNERS_SHEET_ID}/gviz/tq?tqx=out:json`;
-    
-    fetch(spreadsheetUrl)
-      .then(response => response.text())
-      .then(text => {
-        // The response is not pure JSON, it's wrapped in a callback
-        // We need to extract the JSON part
-        const jsonStart = text.indexOf('{');
-        const jsonEnd = text.lastIndexOf('}') + 1;
-        const jsonString = text.substring(jsonStart, jsonEnd);
-        return JSON.parse(jsonString);
-      })
-      .then(data => {
-        if (data && data.table && data.table.rows) {
-          const runnerMap = {};
-          const rows = data.table.rows;
-          const headers = data.table.cols.map(col => col.label);
-          
-          // Find column indices
-          const bibIndex = headers.findIndex(h => h.toLowerCase().includes('bib'));
-          const nameIndex = headers.findIndex(h => h.toLowerCase().includes('name'));
-          const statusIndex = headers.findIndex(h => h.toLowerCase().includes('status') || h === 'DNF');
-          
-          if (bibIndex === -1 || nameIndex === -1) {
-            throw new Error('Could not find required columns in spreadsheet');
-          }
-          
-          for (let i = 0; i < rows.length; i++) {
-            const row = rows[i].c;
-            if (row && row[bibIndex] && row[bibIndex].v) {
-              const bib = row[bibIndex].v.toString();
-              const name = row[nameIndex] && row[nameIndex].v ? row[nameIndex].v.toString() : 'Unknown';
-              let dnf = false;
-              
-              // Check for DNF in column D (status column)
-              if (statusIndex !== -1 && row[statusIndex] && row[statusIndex].v) {
-                const status = row[statusIndex].v.toString().toUpperCase();
-                dnf = (status === 'DNF' || status === 'DNS' || status === 'TRUE');
-              }
-              
-              runnerMap[bib] = {
-                name: name,
-                dnf: dnf
-              };
-            }
-          }
-          
-          if (Object.keys(runnerMap).length === 0) {
-            throw new Error('No runner data found in spreadsheet');
-          }
-          
-          runnersData = runnerMap;
-          localStorage.setItem('runnersData', JSON.stringify(runnersData));
-          logDebug(`Loaded ${Object.keys(runnersData).length} runners directly from spreadsheet`);
-          
-          // Hide loading screen and proceed
-          loadingScreen.classList.add('hidden');
-          isLoadingRunnerData = false;
-          checkLoginStatus();
-          
-          // Set up periodic refresh of runner data
-          setupRunnerDataRefresh();
-          
-          // Fetch checkpoint stats if we're logged in
-          if (checkpoint) {
-            fetchCheckpointStats();
-            fetchAlreadyScannedRunners();
-          }
-        } else {
-          throw new Error('Invalid spreadsheet data format');
+          fetchCheckpointStatsFromSpreadsheet();
         }
       })
       .catch(error => {
-        logDebug('Error fetching runner data from spreadsheet: ' + error);
+        clearTimeout(timeoutId);
+        logDebug('Error fetching runner data: ' + error);
         
         // Show error and let user proceed with sample data
         loadingError.classList.remove('hidden');
@@ -1254,6 +1222,85 @@ document.addEventListener('DOMContentLoaded', function() {
       });
   }
   
+  // Fetch runner data directly from the spreadsheet
+  function fetchRunnerDataFromSpreadsheet(forceRefresh = false) {
+    return new Promise((resolve, reject) => {
+      logDebug('Fetching runner data directly from spreadsheet');
+      
+      // Fetch directly from the spreadsheet using the Google Visualization API
+      const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${RUNNERS_SHEET_ID}/gviz/tq?tqx=out:json`;
+      
+      fetch(spreadsheetUrl)
+        .then(response => response.text())
+        .then(text => {
+          // The response is not pure JSON, it's wrapped in a callback
+          // We need to extract the JSON part
+          const jsonStart = text.indexOf('{');
+          const jsonEnd = text.lastIndexOf('}') + 1;
+          const jsonString = text.substring(jsonStart, jsonEnd);
+          return JSON.parse(jsonString);
+        })
+        .then(data => {
+          if (data && data.table && data.table.rows) {
+            const runnerMap = {};
+            const rows = data.table.rows;
+            const headers = data.table.cols.map(col => col.label);
+            
+            // Find column indices
+            const bibIndex = headers.findIndex(h => h.toLowerCase().includes('bib'));
+            const nameIndex = headers.findIndex(h => h.toLowerCase().includes('name'));
+            const statusIndex = headers.findIndex(h => h === 'DNF' || h.toLowerCase().includes('status'));
+            
+            if (bibIndex === -1 || nameIndex === -1) {
+              throw new Error('Could not find required columns in spreadsheet');
+            }
+            
+            for (let i = 0; i < rows.length; i++) {
+              const row = rows[i].c;
+              if (row && row[bibIndex] && row[bibIndex].v) {
+                const bib = row[bibIndex].v.toString();
+                const name = row[nameIndex] && row[nameIndex].v ? row[nameIndex].v.toString() : 'Unknown';
+                let dnf = false;
+                
+                // Check for DNF in column D (status column)
+                if (statusIndex !== -1 && row[statusIndex] && row[statusIndex].v) {
+                  const status = row[statusIndex].v.toString().toUpperCase();
+                  dnf = (status === 'DNF' || status === 'DNS' || status === 'TRUE');
+                }
+                
+                runnerMap[bib] = {
+                  name: name,
+                  dnf: dnf
+                };
+              }
+            }
+            
+            if (Object.keys(runnerMap).length === 0) {
+              throw new Error('No runner data found in spreadsheet');
+            }
+            
+            // Update the last DNF check timestamp
+            lastDnfCheck = Date.now();
+            
+            runnersData = runnerMap;
+            localStorage.setItem('runnersData', JSON.stringify(runnersData));
+            logDebug(`Loaded ${Object.keys(runnersData).length} runners directly from spreadsheet`);
+            
+            // Update recent scans UI to reflect any DNF changes
+            updateRecentScansUI();
+            
+            resolve();
+          } else {
+            throw new Error('Invalid spreadsheet data format');
+          }
+        })
+        .catch(error => {
+          logDebug('Error fetching runner data from spreadsheet: ' + error);
+          reject(error);
+        });
+    });
+  }
+  
   // Set up periodic refresh of runner data
   function setupRunnerDataRefresh() {
     // Clear any existing interval
@@ -1271,52 +1318,22 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   
   // Fetch checkpoint stats
-  function fetchCheckpointStats() {
+  function fetchCheckpointStats(forceRefresh = false) {
     if (!checkpoint || !isOnline) return;
+    
+    if (forceRefresh) {
+      // Show refreshing indicator
+      statsRefreshing.classList.remove('hidden');
+      isRefreshingStats = true;
+    }
     
     logDebug(`Fetching stats for checkpoint: ${checkpoint}`);
     
     // Update UI to show loading
     statsText.textContent = 'Loading checkpoint stats...';
     
-    // Use fetch API to get checkpoint stats
-    fetch(`${APPS_SCRIPT_URL}?action=getCheckpointStats&checkpoint=${encodeURIComponent(checkpoint)}`, {
-      method: 'GET',
-      mode: 'cors',
-      cache: 'no-cache'
-    })
-    .then(response => {
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return response.json();
-    })
-    .then(data => {
-      if (data.success && data.data) {
-        // Update already scanned runners if available
-        if (data.data.scannedBibs) {
-          alreadyScannedRunners = new Set(data.data.scannedBibs);
-          logDebug(`Updated already scanned runners: ${alreadyScannedRunners.size} bibs`);
-        }
-        
-        // Check for DNF updates
-        checkForDnfUpdates();
-        
-        // Update the UI with the latest stats
-        updateCheckpointStatsUI(data.data);
-        setupCheckpointStatsRefresh();
-      } else {
-        throw new Error('Invalid response format or no data returned');
-      }
-    })
-    .catch(error => {
-      logDebug('Error fetching checkpoint stats: ' + error);
-      
-      // Calculate stats locally as fallback
-      const stats = calculateLocalCheckpointStats();
-      updateCheckpointStatsUI(stats);
-      setupCheckpointStatsRefresh();
-    });
+    // Fetch directly from spreadsheet
+    fetchCheckpointStatsFromSpreadsheet();
   }
   
   // Calculate checkpoint stats locally based on our data
