@@ -441,6 +441,22 @@ button:disabled {
   font-size: 10px;
   margin-left: 5px;
 }
+
+/* Loading error message */
+.loading-error {
+  color: #dc3545;
+  margin-top: 10px;
+  text-align: center;
+}
+
+.loading-error button {
+  background-color: #dc3545;
+  margin-top: 10px;
+  padding: 8px 15px;
+  font-size: 14px;
+  width: auto;
+  display: inline-block;
+}
 </style>
 </head>
 <body>
@@ -451,6 +467,10 @@ button:disabled {
     <h1>TIGER CLAW TIMING SYSTEM</h1>
     <p>Loading runner data...</p>
     <div class="loading-spinner"></div>
+    <div id="loading-error" class="loading-error hidden">
+      <p>Error loading runner data. Please try again.</p>
+      <button id="retry-loading">Retry</button>
+    </div>
   </div>
 </div>
 
@@ -582,6 +602,8 @@ button:disabled {
 document.addEventListener('DOMContentLoaded', function() {
   // DOM Elements
   const loadingScreen = document.getElementById('loading-screen');
+  const loadingError = document.getElementById('loading-error');
+  const retryLoadingBtn = document.getElementById('retry-loading');
   const loginScreen = document.getElementById('login-screen');
   const scannerScreen = document.getElementById('scanner-screen');
   const checkpointSelect = document.getElementById('checkpoint-select');
@@ -641,6 +663,7 @@ document.addEventListener('DOMContentLoaded', function() {
   let runnerDataRefreshInterval = null; // Interval for refreshing runner data
   let checkpointStatsRefreshInterval = null; // Interval for refreshing checkpoint stats
   let alreadyScannedRunners = new Set(); // Track which runners have already been scanned at this checkpoint
+  let isLoadingRunnerData = false; // Flag to prevent multiple simultaneous data loads
   
   // Constants
   const CORRECT_PASSWORD = "threeloops";
@@ -649,6 +672,13 @@ document.addEventListener('DOMContentLoaded', function() {
   const CHECKPOINT_STATS_REFRESH_INTERVAL = 60 * 1000; // 1 minute
   const RUNNERS_SHEET_ID = "19ysJEfg5dDTUe6q-JXngWbUAziGmrn0jGilGy8SkcYg"; // Your runners spreadsheet ID
   const RESULTS_SHEET_ID = "1StRgcagtoZs6x-TRCQMAWiTIqXKq__6_Gvcj8ysUz5c"; // Your results spreadsheet ID
+  const DATA_LOAD_TIMEOUT = 30000; // 30 seconds timeout for data loading
+  
+  // Retry loading button
+  retryLoadingBtn.addEventListener('click', function() {
+    loadingError.classList.add('hidden');
+    fetchRunnerData(true);
+  });
   
   // Handle login form submission
   loginForm.addEventListener('submit', function(event) {
@@ -1001,9 +1031,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
   
-  // Fetch runner data directly from the spreadsheet
+  // Fetch runner data from Apps Script
   function fetchRunnerData(forceRefresh = false) {
-    logDebug('Fetching runner data from Google Sheets...');
+    if (isLoadingRunnerData) return; // Prevent multiple simultaneous loads
+    isLoadingRunnerData = true;
+    
+    // Show loading screen
+    loadingScreen.classList.remove('hidden');
+    loadingError.classList.add('hidden');
+    
+    logDebug('Fetching runner data from Google Apps Script...');
     
     // Try to load from localStorage first if not forcing refresh
     if (!forceRefresh) {
@@ -1015,6 +1052,7 @@ document.addEventListener('DOMContentLoaded', function() {
             runnersData = parsedData;
             logDebug(`Loaded ${Object.keys(runnersData).length} runners from localStorage`);
             loadingScreen.classList.add('hidden');
+            isLoadingRunnerData = false;
             checkLoginStatus();
             
             // Set up periodic refresh of runner data
@@ -1034,7 +1072,72 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     }
     
-    // Direct fetch from the spreadsheet
+    // Set a timeout to handle cases where the fetch never completes
+    const timeoutId = setTimeout(() => {
+      if (isLoadingRunnerData) {
+        logDebug('Runner data fetch timed out');
+        isLoadingRunnerData = false;
+        loadingError.classList.remove('hidden');
+      }
+    }, DATA_LOAD_TIMEOUT);
+    
+    // Use fetch API to get runner data from Apps Script
+    fetch(`${APPS_SCRIPT_URL}?action=getRunnerData`, {
+      method: 'GET',
+      mode: 'cors',
+      cache: 'no-cache'
+    })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    })
+    .then(data => {
+      clearTimeout(timeoutId);
+      
+      if (data.success && data.data) {
+        // Process the runner data
+        const runnerMap = {};
+        data.data.forEach(runner => {
+          runnerMap[runner.bibNumber] = {
+            name: runner.name,
+            dnf: runner.dnf || false
+          };
+        });
+        
+        runnersData = runnerMap;
+        localStorage.setItem('runnersData', JSON.stringify(runnersData));
+        logDebug(`Loaded ${Object.keys(runnersData).length} runners from Apps Script`);
+        
+        // Hide loading screen and proceed
+        loadingScreen.classList.add('hidden');
+        isLoadingRunnerData = false;
+        checkLoginStatus();
+        
+        // Set up periodic refresh of runner data
+        setupRunnerDataRefresh();
+        
+        // Fetch checkpoint stats if we're logged in
+        if (checkpoint) {
+          fetchCheckpointStats();
+          fetchAlreadyScannedRunners();
+        }
+      } else {
+        throw new Error('Invalid response format or no data returned');
+      }
+    })
+    .catch(error => {
+      clearTimeout(timeoutId);
+      logDebug('Error fetching runner data from Apps Script: ' + error);
+      
+      // Try direct fetch from spreadsheet as fallback
+      fetchRunnerDataFromSpreadsheet();
+    });
+  }
+  
+  // Fetch runner data directly from the spreadsheet
+  function fetchRunnerDataFromSpreadsheet() {
     logDebug('Attempting direct fetch from runners spreadsheet');
     
     // Fetch directly from the spreadsheet using the Google Visualization API
@@ -1094,6 +1197,7 @@ document.addEventListener('DOMContentLoaded', function() {
           
           // Hide loading screen and proceed
           loadingScreen.classList.add('hidden');
+          isLoadingRunnerData = false;
           checkLoginStatus();
           
           // Set up periodic refresh of runner data
@@ -1109,59 +1213,24 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       })
       .catch(error => {
-        logDebug('Error fetching runner data: ' + error);
+        logDebug('Error fetching runner data from spreadsheet: ' + error);
         
-        // Try with Apps Script as fallback
-        fetch(`${APPS_SCRIPT_URL}?action=getRunnerData`, {
-          method: 'GET',
-          mode: 'cors',
-          cache: 'no-cache'
-        })
-        .then(response => {
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          return response.json();
-        })
-        .then(data => {
-          if (data.success && data.data) {
-            // Process the runner data
-            const runnerMap = {};
-            data.data.forEach(runner => {
-              runnerMap[runner.bibNumber] = {
-                name: runner.name,
-                dnf: runner.dnf || false
-              };
-            });
-            
-            runnersData = runnerMap;
-            localStorage.setItem('runnersData', JSON.stringify(runnersData));
-            logDebug(`Loaded ${Object.keys(runnersData).length} runners from Apps Script`);
-            
-            // Hide loading screen and proceed
-            loadingScreen.classList.add('hidden');
-            checkLoginStatus();
-            
-            // Set up periodic refresh of runner data
-            setupRunnerDataRefresh();
-            
-            // Fetch checkpoint stats if we're logged in
-            if (checkpoint) {
-              fetchCheckpointStats();
-              fetchAlreadyScannedRunners();
-            }
-          } else {
-            throw new Error('Invalid response format or no data returned');
-          }
-        })
-        .catch(err => {
-          logDebug('Complete failure to fetch runner data: ' + err);
-          
-          // Show error and let user proceed anyway
-          loadingScreen.classList.add('hidden');
-          checkLoginStatus();
-          showMessage('Failed to load runner data. Please check your connection and try again.', true);
-        });
+        // Show error and let user proceed with sample data
+        loadingError.classList.remove('hidden');
+        isLoadingRunnerData = false;
+        
+        // Create sample data as last resort
+        const sampleRunners = {
+          "101": { name: "Gus Newberry", dnf: false },
+          "102": { name: "Jane Smith", dnf: false },
+          "103": { name: "Bob Johnson", dnf: false },
+          "104": { name: "Alice Williams", dnf: false },
+          "105": { name: "Charlie Brown", dnf: false }
+        };
+        
+        runnersData = sampleRunners;
+        localStorage.setItem('runnersData', JSON.stringify(runnersData));
+        logDebug(`Created sample runner data as fallback`);
       });
   }
   
@@ -1742,9 +1811,6 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Handle successful QR scan
   function onScanSuccess(decodedText) {
-    // Log the raw scanned text for debugging
-    logDebug(`Raw QR scan result: ${decodedText}`);
-      {
     // Log the raw scanned text for debugging
     logDebug(`Raw QR scan result: ${decodedText}`);
     
