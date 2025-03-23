@@ -664,12 +664,14 @@ document.addEventListener('DOMContentLoaded', function() {
   let checkpointStatsRefreshInterval = null; // Interval for refreshing checkpoint stats
   let alreadyScannedRunners = new Set(); // Track which runners have already been scanned at this checkpoint
   let isLoadingRunnerData = false; // Flag to prevent multiple simultaneous data loads
+  let lastDnfCheck = 0; // Track when we last checked for DNF updates
   
   // Constants
   const CORRECT_PASSWORD = "threeloops";
   const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxfqGtjmo26ZYjJRwyUWE2356sP-magLAvyfSa10kPg9bhn5LSnoE5loC75u73il-br/exec";
-  const RUNNER_DATA_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
-  const CHECKPOINT_STATS_REFRESH_INTERVAL = 60 * 1000; // 1 minute
+  const RUNNER_DATA_REFRESH_INTERVAL = 2 * 60 * 1000; // 2 minutes (reduced from 5)
+  const CHECKPOINT_STATS_REFRESH_INTERVAL = 30 * 1000; // 30 seconds (reduced from 60)
+  const DNF_CHECK_INTERVAL = 60 * 1000; // 1 minute
   const RUNNERS_SHEET_ID = "19ysJEfg5dDTUe6q-JXngWbUAziGmrn0jGilGy8SkcYg"; // Your runners spreadsheet ID
   const RESULTS_SHEET_ID = "1StRgcagtoZs6x-TRCQMAWiTIqXKq__6_Gvcj8ysUz5c"; // Your results spreadsheet ID
   const DATA_LOAD_TIMEOUT = 30000; // 30 seconds timeout for data loading
@@ -764,6 +766,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update already scanned runners
         alreadyScannedRunners = new Set(data.data.scannedBibs);
         logDebug(`Loaded ${alreadyScannedRunners.size} already scanned runners at this checkpoint`);
+        
+        // Update the checkpoint stats UI
+        updateCheckpointStatsUI(data.data);
       } else {
         throw new Error('Invalid response format or no data returned');
       }
@@ -1031,14 +1036,28 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
   
+  // Check for DNF updates
+  function checkForDnfUpdates() {
+    const now = Date.now();
+    if (now - lastDnfCheck < DNF_CHECK_INTERVAL) return;
+    
+    lastDnfCheck = now;
+    logDebug('Checking for DNF updates');
+    
+    // Refresh runner data to get latest DNF status
+    fetchRunnerData(true);
+  }
+  
   // Fetch runner data from Apps Script
   function fetchRunnerData(forceRefresh = false) {
     if (isLoadingRunnerData) return; // Prevent multiple simultaneous loads
     isLoadingRunnerData = true;
     
-    // Show loading screen
-    loadingScreen.classList.remove('hidden');
-    loadingError.classList.add('hidden');
+    // Show loading screen if we don't have any runner data yet
+    if (Object.keys(runnersData).length === 0) {
+      loadingScreen.classList.remove('hidden');
+      loadingError.classList.add('hidden');
+    }
     
     logDebug('Fetching runner data from Google Apps Script...');
     
@@ -1175,6 +1194,7 @@ document.addEventListener('DOMContentLoaded', function() {
               const name = row[nameIndex] && row[nameIndex].v ? row[nameIndex].v.toString() : 'Unknown';
               let dnf = false;
               
+              // Check for DNF in column D (status column)
               if (statusIndex !== -1 && row[statusIndex] && row[statusIndex].v) {
                 const status = row[statusIndex].v.toString().toUpperCase();
                 dnf = (status === 'DNF' || status === 'DNS' || status === 'TRUE');
@@ -1279,6 +1299,10 @@ document.addEventListener('DOMContentLoaded', function() {
           logDebug(`Updated already scanned runners: ${alreadyScannedRunners.size} bibs`);
         }
         
+        // Check for DNF updates
+        checkForDnfUpdates();
+        
+        // Update the UI with the latest stats
         updateCheckpointStatsUI(data.data);
         setupCheckpointStatsRefresh();
       } else {
@@ -1322,7 +1346,12 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
     
-    const scannedCount = scannedBibs.size;
+    // Filter out DNF runners from the scanned count
+    const activeScannedBibs = Array.from(scannedBibs).filter(bib => {
+      return runnersData[bib] && !runnersData[bib].dnf;
+    });
+    
+    const scannedCount = activeScannedBibs.length;
     const remainingCount = totalRunners - scannedCount;
     
     return {
@@ -1331,7 +1360,7 @@ document.addEventListener('DOMContentLoaded', function() {
       scannedCount: scannedCount,
       remainingCount: remainingCount,
       scannedPercentage: totalRunners > 0 ? Math.round((scannedCount / totalRunners) * 100) : 0,
-      scannedBibs: Array.from(scannedBibs)
+      scannedBibs: activeScannedBibs
     };
   }
   
