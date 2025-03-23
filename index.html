@@ -787,8 +787,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     logDebug(`Fetching checkpoint stats from spreadsheet for: ${checkpoint}`);
     
+    // Add a cache-busting parameter to ensure we get fresh data
+    const cacheBuster = new Date().getTime();
+    
     // Fetch directly from the results spreadsheet using the Google Visualization API
-    const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${RESULTS_SHEET_ID}/gviz/tq?tqx=out:json&sheet=Sheet1`;
+    const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${RESULTS_SHEET_ID}/gviz/tq?tqx=out:json&sheet=Sheet1&cacheBuster=${cacheBuster}`;
     
     fetch(spreadsheetUrl)
       .then(response => response.text())
@@ -802,7 +805,10 @@ document.addEventListener('DOMContentLoaded', function() {
       })
       .then(data => {
         if (data && data.table && data.table.rows) {
-          const scannedBibs = new Set();
+          // IMPORTANT: Clear the existing set of scanned runners
+          // This ensures deleted entries are properly reflected
+          alreadyScannedRunners = new Set();
+          
           const rows = data.table.rows;
           const headers = data.table.cols.map(col => col.label);
           
@@ -822,14 +828,16 @@ document.addEventListener('DOMContentLoaded', function() {
               const scanCheckpoint = row[checkpointIndex].v.toString();
               
               if (scanCheckpoint === checkpoint) {
-                scannedBibs.add(bib);
+                alreadyScannedRunners.add(bib);
               }
             }
           }
           
-          // Update already scanned runners
-          alreadyScannedRunners = scannedBibs;
           logDebug(`Loaded ${alreadyScannedRunners.size} already scanned runners from spreadsheet`);
+          
+          // Reset processed scans for runners that no longer have entries
+          // This allows them to be scanned again if their entry was deleted
+          resetProcessedScansForDeletedEntries();
           
           // Calculate and update stats
           updateStatsWithDnfCheck();
@@ -847,6 +855,41 @@ document.addEventListener('DOMContentLoaded', function() {
         statsRefreshing.classList.add('hidden');
         isRefreshingStats = false;
       });
+  }
+  
+  // Reset processed scans for runners that no longer have entries in the results spreadsheet
+  function resetProcessedScansForDeletedEntries() {
+    // Create a list of keys to remove
+    const keysToRemove = [];
+    
+    // Check each processed scan
+    for (const key in processedScans) {
+      // Keys are in the format "bib-checkpoint"
+      const parts = key.split('-');
+      if (parts.length === 2) {
+        const bib = parts[0];
+        const scanCheckpoint = parts[1];
+        
+        // If this is for our current checkpoint and the runner is not in alreadyScannedRunners,
+        // then their entry was likely deleted from the spreadsheet
+        if (scanCheckpoint === checkpoint && !alreadyScannedRunners.has(bib)) {
+          keysToRemove.push(key);
+        }
+      }
+    }
+    
+    // Remove the keys
+    keysToRemove.forEach(key => {
+      delete processedScans[key];
+      delete scanTimestamps[key];
+      logDebug(`Reset processed scan for ${key} - entry was deleted from spreadsheet`);
+    });
+    
+    // Save the updated processed scans
+    if (keysToRemove.length > 0) {
+      saveProcessedScans();
+      saveScanTimestamps();
+    }
   }
   
   // Update stats with DNF check
@@ -1227,8 +1270,11 @@ document.addEventListener('DOMContentLoaded', function() {
     return new Promise((resolve, reject) => {
       logDebug('Fetching runner data directly from spreadsheet');
       
+      // Add a cache-busting parameter to ensure we get fresh data
+      const cacheBuster = new Date().getTime();
+      
       // Fetch directly from the spreadsheet using the Google Visualization API
-      const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${RUNNERS_SHEET_ID}/gviz/tq?tqx=out:json`;
+      const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${RUNNERS_SHEET_ID}/gviz/tq?tqx=out:json&cacheBuster=${cacheBuster}`;
       
       fetch(spreadsheetUrl)
         .then(response => response.text())
@@ -2222,7 +2268,7 @@ document.addEventListener('DOMContentLoaded', function() {
       // Clear form
       bibInput.value = '';
     }
-  });
+  }
   
   // Show message
   function showMessage(text, isError = false) {
