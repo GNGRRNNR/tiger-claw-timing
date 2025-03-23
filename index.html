@@ -979,9 +979,12 @@ refreshStatsBtn.addEventListener('click', function() {
   isRefreshingStats = true;
   statsRefreshing.classList.remove('hidden');
   
+  // Clear the existing set of scanned runners to force a complete refresh
+  alreadyScannedRunners = new Set();
+  
   // Force refresh runner data first to get latest DNF status
   fetchRunnerDataFromSpreadsheet(true).then(() => {
-    // Then fetch checkpoint stats
+    // Then fetch checkpoint stats with a forced refresh
     fetchCheckpointStatsFromSpreadsheet();
   }).catch(() => {
     // If there's an error, still try to fetch checkpoint stats
@@ -989,6 +992,7 @@ refreshStatsBtn.addEventListener('click', function() {
   });
 });
 
+  
 // Clear all data from localStorage
 function clearAllData() {
   try {
@@ -1048,6 +1052,13 @@ function init() {
         // We have data, use it immediately
         runnersData = parsedData;
         logDebug(`Loaded ${Object.keys(runnersData).length} runners from localStorage at init`);
+        
+        // Check for pending uploads that need to be processed
+        if (pendingUploads.length > 0) {
+          logDebug(`Found ${pendingUploads.length} pending uploads at startup`);
+          updatePendingUploadsUI();
+        }
+        
         loadingScreen.classList.add('hidden');
         checkLoginStatus();
         
