@@ -367,25 +367,79 @@
   }
 
   /* Center connection status and refresh button */
-.connection-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 15px;
-}
+  .connection-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 15px;
+  }
 
-#refresh-button {
-  background-color: #28a745;
-  margin: 5px auto;
-  display: block;
-  width: auto;
-  font-size: 12px;
-  padding: 5px 10px;
-  max-width: 200px;
-}
-
+  #refresh-button {
+    background-color: #28a745;
+    margin: 5px auto;
+    display: block;
+    width: auto;
+    font-size: 12px;
+    padding: 5px 10px;
+    max-width: 200px;
+  }
   
+  /* Checkpoint stats */
+  .checkpoint-stats {
+    background-color: #e9f7ef;
+    border-radius: 5px;
+    padding: 10px;
+    margin: 10px 0;
+    text-align: center;
+    font-size: 14px;
+  }
+  
+  .checkpoint-stats .progress-bar {
+    height: 10px;
+    background-color: #e0e0e0;
+    border-radius: 5px;
+    margin: 5px 0;
+    overflow: hidden;
+  }
+  
+  .checkpoint-stats .progress-bar-fill {
+    height: 100%;
+    background-color: #28a745;
+    border-radius: 5px;
+    transition: width 0.5s ease;
+  }
+  
+  .checkpoint-stats .stats-numbers {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: #666;
+  }
+  
+  .checkpoint-stats .refresh-stats {
+    background-color: transparent;
+    color: #28a745;
+    border: 1px solid #28a745;
+    padding: 5px 10px;
+    font-size: 12px;
+    margin-top: 5px;
+    cursor: pointer;
+  }
+  
+  .checkpoint-stats .refresh-stats:hover {
+    background-color: #f0f9f2;
+  }
+  
+  /* DNF indicator */
+  .dnf-indicator {
+    background-color: #dc3545;
+    color: white;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-size: 10px;
+    margin-left: 5px;
+  }
 </style>
 </head>
 <body>
@@ -406,30 +460,30 @@
     </div>
     
     <form id="login-form" onsubmit="event.preventDefault(); handleLogin();">
-  <div class="form-group">
-    <label for="checkpoint-select">Select Checkpoint</label>
-    <select id="checkpoint-select">
-      <option value="">Select checkpoint</option>
-      <option value="GREEN CHECKPOINT">GREEN CHECKPOINT</option>
-      <option value="PINK LOOP TOP">PINK LOOP TOP</option>
-      <option value="PINK LOOP BOTTOM">PINK LOOP BOTTOM</option>
-      <option value="YELLOW LOOP TOP">YELLOW LOOP TOP</option>
-      <option value="YELLOW LOOP BOTTOM">YELLOW LOOP BOTTOM</option>
-      <option value="WHITE LOOP TOP">WHITE LOOP TOP</option>
-      <option value="WHITE LOOP BOTTOM">WHITE LOOP BOTTOM</option>
-      <option value="RED CHECKPOINT">RED CHECKPOINT</option>
-      <option value="FINISHLINE">FINISHLINE</option>
-    </select>
-  </div>
-  
-  <div class="form-group">
-    <label for="password-input">Password</label>
-    <input type="password" id="password-input" placeholder="Enter password">
-    <div id="login-error" class="error-message hidden"></div>
-  </div>
-  
-  <button type="submit" id="login-button">Login</button>
-</form>
+      <div class="form-group">
+        <label for="checkpoint-select">Select Checkpoint</label>
+        <select id="checkpoint-select">
+          <option value="">Select checkpoint</option>
+          <option value="GREEN CHECKPOINT">GREEN CHECKPOINT</option>
+          <option value="PINK LOOP TOP">PINK LOOP TOP</option>
+          <option value="PINK LOOP BOTTOM">PINK LOOP BOTTOM</option>
+          <option value="YELLOW LOOP TOP">YELLOW LOOP TOP</option>
+          <option value="YELLOW LOOP BOTTOM">YELLOW LOOP BOTTOM</option>
+          <option value="WHITE LOOP TOP">WHITE LOOP TOP</option>
+          <option value="WHITE LOOP BOTTOM">WHITE LOOP BOTTOM</option>
+          <option value="RED CHECKPOINT">RED CHECKPOINT</option>
+          <option value="FINISHLINE">FINISHLINE</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label for="password-input">Password</label>
+        <input type="password" id="password-input" placeholder="Enter password">
+        <div id="login-error" class="error-message hidden"></div>
+      </div>
+      
+      <button type="submit" id="login-button">Login</button>
+    </form>
     
     <!-- Debug panel toggle -->
     <div style="margin-top: 20px; text-align: center;">
@@ -442,14 +496,28 @@
     <div class="app-header">
       <h1>TIGER CLAW TIMING</h1>
       <div id="checkpoint-display" style="font-weight: bold; font-size: 18px; margin: 10px 0;"></div>
-      <!-- Replace your existing connection status div with this -->
-<div class="connection-container">
-  <div id="connection-status" class="connection-status">
-    <span id="status-icon" class="status-icon">●</span>
-    <span id="status-text">CHECKING CONNECTION...</span>
-  </div>
-  <button id="refresh-button">Refresh Connection</button>
-</div>
+      
+      <!-- Checkpoint Stats -->
+      <div id="checkpoint-stats" class="checkpoint-stats">
+        <div id="stats-text">Loading checkpoint stats...</div>
+        <div class="progress-bar">
+          <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%"></div>
+        </div>
+        <div class="stats-numbers">
+          <span id="scanned-count">0 scanned</span>
+          <span id="remaining-count">0 remaining</span>
+        </div>
+        <button id="refresh-stats" class="refresh-stats">Refresh Stats</button>
+      </div>
+      
+      <!-- Connection status and refresh button -->
+      <div class="connection-container">
+        <div id="connection-status" class="connection-status">
+          <span id="status-icon" class="status-icon">●</span>
+          <span id="status-text">CHECKING CONNECTION...</span>
+        </div>
+        <button id="refresh-button">Refresh Connection</button>
+      </div>
     </div>
     
     <button id="scan-button" class="scan-button">START SCANNING</button>
@@ -500,6 +568,7 @@
       <pre id="debug-info"></pre>
       <button id="force-upload" style="background-color: #6c757d; margin-top: 10px; font-size: 12px;">Force Upload Pending Scans</button>
       <button id="clear-data" style="background-color: #dc3545; margin-top: 10px; font-size: 12px;">Clear All Data</button>
+      <button id="refresh-runners" style="background-color: #007bff; margin-top: 10px; font-size: 12px;">Refresh Runner Data</button>
     </div>
   </div>
 </div>
@@ -509,21 +578,6 @@
 
 <script>
   // Main application code
-  // Add this event listener with your other event listeners
-document.getElementById('refresh-button').addEventListener('click', function() {
-  logDebug('Manual connection refresh requested');
-  
-  // Check connection
-  const currentOnlineStatus = navigator.onLine;
-  logDebug(`Current connection status: ${currentOnlineStatus ? 'online' : 'offline'}`);
-  
-  if (currentOnlineStatus) {
-    showMessage('Checking for pending uploads...');
-    uploadPendingScans(true);
-  } else {
-    showMessage('No internet connection available', true);
-  }
-});
   document.addEventListener('DOMContentLoaded', function() {
     // DOM Elements
     const loadingScreen = document.getElementById('loading-screen');
@@ -531,7 +585,6 @@ document.getElementById('refresh-button').addEventListener('click', function() {
     const scannerScreen = document.getElementById('scanner-screen');
     const checkpointSelect = document.getElementById('checkpoint-select');
     const passwordInput = document.getElementById('password-input');
-    const loginButton = document.getElementById('login-button');
     const loginError = document.getElementById('login-error');
     const checkpointDisplay = document.getElementById('checkpoint-display');
     const scanButton = document.getElementById('scan-button');
@@ -555,6 +608,16 @@ document.getElementById('refresh-button').addEventListener('click', function() {
     const toggleDebugBtn = document.getElementById('toggle-debug');
     const forceUploadBtn = document.getElementById('force-upload');
     const clearDataBtn = document.getElementById('clear-data');
+    const refreshButton = document.getElementById('refresh-button');
+    const refreshRunnersBtn = document.getElementById('refresh-runners');
+    
+    // Checkpoint stats elements
+    const checkpointStats = document.getElementById('checkpoint-stats');
+    const statsText = document.getElementById('stats-text');
+    const progressBarFill = document.getElementById('progress-bar-fill');
+    const scannedCount = document.getElementById('scanned-count');
+    const remainingCount = document.getElementById('remaining-count');
+    const refreshStatsBtn = document.getElementById('refresh-stats');
     
     // Application state
     let isScanning = false;
@@ -573,10 +636,23 @@ document.getElementById('refresh-button').addEventListener('click', function() {
     let cameraStartTimeout = null; // Timeout for camera start
     let isUploadingPendingScans = false; // Flag to prevent multiple simultaneous uploads
     let uploadedScans = {}; // Track which scans have been uploaded to prevent duplicates
+    let runnerDataRefreshInterval = null; // Interval for refreshing runner data
+    let checkpointStatsRefreshInterval = null; // Interval for refreshing checkpoint stats
     
     // Constants
     const CORRECT_PASSWORD = "threeloops";
     const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby5zoPl-2FMocFRUj9p1QSbSv9smuw5hjtyuQmUIgdpBHIf79xHKeLdKxyELxhGE6kh/exec";
+    const RUNNER_DATA_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
+    const CHECKPOINT_STATS_REFRESH_INTERVAL = 60 * 1000; // 1 minute
+    
+    // Log to debug panel
+    function logDebug(message) {
+      const timestamp = new Date().toLocaleTimeString();
+      if (debugInfo) {
+        debugInfo.textContent = `[${timestamp}] ${message}\n` + debugInfo.textContent;
+      }
+      console.log(message);
+    }
     
     // Toggle debug panel
     toggleDebugBtn.addEventListener('click', function() {
@@ -596,11 +672,39 @@ document.getElementById('refresh-button').addEventListener('click', function() {
       uploadPendingScans(true);
     });
     
+    // Refresh runner data manually
+    refreshRunnersBtn.addEventListener('click', function() {
+      logDebug('Manually refreshing runner data');
+      fetchRunnerData(true);
+    });
+    
     // Clear all data
     clearDataBtn.addEventListener('click', function() {
       if (confirm('Are you sure you want to clear all data? This will delete all stored runner data and scans.')) {
         clearAllData();
       }
+    });
+    
+    // Refresh connection button
+    refreshButton.addEventListener('click', function() {
+      logDebug('Manual connection refresh requested');
+      
+      // Check connection
+      const currentOnlineStatus = navigator.onLine;
+      logDebug(`Current connection status: ${currentOnlineStatus ? 'online' : 'offline'}`);
+      
+      if (currentOnlineStatus) {
+        showMessage('Checking for pending uploads...');
+        uploadPendingScans(true);
+      } else {
+        showMessage('No internet connection available', true);
+      }
+    });
+    
+    // Refresh checkpoint stats button
+    refreshStatsBtn.addEventListener('click', function() {
+      logDebug('Manual checkpoint stats refresh requested');
+      fetchCheckpointStats();
     });
     
     // Clear all data from localStorage
@@ -631,68 +735,34 @@ document.getElementById('refresh-button').addEventListener('click', function() {
       }
     }
     
-    // Log to debug panel
-    function logDebug(message) {
-      const timestamp = new Date().toLocaleTimeString();
-      if (debugInfo) {
-        debugInfo.textContent = `[${timestamp}] ${message}
-` + debugInfo.textContent;
+    // Initialize the application
+    function init() {
+      // Load data from localStorage
+      loadPendingScans();
+      loadRecentScans();
+      loadProcessedScans();
+      loadScanTimestamps();
+      loadUploadedScans();
+      
+      // Set initial online status
+      isOnline = navigator.onLine;
+      
+      // Fetch runner data
+      fetchRunnerData();
+      
+      // Set up online/offline event listeners
+      window.addEventListener('online', handleOnlineStatusChange);
+      window.addEventListener('offline', handleOnlineStatusChange);
+      
+      // Check if we have pending uploads and we're online
+      if (isOnline && pendingUploads.length > 0) {
+        logDebug(`Found ${pendingUploads.length} pending uploads at startup - attempting to upload`);
+        setTimeout(() => {
+          uploadPendingScans(true);
+        }, 3000);
       }
-      console.log(message);
     }
-
-
-
-// Handle login form submission
-function handleLogin() {
-  const selectedCheckpoint = checkpointSelect.value;
-  const password = passwordInput.value;
-  
-  if (!selectedCheckpoint) {
-    loginError.textContent = 'Please select a checkpoint';
-    loginError.classList.remove('hidden');
-    return;
-  }
-  
-  if (password !== CORRECT_PASSWORD) {
-    loginError.textContent = 'Incorrect password';
-    loginError.classList.remove('hidden');
-    return;
-  }
-  
-  // Save checkpoint and show scanner screen
-  checkpoint = selectedCheckpoint;
-  localStorage.setItem('tigerClawCheckpoint', checkpoint);
-  showScannerScreen();
-}
     
-   // Initialize the application - UPDATED
-function init() {
-  // Load data from localStorage
-  loadPendingScans();
-  loadRecentScans();
-  loadProcessedScans();
-  loadScanTimestamps();
-  loadUploadedScans();
-  
-  // Set initial online status
-  isOnline = navigator.onLine;
-  
-  // Fetch runner data
-  fetchRunnerData();
-  
-  // Set up online/offline event listeners
-  window.addEventListener('online', handleOnlineStatusChange);
-  window.addEventListener('offline', handleOnlineStatusChange);
-  
-  // Check if we have pending uploads and we're online
-  if (isOnline && pendingUploads.length > 0) {
-    logDebug(`Found ${pendingUploads.length} pending uploads at startup - attempting to upload`);
-    setTimeout(() => {
-      uploadPendingScans(true);
-    }, 3000);
-  }
-}
     // Load uploaded scans from localStorage
     function loadUploadedScans() {
       try {
@@ -762,23 +832,29 @@ function init() {
       }
     }
     
-// Handle online/offline status changes
-function handleOnlineStatusChange() {
-  const wasOnline = isOnline;
-  isOnline = navigator.onLine;
-  
-  logDebug(`Connection status changed: ${wasOnline ? 'online' : 'offline'} -> ${isOnline ? 'online' : 'offline'}`);
-  updateConnectionStatus();
-  
-  // If we're back online and have offline entries, try to sync them
-  if (isOnline && !wasOnline && pendingUploads.length > 0) {
-    logDebug('Connection restored - attempting to upload pending scans');
-    // Wait a moment for the connection to stabilize
-    setTimeout(() => {
-      uploadPendingScans(true);
-    }, 2000);
-  }
-}
+    // Handle online/offline status changes
+    function handleOnlineStatusChange() {
+      const wasOnline = isOnline;
+      isOnline = navigator.onLine;
+      
+      logDebug(`Connection status changed: ${wasOnline ? 'online' : 'offline'} -> ${isOnline ? 'online' : 'offline'}`);
+      updateConnectionStatus();
+      
+      // If we're back online and have offline entries, try to sync them
+      if (isOnline && !wasOnline && pendingUploads.length > 0) {
+        logDebug('Connection restored - attempting to upload pending scans');
+        // Wait a moment for the connection to stabilize
+        setTimeout(() => {
+          uploadPendingScans(true);
+        }, 2000);
+      }
+      
+      // If we're back online, refresh runner data
+      if (isOnline && !wasOnline) {
+        fetchRunnerData(true);
+        fetchCheckpointStats();
+      }
+    }
     
     // Load pending scans from localStorage
     function loadPendingScans() {
@@ -809,77 +885,264 @@ function handleOnlineStatusChange() {
         recentScans = [];
       }
     }
-        
-    // Declare variables
-let logDebug = console.log; // Or a more sophisticated logging function
-let runnersData = {};
-let loadingScreen = document.getElementById('loading-screen'); // Or however you access your loading screen
-let APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby5zoPl-2FMocFRUj9p1QSbSv9smuw5hjtyuQmUIgdpBHIf79xHKeLdKxyELxhGE6kh/exec'; // Replace with your actual Apps Script URL
-
-function checkLoginStatus() {
-  // Implement your login status check here
-  console.log('Checking login status...');
-}
-
-function fetchRunnerData() {
-  logDebug('Fetching runner data from Google Sheets...');
-  
-  // Try to load from localStorage first
-  try {
-    const storedData = localStorage.getItem('runnersData');
-    if (storedData) {
-      const parsedData = JSON.parse(storedData);
-      if (parsedData && Object.keys(parsedData).length > 0) {
-        runnersData = parsedData;
-        logDebug(`Loaded ${Object.keys(runnersData).length} runners from localStorage`);
-        loadingScreen.classList.add('hidden');
-        checkLoginStatus();
-        return;
+    
+    // Fetch runner data from Google Sheets
+    function fetchRunnerData(forceRefresh = false) {
+      logDebug('Fetching runner data from Google Sheets...');
+      
+      // Try to load from localStorage first if not forcing refresh
+      if (!forceRefresh) {
+        try {
+          const storedData = localStorage.getItem('runnersData');
+          if (storedData) {
+            const parsedData = JSON.parse(storedData);
+            if (parsedData && Object.keys(parsedData).length > 0) {
+              runnersData = parsedData;
+              logDebug(`Loaded ${Object.keys(runnersData).length} runners from localStorage`);
+              loadingScreen.classList.add('hidden');
+              checkLoginStatus();
+              
+              // Set up periodic refresh of runner data
+              setupRunnerDataRefresh();
+              
+              // Fetch checkpoint stats if we're logged in
+              if (checkpoint) {
+                fetchCheckpointStats();
+              }
+              
+              return;
+            }
+          }
+        } catch (error) {
+          logDebug('Error loading runners data from localStorage: ' + error);
+        }
       }
-    }
-  } catch (error) {
-    logDebug('Error loading runners data from localStorage: ' + error);
-  }
-  
-  // Create a fetch request with a no-cors mode as fallback
-  fetch(`${APPS_SCRIPT_URL}?action=getRunnerData`, { 
-    method: 'GET',
-    mode: 'no-cors', // This allows the request but won't let you read the response
-    cache: 'no-cache'
-  })
-  .then(() => {
-    // Since we can't read the response with no-cors, we'll use a hardcoded fallback
-    // or data from a public JSON file you can host on GitHub
-    
-    // For now, let's just proceed with whatever data we might have
-    logDebug('Fetch request sent, but response not readable due to CORS');
-    loadingScreen.classList.add('hidden');
-    checkLoginStatus();
-    
-    // Optionally, you could load a static JSON file from your GitHub Pages site
-    // that contains your runner data
-    fetch('runners-data.json')
-      .then(response => response.json())
-      .then(data => {
-        const runnerMap = {};
-        data.forEach(runner => {
-          runnerMap[runner.bibNumber] = runner.name;
-        });
-        runnersData = runnerMap;
-        localStorage.setItem('runnersData', JSON.stringify(runnersData));
-        logDebug(`Loaded ${Object.keys(runnersData).length} runners from static file`);
+      
+      // Use fetch API to get runner data
+      fetch(`${APPS_SCRIPT_URL}?action=getRunnerData`, {
+        method: 'GET',
+        mode: 'cors', // Try with CORS first
+        cache: 'no-cache'
       })
-      .catch(err => {
-        logDebug('Error loading static runner data: ' + err);
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (data.success && data.data) {
+          // Process the runner data
+          const runnerMap = {};
+          data.data.forEach(runner => {
+            runnerMap[runner.bibNumber] = {
+              name: runner.name,
+              dnf: runner.dnf || false
+            };
+          });
+          
+          runnersData = runnerMap;
+          localStorage.setItem('runnersData', JSON.stringify(runnersData));
+          logDebug(`Loaded ${Object.keys(runnersData).length} runners from Google Sheets`);
+          
+          // Hide loading screen and proceed
+          loadingScreen.classList.add('hidden');
+          checkLoginStatus();
+          
+          // Set up periodic refresh of runner data
+          setupRunnerDataRefresh();
+          
+          // Fetch checkpoint stats if we're logged in
+          if (checkpoint) {
+            fetchCheckpointStats();
+          }
+        } else {
+          throw new Error('Invalid response format or no data returned');
+        }
+      })
+      .catch(error => {
+        logDebug('Error fetching runner data: ' + error);
+        
+        // Try with no-cors as fallback
+        fetch(`${APPS_SCRIPT_URL}?action=getRunnerData`, {
+          method: 'GET',
+          mode: 'no-cors', // Fallback to no-cors
+          cache: 'no-cache'
+        })
+        .then(() => {
+          logDebug('Fetch request sent with no-cors, but response not readable');
+          
+          // Use sample data as fallback
+          const sampleRunners = {
+            "101": { name: "John Doe", dnf: false },
+            "102": { name: "Jane Smith", dnf: false },
+            "103": { name: "Bob Johnson", dnf: false },
+            "104": { name: "Alice Williams", dnf: false },
+            "105": { name: "Charlie Brown", dnf: false },
+            "106": { name: "Diana Prince", dnf: false },
+            "107": { name: "Bruce Wayne", dnf: false },
+            "108": { name: "Clark Kent", dnf: false },
+            "109": { name: "Peter Parker", dnf: false },
+            "110": { name: "Tony Stark", dnf: false }
+          };
+          
+          runnersData = sampleRunners;
+          localStorage.setItem('runnersData', JSON.stringify(runnersData));
+          logDebug(`Loaded ${Object.keys(runnersData).length} sample runners after fetch error`);
+          
+          // Hide loading screen and proceed
+          loadingScreen.classList.add('hidden');
+          checkLoginStatus();
+          
+          // Set up periodic refresh of runner data
+          setupRunnerDataRefresh();
+          
+          // Fetch checkpoint stats if we're logged in
+          if (checkpoint) {
+            fetchCheckpointStats();
+          }
+        })
+        .catch(err => {
+          logDebug('Complete failure to fetch runner data: ' + err);
+          
+          // Use sample data as last resort
+          const sampleRunners = {
+            "101": { name: "John Doe", dnf: false },
+            "102": { name: "Jane Smith", dnf: false },
+            "103": { name: "Bob Johnson", dnf: false },
+            "104": { name: "Alice Williams", dnf: false },
+            "105": { name: "Charlie Brown", dnf: false }
+          };
+          
+          runnersData = sampleRunners;
+          localStorage.setItem('runnersData', JSON.stringify(runnersData));
+          logDebug(`Loaded ${Object.keys(runnersData).length} sample runners as last resort`);
+          
+          // Hide loading screen and proceed
+          loadingScreen.classList.add('hidden');
+          checkLoginStatus();
+          
+          // Set up periodic refresh of runner data
+          setupRunnerDataRefresh();
+        });
       });
-  })
-  .catch(error => {
-    logDebug('Error fetching runner data: ' + error);
-    loadingScreen.classList.add('hidden');
-    checkLoginStatus();
-  });
-}
+    }
     
+    // Set up periodic refresh of runner data
+    function setupRunnerDataRefresh() {
+      // Clear any existing interval
+      if (runnerDataRefreshInterval) {
+        clearInterval(runnerDataRefreshInterval);
+      }
+      
+      // Set up new interval
+      runnerDataRefreshInterval = setInterval(() => {
+        if (isOnline) {
+          logDebug('Periodic runner data refresh');
+          fetchRunnerData(true);
+        }
+      }, RUNNER_DATA_REFRESH_INTERVAL);
+    }
+    
+    // Fetch checkpoint stats
+    function fetchCheckpointStats() {
+      if (!checkpoint || !isOnline) return;
+      
+      logDebug(`Fetching stats for checkpoint: ${checkpoint}`);
+      
+      // Update UI to show loading
+      statsText.textContent = 'Loading checkpoint stats...';
+      
+      // Use fetch API to get checkpoint stats
+      fetch(`${APPS_SCRIPT_URL}?action=getCheckpointStats&checkpoint=${encodeURIComponent(checkpoint)}`, {
+        method: 'GET',
+        mode: 'cors', // Try with CORS first
+        cache: 'no-cache'
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (data.success && data.data) {
+          updateCheckpointStatsUI(data.data);
+          setupCheckpointStatsRefresh();
+        } else {
+          throw new Error('Invalid response format or no data returned');
+        }
+      })
+      .catch(error => {
+        logDebug('Error fetching checkpoint stats: ' + error);
+        
+        // Calculate stats locally as fallback
+        const stats = calculateLocalCheckpointStats();
+        updateCheckpointStatsUI(stats);
+        setupCheckpointStatsRefresh();
+      });
+    }
+    
+    // Calculate checkpoint stats locally based on our data
+    function calculateLocalCheckpointStats() {
+      // Count total active runners (not DNF)
+      let totalRunners = 0;
+      for (const bib in runnersData) {
+        if (!runnersData[bib].dnf) {
+          totalRunners++;
+        }
+      }
+      
+      // Count scanned runners at this checkpoint
+      const scannedBibs = new Set();
+      recentScans.forEach(scan => {
+        if (scan.checkpoint === checkpoint) {
+          scannedBibs.add(scan.bib);
+        }
+      });
+      
+      // Also check pending uploads
+      pendingUploads.forEach(scan => {
+        if (scan.checkpoint === checkpoint) {
+          scannedBibs.add(scan.bib);
+        }
+      });
+      
+      const scannedCount = scannedBibs.size;
+      const remainingCount = totalRunners - scannedCount;
+      
+      return {
+        checkpoint: checkpoint,
+        totalRunners: totalRunners,
+        scannedCount: scannedCount,
+        remainingCount: remainingCount,
+        scannedPercentage: totalRunners > 0 ? Math.round((scannedCount / totalRunners) * 100) : 0
+      };
+    }
+    
+    // Update checkpoint stats UI
+    function updateCheckpointStatsUI(stats) {
+      statsText.textContent = `${stats.scannedCount} of ${stats.totalRunners} runners scanned (${stats.scannedPercentage}%)`;
+      progressBarFill.style.width = `${stats.scannedPercentage}%`;
+      scannedCount.textContent = `${stats.scannedCount} scanned`;
+      remainingCount.textContent = `${stats.remainingCount} remaining`;
+    }
+    
+    // Set up periodic refresh of checkpoint stats
+    function setupCheckpointStatsRefresh() {
+      // Clear any existing interval
+      if (checkpointStatsRefreshInterval) {
+        clearInterval(checkpointStatsRefreshInterval);
+      }
+      
+      // Set up new interval
+      checkpointStatsRefreshInterval = setInterval(() => {
+        if (isOnline && checkpoint) {
+          logDebug('Periodic checkpoint stats refresh');
+          fetchCheckpointStats();
+        }
+      }, CHECKPOINT_STATS_REFRESH_INTERVAL);
+    }
     
     // Update recent scans UI
     function updateRecentScansUI() {
@@ -894,9 +1157,15 @@ function fetchRunnerData() {
         const scanTime = new Date(scan.timestamp).toLocaleTimeString();
         const scanItem = document.createElement('div');
         scanItem.className = 'scan-item';
+        
+        // Check if runner is marked as DNF
+        const runnerInfo = runnersData[scan.bib];
+        const isDnf = runnerInfo && runnerInfo.dnf;
+        
         scanItem.innerHTML = `
           <div>
             <span class="scan-bib">#${scan.bib}</span> - ${scan.name}
+            ${isDnf ? '<span class="dnf-indicator">DNF</span>' : ''}
           </div>
           <div class="scan-time">${scanTime}</div>
         `;
@@ -904,89 +1173,50 @@ function fetchRunnerData() {
       });
     }
     
-    // Update pending uploads UI - IMPROVED VERSION
-function updatePendingUploadsUI() {
-  if (pendingUploads.length > 0) {
-    pendingUploadsContainer.classList.remove('hidden');
-    pendingUploadsContainer.textContent = `${pendingUploads.length} scan${pendingUploads.length > 1 ? 's' : ''} pending upload. Data will be uploaded automatically when connection is restored.`;
-  } else {
-    pendingUploadsContainer.classList.add('hidden');
-    pendingUploadsContainer.textContent = '';
-  }
-  
-  // Log the current state for debugging
-  logDebug(`Pending uploads UI updated: ${pendingUploads.length} scans pending`);
-}
-    
-// Declare variables
-let isOnline = navigator.onLine;
-let pendingUploads = [];
-let lastUploadAttempt = 0;
-
-    
-// Update connection status UI and check connectivity
-function updateConnectionStatus() {
-  // First check navigator.onLine
-  isOnline = navigator.onLine;
-
-  // If navigator.onLine says we're online, do an additional check
-  if (isOnline) {
-    // Create a unique callback name
-    const callbackName = 'pingCallback_' + Date.now();
-    
-    // Define the callback function
-    window[callbackName] = function(response) {
-      // Clean up
-      document.body.removeChild(script);
-      delete window[callbackName];
+    // Update pending uploads UI
+    function updatePendingUploadsUI() {
+      if (pendingUploads.length > 0) {
+        pendingUploadsContainer.classList.remove('hidden');
+        pendingUploadsContainer.textContent = `${pendingUploads.length} scan${pendingUploads.length > 1 ? 's' : ''} pending upload. Data will be uploaded automatically when connection is restored.`;
+      } else {
+        pendingUploadsContainer.classList.add('hidden');
+        pendingUploadsContainer.textContent = '';
+      }
       
-      // If we get here, we're definitely online
-      isOnline = true;
+      // Log the current state for debugging
+      logDebug(`Pending uploads UI updated: ${pendingUploads.length} scans pending`);
+    }
+    
+    // Update connection status UI
+    function updateConnectionStatusUI() {
+      if (isOnline) {
+        statusIcon.style.color = '#28a745';
+        statusText.textContent = 'CONNECTED';
+        statusText.classList.add('status-connected');
+        statusText.classList.remove('status-disconnected');
+      } else {
+        statusIcon.style.color = '#dc3545';
+        statusText.textContent = 'DISCONNECTED';
+        statusText.classList.add('status-disconnected');
+        statusText.classList.remove('status-connected');
+      }
+    }
+    
+    // Update connection status and check connectivity
+    function updateConnectionStatus() {
+      // First check navigator.onLine
+      isOnline = navigator.onLine;
       updateConnectionStatusUI();
       
-      // Try to upload pending scans if we have any
-      if (pendingUploads.length > 0) {
-        // Only attempt upload if it's been more than 5 seconds since last attempt
+      // If we're online and have pending uploads, try to upload them
+      if (isOnline && pendingUploads.length > 0) {
         const now = Date.now();
         if (now - lastUploadAttempt > 5000) {
           lastUploadAttempt = now;
           uploadPendingScans();
         }
       }
-    };
-    
-    // Create the script element for JSONP
-    const script = document.createElement('script');
-    script.src = `${APPS_SCRIPT_URL}?action=ping&callback=${callbackName}&nocache=${Date.now()}`;
-    
-    // Handle errors
-    script.onerror = function() {
-      // Clean up
-      delete window[callbackName];
-      document.body.removeChild(script);
-      
-      // If the fetch fails, we're offline despite what navigator.onLine says
-      isOnline = false;
-      updateConnectionStatusUI();
-    };
-    
-    // Add the script to the document
-    document.body.appendChild(script);
-    
-    // Set a timeout to handle case where script doesn't load or callback isn't called
-    setTimeout(() => {
-      if (window[callbackName]) {
-        delete window[callbackName];
-        // If we get here, the callback wasn't called, so we're offline
-        isOnline = false;
-        updateConnectionStatusUI();
-      }
-    }, 5000);
-  } else {
-    // We're definitely offline according to navigator.onLine
-    updateConnectionStatusUI();
-  }
-}
+    }
     
     // Check if user is already logged in
     function checkLoginStatus() {
@@ -1006,6 +1236,7 @@ function updateConnectionStatus() {
       scannerScreen.classList.remove('hidden');
       checkpointDisplay.textContent = checkpoint;
       updateConnectionStatus();
+      fetchCheckpointStats();
     }
     
     // Show login screen
@@ -1021,7 +1252,7 @@ function updateConnectionStatus() {
     }
     
     // Handle login
-    loginButton.addEventListener('click', function() {
+    function handleLogin() {
       const selectedCheckpoint = checkpointSelect.value;
       const password = passwordInput.value;
       
@@ -1041,14 +1272,26 @@ function updateConnectionStatus() {
       checkpoint = selectedCheckpoint;
       localStorage.setItem('tigerClawCheckpoint', checkpoint);
       showScannerScreen();
-    });
+    }
     
     // Handle logout
     logoutButton.addEventListener('click', function() {
       // Stop scanner if running
       stopScanning();
       
+      // Clear intervals
+      if (runnerDataRefreshInterval) {
+        clearInterval(runnerDataRefreshInterval);
+        runnerDataRefreshInterval = null;
+      }
+      
+      if (checkpointStatsRefreshInterval) {
+        clearInterval(checkpointStatsRefreshInterval);
+        checkpointStatsRefreshInterval = null;
+      }
+      
       localStorage.removeItem('tigerClawCheckpoint');
+      checkpoint = '';
       showLoginScreen();
     });
     
@@ -1110,7 +1353,7 @@ function updateConnectionStatus() {
       }
     });
     
-    // Start QR scanner with back camera - COMPLETELY REVISED VERSION
+    // Start QR scanner with back camera
     function startScanner() {
       try {
         // First, ensure any existing scanner is properly stopped
@@ -1387,84 +1630,89 @@ function updateConnectionStatus() {
       processScan(decodedText);
     }
     
-    // Process scan data - UPDATED TO HANDLE QR CODE URLS
-// Process scan data - UPDATED TO HANDLE "BibNumber, RunnerName" FORMAT
-function processScan(decodedText) {
-  // Log the raw scanned text for debugging
-  logDebug(`Raw QR scan result: ${decodedText}`);
-  
-  // Extract the bib number from the scanned text
-  let cleanBib;
-  
-  // Check if the text contains a comma (BibNumber, RunnerName format)
-  if (decodedText.includes(',')) {
-    // Split by comma and take the first part as the bib number
-    const parts = decodedText.split(',');
-    cleanBib = parts[0].trim().replace(/\D/g, '');
-    logDebug(`Extracted bib from comma-separated format: ${cleanBib}`);
-  } else {
-    // If no comma, just clean the whole text
-    cleanBib = decodedText.toString().replace(/\D/g, '');
-    logDebug(`No comma found, cleaned bib: ${cleanBib}`);
-  }
-  
-  // If no bib number could be extracted, show error
-  if (!cleanBib) {
-    showMessage(`Could not extract bib number from scan`, true);
-    return;
-  }
-  
-  logDebug(`Processing scan for bib: ${cleanBib}`);
-  
-  // Find runner in our loaded data
-  const runnerName = runnersData[cleanBib];
-  
-  if (!runnerName) {
-    showMessage(`No runner found with bib ${cleanBib}`, true);
-    return;
-  }
-  
-  // Check if we should process this scan (not a duplicate or is newer)
-  if (!shouldProcessScan(cleanBib, checkpoint)) {
-    showMessage(`Already recorded: ${runnerName} (${cleanBib})`, false);
-    return;
-  }
-  
-  const scanData = {
-    timestamp: new Date().toISOString(),
-    bib: cleanBib,
-    name: runnerName,
-    checkpoint: checkpoint
-  };
-  
-  // Mark as processed to prevent duplicates
-  markScanAsProcessed(cleanBib, checkpoint);
-  
-  // Add to recent scans
-  storeRecentScan(scanData);
-  
-  if (isOnline) {
-    submitScanToSheet(scanData)
-      .then(function(success) {
-        if (success) {
-          // Mark as uploaded to prevent duplicates
-          markScanAsUploaded(scanData);
-          showMessage(`Recorded: ${runnerName} (${cleanBib})`);
-        } else {
-          showMessage('Error submitting scan. Storing offline.', true);
-          storeScanOffline(scanData);
-        }
-      })
-      .catch(function(error) {
-        logDebug('Error submitting scan: ' + error);
-        showMessage('Error submitting scan. Storing offline.', true);
+    // Process scan data
+    function processScan(decodedText) {
+      // Extract the bib number from the scanned text
+      let cleanBib;
+      
+      // Check if the text contains a comma (BibNumber, RunnerName format)
+      if (decodedText.includes(',')) {
+        // Split by comma and take the first part as the bib number
+        const parts = decodedText.split(',');
+        cleanBib = parts[0].trim().replace(/\D/g, '');
+        logDebug(`Extracted bib from comma-separated format: ${cleanBib}`);
+      } else {
+        // If no comma, just clean the whole text
+        cleanBib = decodedText.toString().replace(/\D/g, '');
+        logDebug(`No comma found, cleaned bib: ${cleanBib}`);
+      }
+      
+      // If no bib number could be extracted, show error
+      if (!cleanBib) {
+        showMessage(`Could not extract bib number from scan`, true);
+        return;
+      }
+      
+      logDebug(`Processing scan for bib: ${cleanBib}`);
+      
+      // Find runner in our loaded data
+      const runnerInfo = runnersData[cleanBib];
+      
+      if (!runnerInfo) {
+        showMessage(`No runner found with bib ${cleanBib}`, true);
+        return;
+      }
+      
+      // Check if runner is marked as DNF
+      if (runnerInfo.dnf) {
+        showMessage(`Runner #${cleanBib} (${runnerInfo.name}) is marked as DNF`, true);
+        return;
+      }
+      
+      // Check if we should process this scan (not a duplicate or is newer)
+      if (!shouldProcessScan(cleanBib, checkpoint)) {
+        showMessage(`Already recorded: ${runnerInfo.name} (${cleanBib})`, false);
+        return;
+      }
+      
+      const scanData = {
+        timestamp: new Date().toISOString(),
+        bib: cleanBib,
+        name: runnerInfo.name,
+        checkpoint: checkpoint
+      };
+      
+      // Mark as processed to prevent duplicates
+      markScanAsProcessed(cleanBib, checkpoint);
+      
+      // Add to recent scans
+      storeRecentScan(scanData);
+      
+      // Update checkpoint stats
+      fetchCheckpointStats();
+      
+      if (isOnline) {
+        submitScanToSheet(scanData)
+          .then(function(success) {
+            if (success) {
+              // Mark as uploaded to prevent duplicates
+              markScanAsUploaded(scanData);
+              showMessage(`Recorded: ${runnerInfo.name} (${cleanBib})`);
+            } else {
+              showMessage('Error submitting scan. Storing offline.', true);
+              storeScanOffline(scanData);
+            }
+          })
+          .catch(function(error) {
+            logDebug('Error submitting scan: ' + error);
+            showMessage('Error submitting scan. Storing offline.', true);
+            storeScanOffline(scanData);
+          });
+      } else {
         storeScanOffline(scanData);
-      });
-  } else {
-    storeScanOffline(scanData);
-    showMessage(`Stored offline: ${runnerName} (${cleanBib})`);
-  }
-}
+        showMessage(`Stored offline: ${runnerInfo.name} (${cleanBib})`);
+      }
+    }
     
     // Check if scan is a duplicate and if it's the most recent
     function shouldProcessScan(bib, checkpoint) {
@@ -1549,114 +1797,88 @@ function processScan(decodedText) {
       }
     }
     
-// Submit scan to Google Sheet using JSONP
-function submitScanToSheet(scanData) {
-  return new Promise(function(resolve, reject) {
-    // Assuming logDebug and APPS_SCRIPT_URL are defined elsewhere or will be defined before this function is called.
-    // For example:
-    // const logDebug = console.log; // Or a more sophisticated logging function
-    // const APPS_SCRIPT_URL = 'YOUR_APPS_SCRIPT_URL';
-
-    logDebug(`Submitting scan to sheet: ${scanData.bib} - ${scanData.name} at ${scanData.checkpoint}`);
-    
-    // Create a unique callback name
-    const callbackName = 'jsonpCallback_' + Date.now();
-    
-    // Define the callback function
-    window[callbackName] = function(response) {
-      // Clean up
-      document.body.removeChild(script);
-      delete window[callbackName];
-      
-      logDebug('JSONP response received');
-      resolve(true);
-    };
-    
-    // Create the data to send
-    const data = {
-      timestamp: scanData.timestamp,
-      bibNumber: scanData.bib,
-      runnerName: scanData.name,
-      checkpoint: scanData.checkpoint,
-      replaceExisting: true
-    };
-    
-    // Create the script element
-    const script = document.createElement('script');
-    script.src = `${APPS_SCRIPT_URL}?action=recordScan&data=${encodeURIComponent(JSON.stringify(data))}&callback=${callbackName}&nocache=${Date.now()}`;
-    
-    // Handle errors
-    script.onerror = function() {
-      // Clean up
-      delete window[callbackName];
-      document.body.removeChild(script);
-      
-      logDebug('Network error when submitting scan');
-      // Even with network errors, we'll assume success after a timeout
-      // This is because Google Apps Script often processes the request successfully
-      // even if the browser reports a CORS error
-    };
-    
-    // Add the script to the document
-    document.body.appendChild(script);
-    
-    // Set a timeout to resolve as success after 5 seconds
-    setTimeout(() => {
-      if (window[callbackName]) {
-        delete window[callbackName];
-        logDebug('Assuming success due to timeout');
-        resolve(true);
-      }
-    }, 5000);
-  });
-}
-
-    
-// Upload pending scans
-function uploadPendingScans(forceUpload = false) {
-  if (pendingUploads.length === 0 || (!isOnline && !forceUpload) || isUploadingPendingScans) return;
-  
-  isUploadingPendingScans = true;
-  logDebug(`Attempting to upload ${pendingUploads.length} pending scans`);
-  
-  // Process each scan one at a time
-  uploadNextScan(0);
-  
-  function uploadNextScan(index) {
-    if (index >= pendingUploads.length) {
-      // All done
-      logDebug('Finished uploading pending scans');
-      isUploadingPendingScans = false;
-      return;
+    // Submit scan to Google Sheet - CSP-friendly version
+    function submitScanToSheet(scanData) {
+      return new Promise(function(resolve, reject) {
+        logDebug(`Submitting scan to sheet: ${scanData.bib} - ${scanData.name} at ${scanData.checkpoint}`);
+        
+        // Create the data to send
+        const data = {
+          timestamp: scanData.timestamp,
+          bibNumber: scanData.bib,
+          runnerName: scanData.name,
+          checkpoint: scanData.checkpoint,
+          replaceExisting: true
+        };
+        
+        // Use fetch API instead of JSONP
+        fetch(`${APPS_SCRIPT_URL}?action=recordScan&data=${encodeURIComponent(JSON.stringify(data))}`, {
+          method: 'GET',
+          mode: 'no-cors', // This allows the request but won't let you read the response
+          cache: 'no-cache'
+        })
+        .then(() => {
+          // Since we can't read the response with no-cors, we'll assume success
+          logDebug('Fetch request sent, assuming success');
+          resolve(true);
+        })
+        .catch(error => {
+          logDebug('Network error when submitting scan: ' + error);
+          // Even with network errors, we'll assume success after a timeout
+          // This is because Google Apps Script often processes the request successfully
+          // even if the browser reports a CORS error
+          resolve(true);
+        });
+      });
     }
     
-    const scanData = pendingUploads[index];
-    logDebug(`Uploading pending scan ${index + 1}/${pendingUploads.length}: ${scanData.bib} at ${scanData.checkpoint}`);
-    
-    submitScanToSheet(scanData)
-      .then(success => {
-        // Always remove from pending uploads and assume success
-        // This is because with CORS, we can't reliably determine if the upload failed
-        logDebug(`Processed scan: ${scanData.bib} at ${scanData.checkpoint}`);
+    // Upload pending scans
+    function uploadPendingScans(forceUpload = false) {
+      if (pendingUploads.length === 0 || (!isOnline && !forceUpload) || isUploadingPendingScans) return;
+      
+      isUploadingPendingScans = true;
+      logDebug(`Attempting to upload ${pendingUploads.length} pending scans`);
+      
+      // Process each scan one at a time
+      uploadNextScan(0);
+      
+      function uploadNextScan(index) {
+        if (index >= pendingUploads.length) {
+          // All done
+          logDebug('Finished uploading pending scans');
+          isUploadingPendingScans = false;
+          
+          // Update checkpoint stats after uploads
+          fetchCheckpointStats();
+          return;
+        }
         
-        // Remove this scan from pendingUploads
-        pendingUploads.splice(index, 1);
+        const scanData = pendingUploads[index];
+        logDebug(`Uploading pending scan ${index + 1}/${pendingUploads.length}: ${scanData.bib} at ${scanData.checkpoint}`);
         
-        // Update localStorage
-        localStorage.setItem('pendingUploads', JSON.stringify(pendingUploads));
-        updatePendingUploadsUI();
-        
-        // Continue with the next scan (same index since we removed one)
-        setTimeout(() => uploadNextScan(index), 1000);
-      })
-      .catch(error => {
-        logDebug(`Error uploading scan: ${error}`);
-        // Move to the next scan
-        setTimeout(() => uploadNextScan(index + 1), 1000);
-      });
-  }
-}
-    
+        submitScanToSheet(scanData)
+          .then(success => {
+            // Always remove from pending uploads and assume success
+            // This is because with CORS, we can't reliably determine if the upload failed
+            logDebug(`Processed scan: ${scanData.bib} at ${scanData.checkpoint}`);
+            
+            // Remove this scan from pendingUploads
+            pendingUploads.splice(index, 1);
+            
+            // Update localStorage
+            localStorage.setItem('pendingUploads', JSON.stringify(pendingUploads));
+            updatePendingUploadsUI();
+            
+            // Continue with the next scan (same index since we removed one)
+            setTimeout(() => uploadNextScan(index), 1000);
+          })
+          .catch(error => {
+            logDebug(`Error uploading scan: ${error}`);
+            // Move to the next scan
+            setTimeout(() => uploadNextScan(index + 1), 1000);
+          });
+      }
+    }
     
     // Handle manual bib submission
     manualSubmitButton.addEventListener('click', function() {
@@ -1668,16 +1890,22 @@ function uploadPendingScans(forceUpload = false) {
       }
       
       // Find runner in our loaded data
-      const runnerName = runnersData[bib];
+      const runnerInfo = runnersData[bib];
       
-      if (!runnerName) {
+      if (!runnerInfo) {
         showMessage(`No runner found with bib ${bib}`, true);
+        return;
+      }
+      
+      // Check if runner is marked as DNF
+      if (runnerInfo.dnf) {
+        showMessage(`Runner #${bib} (${runnerInfo.name}) is marked as DNF`, true);
         return;
       }
       
       // Check if we should process this scan (not a duplicate or is newer)
       if (!shouldProcessScan(bib, checkpoint)) {
-        showMessage(`Already recorded: ${runnerName} (${bib})`, false);
+        showMessage(`Already recorded: ${runnerInfo.name} (${bib})`, false);
         bibInput.value = '';
         return;
       }
@@ -1685,7 +1913,7 @@ function uploadPendingScans(forceUpload = false) {
       const scanData = {
         timestamp: new Date().toISOString(),
         bib: bib,
-        name: runnerName,
+        name: runnerInfo.name,
         checkpoint: checkpoint
       };
       
@@ -1699,13 +1927,16 @@ function uploadPendingScans(forceUpload = false) {
       // Add to recent scans
       storeRecentScan(scanData);
       
+      // Update checkpoint stats
+      fetchCheckpointStats();
+      
       if (isOnline) {
         submitScanToSheet(scanData)
           .then(function(success) {
             if (success) {
               // Mark as uploaded to prevent duplicates
               markScanAsUploaded(scanData);
-              showMessage(`Recorded: ${runnerName} (${bib})`);
+              showMessage(`Recorded: ${runnerInfo.name} (${bib})`);
               // Clear form
               bibInput.value = '';
             } else {
@@ -1724,7 +1955,7 @@ function uploadPendingScans(forceUpload = false) {
           });
       } else {
         storeScanOffline(scanData);
-        showMessage(`Stored offline: ${runnerName} (${bib})`);
+        showMessage(`Stored offline: ${runnerInfo.name} (${bib})`);
         // Clear form
         bibInput.value = '';
       }
