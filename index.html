@@ -404,29 +404,31 @@
       <h1>TIGER CLAW TIMING SYSTEM</h1>
     </div>
     
-    <div class="form-group">
-      <label for="checkpoint-select">Select Checkpoint</label>
-      <select id="checkpoint-select">
-        <option value="">Select checkpoint</option>
-        <option value="GREEN CHECKPOINT">GREEN CHECKPOINT</option>
-        <option value="PINK LOOP TOP">PINK LOOP TOP</option>
-        <option value="PINK LOOP BOTTOM">PINK LOOP BOTTOM</option>
-        <option value="YELLOW LOOP TOP">YELLOW LOOP TOP</option>
-        <option value="YELLOW LOOP BOTTOM">YELLOW LOOP BOTTOM</option>
-        <option value="WHITE LOOP TOP">WHITE LOOP TOP</option>
-        <option value="WHITE LOOP BOTTOM">WHITE LOOP BOTTOM</option>
-        <option value="RED CHECKPOINT">RED CHECKPOINT</option>
-        <option value="FINISHLINE">FINISHLINE</option>
-      </select>
-    </div>
-    
-    <div class="form-group">
-      <label for="password-input">Password</label>
-      <input type="password" id="password-input" placeholder="Enter password">
-      <div id="login-error" class="error-message hidden"></div>
-    </div>
-    
-    <button id="login-button">Login</button>
+    <form id="login-form" onsubmit="event.preventDefault(); handleLogin();">
+  <div class="form-group">
+    <label for="checkpoint-select">Select Checkpoint</label>
+    <select id="checkpoint-select">
+      <option value="">Select checkpoint</option>
+      <option value="GREEN CHECKPOINT">GREEN CHECKPOINT</option>
+      <option value="PINK LOOP TOP">PINK LOOP TOP</option>
+      <option value="PINK LOOP BOTTOM">PINK LOOP BOTTOM</option>
+      <option value="YELLOW LOOP TOP">YELLOW LOOP TOP</option>
+      <option value="YELLOW LOOP BOTTOM">YELLOW LOOP BOTTOM</option>
+      <option value="WHITE LOOP TOP">WHITE LOOP TOP</option>
+      <option value="WHITE LOOP BOTTOM">WHITE LOOP BOTTOM</option>
+      <option value="RED CHECKPOINT">RED CHECKPOINT</option>
+      <option value="FINISHLINE">FINISHLINE</option>
+    </select>
+  </div>
+  
+  <div class="form-group">
+    <label for="password-input">Password</label>
+    <input type="password" id="password-input" placeholder="Enter password">
+    <div id="login-error" class="error-message hidden"></div>
+  </div>
+  
+  <button type="submit" id="login-button">Login</button>
+</form>
     
     <!-- Debug panel toggle -->
     <div style="margin-top: 20px; text-align: center;">
@@ -573,7 +575,7 @@ document.getElementById('refresh-button').addEventListener('click', function() {
     
     // Constants
     const CORRECT_PASSWORD = "threeloops";
-    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz1vMTB9jSG8E8GXyrVe_QcTKYaCGrxRxPBiE7QpBHsHVwVNjqhj8s9d1hprsupeOSO/exec";
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzcxl-tr63Jr3GFc80dP_EeL4dC4_7aGjazL-MaJA8HxLqVzyge88RjiIf0W8Rsdmpm/exec";
     
     // Toggle debug panel
     toggleDebugBtn.addEventListener('click', function() {
@@ -637,6 +639,40 @@ document.getElementById('refresh-button').addEventListener('click', function() {
       }
       console.log(message);
     }
+
+
+// Declare variables
+let checkpointSelect;
+let passwordInput;
+let loginError;
+let CORRECT_PASSWORD;
+let checkpoint;
+
+// Declare showScannerScreen
+let showScannerScreen;
+
+// Handle login form submission
+function handleLogin() {
+  const selectedCheckpoint = checkpointSelect.value;
+  const password = passwordInput.value;
+  
+  if (!selectedCheckpoint) {
+    loginError.textContent = 'Please select a checkpoint';
+    loginError.classList.remove('hidden');
+    return;
+  }
+  
+  if (password !== CORRECT_PASSWORD) {
+    loginError.textContent = 'Incorrect password';
+    loginError.classList.remove('hidden');
+    return;
+  }
+  
+  // Save checkpoint and show scanner screen
+  checkpoint = selectedCheckpoint;
+  localStorage.setItem('tigerClawCheckpoint', checkpoint);
+  showScannerScreen();
+}
     
    // Initialize the application - UPDATED
 function init() {
@@ -783,13 +819,16 @@ function handleOnlineStatusChange() {
     }
     
 // Declare variables
-let logDebug;
-let runnersData;
-let loadingScreen;
-let checkLoginStatus;
-let APPS_SCRIPT_URL;
+let logDebug = console.log; // Default to console.log if not provided
+let runnersData = {};
+let loadingScreen = document.getElementById('loading-screen'); // Assuming there's an element with this ID
+let APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzcxl-tr63Jr3GFc80dP_EeL4dC4_7aGjazL-MaJA8HxLqVzyge88RjiIf0W8Rsdmpm/exec'; // Replace with the actual URL
+function checkLoginStatus() {
+  // Placeholder function
+  logDebug('checkLoginStatus called');
+}
 
-// Fetch runner data from Google Sheets using JSONP
+// Fetch runner data from Google Sheets
 function fetchRunnerData() {
   logDebug('Fetching runner data from Google Sheets...');
   
@@ -815,10 +854,6 @@ function fetchRunnerData() {
   
   // Define the callback function
   window[callbackName] = function(response) {
-    // Clean up
-    document.body.removeChild(script);
-    delete window[callbackName];
-    
     logDebug('JSONP response received for runners data');
     
     try {
@@ -840,6 +875,10 @@ function fetchRunnerData() {
       logDebug('Error processing runner data: ' + error);
     }
     
+    // Clean up
+    document.body.removeChild(script);
+    delete window[callbackName];
+    
     loadingScreen.classList.add('hidden');
     checkLoginStatus();
   };
@@ -850,11 +889,12 @@ function fetchRunnerData() {
   
   // Handle errors
   script.onerror = function() {
-    // Clean up
-    delete window[callbackName];
-    document.body.removeChild(script);
-    
     logDebug('Error fetching runner data');
+    
+    // Clean up
+    document.body.removeChild(script);
+    delete window[callbackName];
+    
     loadingScreen.classList.add('hidden');
     checkLoginStatus();
   };
@@ -865,8 +905,8 @@ function fetchRunnerData() {
   // Set a timeout to handle case where script doesn't load or callback isn't called
   setTimeout(() => {
     if (window[callbackName]) {
-      delete window[callbackName];
       logDebug('Timeout fetching runner data');
+      delete window[callbackName];
       loadingScreen.classList.add('hidden');
       checkLoginStatus();
     }
