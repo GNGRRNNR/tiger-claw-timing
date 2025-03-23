@@ -646,6 +646,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxfqGtjmo26ZYjJRwyUWE2356sP-magLAvyfSa10kPg9bhn5LSnoE5loC75u73il-br/exec";
   const RUNNER_DATA_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
   const CHECKPOINT_STATS_REFRESH_INTERVAL = 60 * 1000; // 1 minute
+  const RUNNERS_SHEET_ID = "19ysJEfg5dDTUe6q-JXngWbUAziGmrn0jGilGy8SkcYg"; // Your runners spreadsheet ID
   
   // Handle login form submission
   loginForm.addEventListener('submit', function(event) {
@@ -670,10 +671,36 @@ document.addEventListener('DOMContentLoaded', function() {
       return;
     }
     
+    // Clear old session data
+    clearSessionData();
+    
     // Save checkpoint and show scanner screen
     checkpoint = selectedCheckpoint;
     localStorage.setItem('tigerClawCheckpoint', checkpoint);
     showScannerScreen();
+    
+    // Fetch fresh checkpoint stats
+    fetchCheckpointStats();
+  }
+  
+  // Clear session data when logging in
+  function clearSessionData() {
+    // Clear recent scans
+    recentScans = [];
+    localStorage.removeItem('recentScans');
+    
+    // Clear processed scans tracking
+    processedScans = {};
+    localStorage.removeItem('processedScans');
+    
+    // Clear scan timestamps
+    scanTimestamps = {};
+    localStorage.removeItem('scanTimestamps');
+    
+    // Update UI
+    updateRecentScansUI();
+    
+    logDebug('Session data cleared for new login');
   }
   
   // Log to debug panel
@@ -727,6 +754,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (currentOnlineStatus) {
       showMessage('Checking for pending uploads...');
       uploadPendingScans(true);
+      
+      // Also refresh runner data
+      fetchRunnerData(true);
     } else {
       showMessage('No internet connection available', true);
     }
@@ -760,6 +790,9 @@ document.addEventListener('DOMContentLoaded', function() {
       
       logDebug('All data cleared successfully');
       showMessage('All data cleared successfully');
+      
+      // Fetch fresh runner data
+      fetchRunnerData(true);
     } catch (error) {
       logDebug('Error clearing data: ' + error);
       showMessage('Error clearing data', true);
@@ -770,7 +803,6 @@ document.addEventListener('DOMContentLoaded', function() {
   function init() {
     // Load data from localStorage
     loadPendingScans();
-    loadRecentScans();
     loadProcessedScans();
     loadScanTimestamps();
     loadUploadedScans();
@@ -779,7 +811,7 @@ document.addEventListener('DOMContentLoaded', function() {
     isOnline = navigator.onLine;
     
     // Fetch runner data
-    fetchRunnerData();
+    fetchRunnerData(true); // Force refresh to ensure we get the latest data
     
     // Set up online/offline event listeners
     window.addEventListener('online', handleOnlineStatusChange);
@@ -848,6 +880,8 @@ document.addEventListener('DOMContentLoaded', function() {
   // Save processed scans to localStorage
   function saveProcessedScans() {
     try {
+      localStorage.setItem('processedScans', JSON.stringify(processedScans));  {
+    try {
       localStorage.setItem('processedScans', JSON.stringify(processedScans));
     } catch (error) {
       logDebug('Error saving processed scans: ' + error);
@@ -902,8 +936,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
   
-  // Load recent scans from localStorage
+  // Load recent scans from localStorage - only load if we're already logged in
   function loadRecentScans() {
+    if (!checkpoint) return; // Don't load if not logged in
+    
     try {
       const storedScans = localStorage.getItem('recentScans');
       if (storedScans) {
@@ -994,69 +1030,132 @@ document.addEventListener('DOMContentLoaded', function() {
     .catch(error => {
       logDebug('Error fetching runner data: ' + error);
       
-      // Try with no-cors as fallback
-      fetch(`${APPS_SCRIPT_URL}?action=getRunnerData`, {
-        method: 'GET',
-        mode: 'no-cors', // Fallback to no-cors
-        cache: 'no-cache'
+      // Try with JSONP as fallback
+      const script = document.createElement('script');
+      const callbackName = 'runnerDataCallback_' + Math.floor(Math.random() * 100000);
+      
+      // Define the callback function
+      window[callbackName] = function(data) {
+        if (data.success && data.data) {
+          // Process the runner data
+          const runnerMap = {};
+          data.data.forEach(runner => {
+            runnerMap[runner.bibNumber] = {
+              name: runner.name,
+              dnf: runner.dnf || false
+            };
+          });
+          
+          runnersData = runnerMap;
+          localStorage.setItem('runnersData', JSON.stringify(runnersData));
+          logDebug(`Loaded ${Object.keys(runnersData).length} runners from Google Sheets via JSONP`);
+          
+          // Hide loading screen and proceed
+          loadingScreen.classList.add('hidden');
+          checkLoginStatus();
+          
+          // Set up periodic refresh of runner data
+          setupRunnerDataRefresh();
+          
+          // Fetch checkpoint stats if we're logged in
+          if (checkpoint) {
+            fetchCheckpointStats();
+          }
+        } else {
+          logDebug('Invalid response format or no data returned from JSONP');
+          fallbackToDirectFetch();
+        }
+        
+        // Clean up
+        document.body.removeChild(script);
+        delete window[callbackName];
+      };
+      
+      // Set up the script tag
+      script.src = `${APPS_SCRIPT_URL}?action=getRunnerData&callback=${callbackName}`;
+      document.body.appendChild(script);
+      
+      // Set a timeout in case JSONP fails
+      setTimeout(() => {
+        if (window[callbackName]) {
+          logDebug('JSONP request timed out');
+          delete window[callbackName];
+          fallbackToDirectFetch();
+        }
+      }, 5000);
+    });
+    
+    // Fallback to direct fetch from the spreadsheet
+    function fallbackToDirectFetch() {
+      logDebug('Attempting direct fetch from spreadsheet as last resort');
+      
+      // This is a last resort - we'll try to fetch directly from the spreadsheet
+      fetch(`https://docs.google.com/spreadsheets/d/${RUNNERS_SHEET_ID}/gviz/tq?tqx=out:json`)
+      .then(response => response.text())
+      .then(text => {
+        // The response is not pure JSON, it's wrapped in a callback
+        // We need to extract the JSON part
+        const jsonStart = text.indexOf('{');
+        const jsonEnd = text.lastIndexOf('}') + 1;
+        const jsonString = text.substring(jsonStart, jsonEnd);
+        return JSON.parse(jsonString);
       })
-      .then(() => {
-        logDebug('Fetch request sent with no-cors, but response not readable');
-        
-        // Use sample data as fallback
-        const sampleRunners = {
-          "101": { name: "John Doe", dnf: false },
-          "102": { name: "Jane Smith", dnf: false },
-          "103": { name: "Bob Johnson", dnf: false },
-          "104": { name: "Alice Williams", dnf: false },
-          "105": { name: "Charlie Brown", dnf: false },
-          "106": { name: "Diana Prince", dnf: false },
-          "107": { name: "Bruce Wayne", dnf: false },
-          "108": { name: "Clark Kent", dnf: false },
-          "109": { name: "Peter Parker", dnf: false },
-          "110": { name: "Tony Stark", dnf: false }
-        };
-        
-        runnersData = sampleRunners;
-        localStorage.setItem('runnersData', JSON.stringify(runnersData));
-        logDebug(`Loaded ${Object.keys(runnersData).length} sample runners after fetch error`);
-        
-        // Hide loading screen and proceed
-        loadingScreen.classList.add('hidden');
-        checkLoginStatus();
-        
-        // Set up periodic refresh of runner data
-        setupRunnerDataRefresh();
-        
-        // Fetch checkpoint stats if we're logged in
-        if (checkpoint) {
-          fetchCheckpointStats();
+      .then(data => {
+        if (data && data.table && data.table.rows) {
+          const runnerMap = {};
+          const rows = data.table.rows;
+          const headers = data.table.cols.map(col => col.label);
+          const bibIndex = 0; // Assuming bib is first column
+          const nameIndex = 1; // Assuming name is second column
+          const dnfIndex = headers.findIndex(h => h === 'DNF' || h === 'Status');
+          
+          for (let i = 0; i < rows.length; i++) {
+            const row = rows[i].c;
+            if (row[bibIndex] && row[bibIndex].v) {
+              const bib = row[bibIndex].v.toString();
+              const name = row[nameIndex] ? row[nameIndex].v : 'Unknown';
+              let dnf = false;
+              
+              if (dnfIndex !== -1 && row[dnfIndex] && row[dnfIndex].v) {
+                const status = row[dnfIndex].v.toString().toUpperCase();
+                dnf = (status === 'DNF' || status === 'DNS' || status === 'TRUE');
+              }
+              
+              runnerMap[bib] = {
+                name: name,
+                dnf: dnf
+              };
+            }
+          }
+          
+          runnersData = runnerMap;
+          localStorage.setItem('runnersData', JSON.stringify(runnersData));
+          logDebug(`Loaded ${Object.keys(runnersData).length} runners directly from spreadsheet`);
+          
+          // Hide loading screen and proceed
+          loadingScreen.classList.add('hidden');
+          checkLoginStatus();
+          
+          // Set up periodic refresh of runner data
+          setupRunnerDataRefresh();
+          
+          // Fetch checkpoint stats if we're logged in
+          if (checkpoint) {
+            fetchCheckpointStats();
+          }
+        } else {
+          throw new Error('Invalid spreadsheet data format');
         }
       })
       .catch(err => {
         logDebug('Complete failure to fetch runner data: ' + err);
         
-        // Use sample data as last resort
-        const sampleRunners = {
-          "101": { name: "John Doe", dnf: false },
-          "102": { name: "Jane Smith", dnf: false },
-          "103": { name: "Bob Johnson", dnf: false },
-          "104": { name: "Alice Williams", dnf: false },
-          "105": { name: "Charlie Brown", dnf: false }
-        };
-        
-        runnersData = sampleRunners;
-        localStorage.setItem('runnersData', JSON.stringify(runnersData));
-        logDebug(`Loaded ${Object.keys(runnersData).length} sample runners as last resort`);
-        
-        // Hide loading screen and proceed
+        // Show error and let user proceed anyway
         loadingScreen.classList.add('hidden');
         checkLoginStatus();
-        
-        // Set up periodic refresh of runner data
-        setupRunnerDataRefresh();
+        showMessage('Failed to load runner data. Please check your connection and try again.', true);
       });
-    });
+    }
   }
   
   // Set up periodic refresh of runner data
@@ -1255,6 +1354,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (savedCheckpoint) {
       checkpoint = savedCheckpoint;
       showScannerScreen();
+      
+      // Load recent scans after login
+      loadRecentScans();
     } else {
       loginScreen.classList.remove('hidden');
     }
@@ -1667,6 +1769,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const runnerInfo = runnersData[cleanBib];
     
     if (!runnerInfo) {
+      showMessage(`No runner found with bib ${cleanBib}`, true);
+      return;
+    }
+    
+    //  {
       showMessage(`No runner found with bib ${cleanBib}`, true);
       return;
     }
