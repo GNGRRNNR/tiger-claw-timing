@@ -575,7 +575,7 @@ document.getElementById('refresh-button').addEventListener('click', function() {
     
     // Constants
     const CORRECT_PASSWORD = "threeloops";
-    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxicstXregGCseTMXacGHRGmG36v21lDtxxPGC2bwp0F0YZoHFCW9ZXtijIGQrmBbUi/exec";
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby5zoPl-2FMocFRUj9p1QSbSv9smuw5hjtyuQmUIgdpBHIf79xHKeLdKxyELxhGE6kh/exec";
     
     // Toggle debug panel
     toggleDebugBtn.addEventListener('click', function() {
@@ -641,15 +641,6 @@ document.getElementById('refresh-button').addEventListener('click', function() {
     }
 
 
-// Declare variables
-let checkpointSelect;
-let passwordInput;
-let loginError;
-let CORRECT_PASSWORD;
-let checkpoint;
-
-// Declare showScannerScreen
-let showScannerScreen;
 
 // Handle login form submission
 function handleLogin() {
@@ -817,18 +808,18 @@ function handleOnlineStatusChange() {
         recentScans = [];
       }
     }
-    
-// Declare variables
-let logDebug = console.log; // Default to console.log if not provided
+        
+    // Declare variables
+let logDebug = console.log; // Or a more sophisticated logging function
 let runnersData = {};
-let loadingScreen = document.getElementById('loading-screen'); // Assuming there's an element with this ID
-let APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxicstXregGCseTMXacGHRGmG36v21lDtxxPGC2bwp0F0YZoHFCW9ZXtijIGQrmBbUi/exec'; // Replace with the actual URL
+let loadingScreen = document.getElementById('loading-screen'); // Or however you access your loading screen
+let APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby5zoPl-2FMocFRUj9p1QSbSv9smuw5hjtyuQmUIgdpBHIf79xHKeLdKxyELxhGE6kh/exec'; // Replace with your actual Apps Script URL
+
 function checkLoginStatus() {
-  // Placeholder function
-  logDebug('checkLoginStatus called');
+  // Implement your login status check here
+  console.log('Checking login status...');
 }
 
-// Fetch runner data from Google Sheets
 function fetchRunnerData() {
   logDebug('Fetching runner data from Google Sheets...');
   
@@ -849,68 +840,43 @@ function fetchRunnerData() {
     logDebug('Error loading runners data from localStorage: ' + error);
   }
   
-  // Create a unique callback name
-  const callbackName = 'runnersCallback_' + Date.now();
-  
-  // Define the callback function
-  window[callbackName] = function(response) {
-    logDebug('JSONP response received for runners data');
+  // Create a fetch request with a no-cors mode as fallback
+  fetch(`${APPS_SCRIPT_URL}?action=getRunnerData`, { 
+    method: 'GET',
+    mode: 'no-cors', // This allows the request but won't let you read the response
+    cache: 'no-cache'
+  })
+  .then(() => {
+    // Since we can't read the response with no-cors, we'll use a hardcoded fallback
+    // or data from a public JSON file you can host on GitHub
     
-    try {
-      if (response && response.success && response.data) {
+    // For now, let's just proceed with whatever data we might have
+    logDebug('Fetch request sent, but response not readable due to CORS');
+    loadingScreen.classList.add('hidden');
+    checkLoginStatus();
+    
+    // Optionally, you could load a static JSON file from your GitHub Pages site
+    // that contains your runner data
+    fetch('runners-data.json')
+      .then(response => response.json())
+      .then(data => {
         const runnerMap = {};
-        response.data.forEach(runner => {
+        data.forEach(runner => {
           runnerMap[runner.bibNumber] = runner.name;
         });
         runnersData = runnerMap;
-        
-        // Store in localStorage for future use
         localStorage.setItem('runnersData', JSON.stringify(runnersData));
-        
-        logDebug(`Loaded ${Object.keys(runnersData).length} runners from Google Sheets`);
-      } else {
-        logDebug('Invalid or empty runners data format from API');
-      }
-    } catch (error) {
-      logDebug('Error processing runner data: ' + error);
-    }
-    
-    // Clean up
-    document.body.removeChild(script);
-    delete window[callbackName];
-    
+        logDebug(`Loaded ${Object.keys(runnersData).length} runners from static file`);
+      })
+      .catch(err => {
+        logDebug('Error loading static runner data: ' + err);
+      });
+  })
+  .catch(error => {
+    logDebug('Error fetching runner data: ' + error);
     loadingScreen.classList.add('hidden');
     checkLoginStatus();
-  };
-  
-  // Create the script element for JSONP
-  const script = document.createElement('script');
-  script.src = `${APPS_SCRIPT_URL}?action=getRunnerData&callback=${callbackName}&nocache=${Date.now()}`;
-  
-  // Handle errors
-  script.onerror = function() {
-    logDebug('Error fetching runner data');
-    
-    // Clean up
-    document.body.removeChild(script);
-    delete window[callbackName];
-    
-    loadingScreen.classList.add('hidden');
-    checkLoginStatus();
-  };
-  
-  // Add the script to the document
-  document.body.appendChild(script);
-  
-  // Set a timeout to handle case where script doesn't load or callback isn't called
-  setTimeout(() => {
-    if (window[callbackName]) {
-      logDebug('Timeout fetching runner data');
-      delete window[callbackName];
-      loadingScreen.classList.add('hidden');
-      checkLoginStatus();
-    }
-  }, 10000); // 10 seconds timeout
+  });
 }
     
     
