@@ -1219,7 +1219,9 @@ function init() {
         
         // Still fetch fresh data in the background
         setTimeout(() => {
-          fetchRunnerData(true);
+          fetchRunnerData(true).catch(err => {
+            logDebug('Background data refresh failed: ' + err);
+          });
         }, 1000);
         
         return;
@@ -1388,57 +1390,56 @@ function fetchRunnerData(forceRefresh = false) {
   if (isLoadingRunnerData) return Promise.resolve(); // Prevent multiple simultaneous loads
   isLoadingRunnerData = true;
 
-  // Show loading screen if we don't have any runner data yet
-  if (Object.keys(runnersData).length === 0) {
-    loadingScreen.classList.remove('hidden');
-    loadingError.classList.add('hidden');
-  }
-
-  logDebug('Fetching runner data from Google Apps Script...');
-
-  // Try to load from localStorage first if not forcing refresh
-  if (!forceRefresh) {
-    try {
-      const storedData = localStorage.getItem('runnersData');
-      if (storedData) {
-        const parsedData = JSON.parse(storedData);
-        if (parsedData && Object.keys(parsedData).length > 0) {
-          runnersData = parsedData;
-          logDebug(`Loaded ${Object.keys(runnersData).length} runners from localStorage`);
-          loadingScreen.classList.add('hidden');
-          isLoadingRunnerData = false;
-          checkLoginStatus();
-          
-          // Set up periodic refresh of runner data
-          setupRunnerDataRefresh();
-          
-          // Fetch checkpoint stats if we're logged in
-          if (checkpoint) {
-            fetchCheckpointStatsFromSpreadsheet();
-          }
-          
-          return Promise.resolve();
-        }
-      }
-    } catch (error) {
-      logDebug('Error loading runners data from localStorage: ' + error);
-    }
-  }
-
   return new Promise((resolve) => {
+    // Show loading screen if we don't have any runner data yet
+    if (Object.keys(runnersData).length === 0) {
+      loadingScreen.classList.remove('hidden');
+      loadingError.classList.add('hidden');
+    }
+
+    logDebug('Fetching runner data from Google Apps Script...');
+
+    // Try to load from localStorage first if not forcing refresh
+    if (!forceRefresh) {
+      try {
+        const storedData = localStorage.getItem('runnersData');
+        if (storedData) {
+          const parsedData = JSON.parse(storedData);
+          if (parsedData && Object.keys(parsedData).length > 0) {
+            runnersData = parsedData;
+            logDebug(`Loaded ${Object.keys(runnersData).length} runners from localStorage`);
+            loadingScreen.classList.add('hidden');
+            isLoadingRunnerData = false;
+            checkLoginStatus();
+            
+            // Set up periodic refresh of runner data
+            setupRunnerDataRefresh();
+            
+            // Fetch checkpoint stats if we're logged in
+            if (checkpoint) {
+              fetchCheckpointStatsFromSpreadsheet();
+            }
+            
+            resolve();
+            return;
+          }
+        }
+      } catch (error) {
+        logDebug('Error loading runners data from localStorage: ' + error);
+      }
+    }
+
     // Set a timeout to handle cases where the fetch never completes
     const timeoutId = setTimeout(() => {
       if (isLoadingRunnerData) {
         logDebug('Runner data fetch timed out');
-        isLoadingRunnerData = false;
-        loadingError.classList.remove('hidden');
         
         // Create sample data as fallback when timeout occurs
         const sampleRunners = {
           "101": { name: "Gus Newberry", dnf: false },
           "102": { name: "Jane Smith", dnf: false },
           "103": { name: "Bob Johnson", dnf: false },
-          "104": { name: Alice Williams", dnf: false },
+          "104": { name: "Alice Williams", dnf: false },
           "105": { name: "Charlie Brown", dnf: false }
         };
         
@@ -1448,6 +1449,7 @@ function fetchRunnerData(forceRefresh = false) {
         
         // Hide loading screen and proceed with sample data
         loadingScreen.classList.add('hidden');
+        isLoadingRunnerData = false;
         checkLoginStatus();
         resolve();
       }
@@ -1472,8 +1474,6 @@ function fetchRunnerData(forceRefresh = false) {
       })
       .catch(error => {
         logDebug('Error fetching runner data from spreadsheet: ' + error);
-        
-        // Use sample data as fallback
         clearTimeout(timeoutId);
         
         // Create sample data as fallback
