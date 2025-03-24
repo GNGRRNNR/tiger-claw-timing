@@ -742,6 +742,7 @@ let isRefreshingStats = false; // Flag to prevent multiple simultaneous stats re
 let lastDnfCheck = 0; // Track when we last checked for DNF updates
 let periodicUploadInterval = null; // Interval for periodic upload attempts
 let deferredInstallPrompt = null; // Store the install prompt event
+let dataLoadTimeoutId = null; // Store the timeout ID for data loading
 
 // Constants
 const CORRECT_PASSWORD = "threeloops";
@@ -752,7 +753,7 @@ const DNF_CHECK_INTERVAL = 60 * 1000; // 1 minute
 const PERIODIC_UPLOAD_INTERVAL = 30 * 1000; // 30 seconds
 const RUNNERS_SHEET_ID = "19ysJEfg5dDTUe6q-JXngWbUAziGmrn0jGilGy8SkcYg"; // Your runners spreadsheet ID
 const RESULTS_SHEET_ID = "1StRgcagtoZs6x-TRCQMAWiTIqXKq__6_Gvcj8ysUz5c"; // Your results spreadsheet ID
-const DATA_LOAD_TIMEOUT = 30000; // 30 seconds timeout for data loading
+const DATA_LOAD_TIMEOUT = 10000; // 10 seconds timeout for data loading (reduced from 30 seconds)
 
 // Check for URL parameters (for QR code login)
 function checkUrlParameters() {
@@ -1049,6 +1050,10 @@ if (Date.now() - lastDnfCheck > DNF_CHECK_INTERVAL) {
     // After runner data is refreshed, calculate stats
     const stats = calculateLocalCheckpointStats();
     updateCheckpointStatsUI(stats);
+  }).catch(() => {
+    // If there's an error, still calculate stats with current data
+    const stats = calculateLocalCheckpointStats();
+    updateCheckpointStatsUI(stats);
   });
 } else {
   // Just calculate stats with current data
@@ -1231,7 +1236,10 @@ function init() {
     logDebug('Error loading runners data from localStorage at init: ' + error);
   }
 
-  // If we don't have data, fetch it
+  // If we don't have data, create sample data immediately
+  createSampleData();
+  
+  // Then try to fetch real data
   fetchRunnerData(true)
     .then(() => {
       // Check if we have pending uploads and we're online
@@ -1244,10 +1252,27 @@ function init() {
     })
     .catch(error => {
       logDebug('Error in init: ' + error);
-      // Ensure loading screen is hidden even if there's an error
-      loadingScreen.classList.add('hidden');
-      checkLoginStatus();
+      // We already have sample data, so just log the error
     });
+}
+
+// Create sample data as fallback
+function createSampleData() {
+  const sampleRunners = {
+    "101": { name: "Gus Newberry", dnf: false },
+    "102": { name: "Jane Smith", dnf: false },
+    "103": { name: "Bob Johnson", dnf: false },
+    "104": { name: "Alice Williams", dnf: false },
+    "105": { name: "Charlie Brown", dnf: false }
+  };
+  
+  runnersData = sampleRunners;
+  localStorage.setItem('runnersData', JSON.stringify(runnersData));
+  logDebug(`Created sample runner data as fallback`);
+  
+  // Hide loading screen and proceed with sample data
+  loadingScreen.classList.add('hidden');
+  checkLoginStatus();
 }
 
 // Update offline banner
@@ -1390,7 +1415,7 @@ function fetchRunnerData(forceRefresh = false) {
   if (isLoadingRunnerData) return Promise.resolve(); // Prevent multiple simultaneous loads
   isLoadingRunnerData = true;
 
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     // Show loading screen if we don't have any runner data yet
     if (Object.keys(runnersData).length === 0) {
       loadingScreen.classList.remove('hidden');
@@ -1429,27 +1454,19 @@ function fetchRunnerData(forceRefresh = false) {
       }
     }
 
+    // Clear any existing timeout
+    if (dataLoadTimeoutId) {
+      clearTimeout(dataLoadTimeoutId);
+    }
+
     // Set a timeout to handle cases where the fetch never completes
-    const timeoutId = setTimeout(() => {
+    dataLoadTimeoutId = setTimeout(() => {
       if (isLoadingRunnerData) {
         logDebug('Runner data fetch timed out');
-        
-        // Create sample data as fallback when timeout occurs
-        const sampleRunners = {
-          "101": { name: "Gus Newberry", dnf: false },
-          "102": { name: "Jane Smith", dnf: false },
-          "103": { name: "Bob Johnson", dnf: false },
-          "104": { name: "Alice Williams", dnf: false },
-          "105": { name: "Charlie Brown", dnf: false }
-        };
-        
-        runnersData = sampleRunners;
-        localStorage.setItem('runnersData', JSON.stringify(runnersData));
-        logDebug(`Created sample runner data as fallback after timeout`);
+        isLoadingRunnerData = false;
         
         // Hide loading screen and proceed with sample data
         loadingScreen.classList.add('hidden');
-        isLoadingRunnerData = false;
         checkLoginStatus();
         resolve();
       }
@@ -1458,7 +1475,8 @@ function fetchRunnerData(forceRefresh = false) {
     // First try direct fetch from spreadsheet as primary method
     fetchRunnerDataFromSpreadsheet(forceRefresh)
       .then(() => {
-        clearTimeout(timeoutId);
+        clearTimeout(dataLoadTimeoutId);
+        dataLoadTimeoutId = null;
         loadingScreen.classList.add('hidden');
         isLoadingRunnerData = false;
         checkLoginStatus();
@@ -1474,20 +1492,8 @@ function fetchRunnerData(forceRefresh = false) {
       })
       .catch(error => {
         logDebug('Error fetching runner data from spreadsheet: ' + error);
-        clearTimeout(timeoutId);
-        
-        // Create sample data as fallback
-        const sampleRunners = {
-          "101": { name: "Gus Newberry", dnf: false },
-          "102": { name: "Jane Smith", dnf: false },
-          "103": { name: "Bob Johnson", dnf: false },
-          "104": { name: "Alice Williams", dnf: false },
-          "105": { name: "Charlie Brown", dnf: false }
-        };
-        
-        runnersData = sampleRunners;
-        localStorage.setItem('runnersData', JSON.stringify(runnersData));
-        logDebug(`Created sample runner data as fallback after error`);
+        clearTimeout(dataLoadTimeoutId);
+        dataLoadTimeoutId = null;
         
         // Hide loading screen and proceed with sample data
         loadingScreen.classList.add('hidden');
