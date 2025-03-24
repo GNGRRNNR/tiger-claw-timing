@@ -1178,67 +1178,74 @@ try {
 
 // Initialize the application
 function init() {
-// Register service worker
-registerServiceWorker();
+  // Register service worker
+  registerServiceWorker();
 
-// Check for URL parameters (for QR code login)
-checkUrlParameters();
+  // Check for URL parameters (for QR code login)
+  checkUrlParameters();
 
-// Load data from localStorage
-loadPendingScans();
-loadProcessedScans();
-loadScanTimestamps();
-loadUploadedScans();
+  // Load data from localStorage
+  loadPendingScans();
+  loadProcessedScans();
+  loadScanTimestamps();
+  loadUploadedScans();
 
-// Set initial online status
-isOnline = navigator.onLine;
-updateOfflineBanner();
+  // Set initial online status
+  isOnline = navigator.onLine;
+  updateOfflineBanner();
 
-// Set up online/offline event listeners
-window.addEventListener('online', handleOnlineStatusChange);
-window.addEventListener('offline', handleOnlineStatusChange);
+  // Set up online/offline event listeners
+  window.addEventListener('online', handleOnlineStatusChange);
+  window.addEventListener('offline', handleOnlineStatusChange);
 
-// Check if we already have runner data in localStorage
-try {
-  const storedData = localStorage.getItem('runnersData');
-  if (storedData) {
-    const parsedData = JSON.parse(storedData);
-    if (parsedData && Object.keys(parsedData).length > 0) {
-      // We have data, use it immediately
-      runnersData = parsedData;
-      logDebug(`Loaded ${Object.keys(runnersData).length} runners from localStorage at init`);
-      
-      // Check for pending uploads that need to be processed
-      if (pendingUploads.length > 0) {
-        logDebug(`Found ${pendingUploads.length} pending uploads at startup`);
-        updatePendingUploadsUI();
+  // Check if we already have runner data in localStorage
+  try {
+    const storedData = localStorage.getItem('runnersData');
+    if (storedData) {
+      const parsedData = JSON.parse(storedData);
+      if (parsedData && Object.keys(parsedData).length > 0) {
+        // We have data, use it immediately
+        runnersData = parsedData;
+        logDebug(`Loaded ${Object.keys(runnersData).length} runners from localStorage at init`);
+        
+        // Check for pending uploads that need to be processed
+        if (pendingUploads.length > 0) {
+          logDebug(`Found ${pendingUploads.length} pending uploads at startup`);
+          updatePendingUploadsUI();
+        }
+        
+        loadingScreen.classList.add('hidden');
+        checkLoginStatus();
+        
+        // Still fetch fresh data in the background
+        setTimeout(() => {
+          fetchRunnerData(true);
+        }, 1000);
+        
+        return;
       }
-      
+    }
+  } catch (error) {
+    logDebug('Error loading runners data from localStorage at init: ' + error);
+  }
+
+  // If we don't have data, fetch it
+  fetchRunnerData(true)
+    .then(() => {
+      // Check if we have pending uploads and we're online
+      if (isOnline && pendingUploads.length > 0) {
+        logDebug(`Found ${pendingUploads.length} pending uploads at startup - attempting to upload`);
+        setTimeout(() => {
+          uploadPendingScans(true);
+        }, 3000);
+      }
+    })
+    .catch(error => {
+      logDebug('Error in init: ' + error);
+      // Ensure loading screen is hidden even if there's an error
       loadingScreen.classList.add('hidden');
       checkLoginStatus();
-      
-      // Still fetch fresh data in the background
-      setTimeout(() => {
-        fetchRunnerData(true);
-      }, 1000);
-      
-      return;
-    }
-  }
-} catch (error) {
-  logDebug('Error loading runners data from localStorage at init: ' + error);
-}
-
-// If we don't have data, fetch it
-fetchRunnerData(true);
-
-// Check if we have pending uploads and we're online
-if (isOnline && pendingUploads.length > 0) {
-  logDebug(`Found ${pendingUploads.length} pending uploads at startup - attempting to upload`);
-  setTimeout(() => {
-    uploadPendingScans(true);
-  }, 3000);
-}
+    });
 }
 
 // Update offline banner
@@ -1378,26 +1385,78 @@ try {
 
 // Fetch runner data from Apps Script
 function fetchRunnerData(forceRefresh = false) {
-if (isLoadingRunnerData) return; // Prevent multiple simultaneous loads
-isLoadingRunnerData = true;
+  if (isLoadingRunnerData) return Promise.resolve(); // Prevent multiple simultaneous loads
+  isLoadingRunnerData = true;
 
-// Show loading screen if we don't have any runner data yet
-if (Object.keys(runnersData).length === 0) {
-  loadingScreen.classList.remove('hidden');
-  loadingError.classList.add('hidden');
-}
+  // Show loading screen if we don't have any runner data yet
+  if (Object.keys(runnersData).length === 0) {
+    loadingScreen.classList.remove('hidden');
+    loadingError.classList.add('hidden');
+  }
 
-logDebug('Fetching runner data from Google Apps Script...');
+  logDebug('Fetching runner data from Google Apps Script...');
 
-// Try to load from localStorage first if not forcing refresh
-if (!forceRefresh) {
-  try {
-    const storedData = localStorage.getItem('runnersData');
-    if (storedData) {
-      const parsedData = JSON.parse(storedData);
-      if (parsedData && Object.keys(parsedData).length > 0) {
-        runnersData = parsedData;
-        logDebug(`Loaded ${Object.keys(runnersData).length} runners from localStorage`);
+  // Try to load from localStorage first if not forcing refresh
+  if (!forceRefresh) {
+    try {
+      const storedData = localStorage.getItem('runnersData');
+      if (storedData) {
+        const parsedData = JSON.parse(storedData);
+        if (parsedData && Object.keys(parsedData).length > 0) {
+          runnersData = parsedData;
+          logDebug(`Loaded ${Object.keys(runnersData).length} runners from localStorage`);
+          loadingScreen.classList.add('hidden');
+          isLoadingRunnerData = false;
+          checkLoginStatus();
+          
+          // Set up periodic refresh of runner data
+          setupRunnerDataRefresh();
+          
+          // Fetch checkpoint stats if we're logged in
+          if (checkpoint) {
+            fetchCheckpointStatsFromSpreadsheet();
+          }
+          
+          return Promise.resolve();
+        }
+      }
+    } catch (error) {
+      logDebug('Error loading runners data from localStorage: ' + error);
+    }
+  }
+
+  return new Promise((resolve) => {
+    // Set a timeout to handle cases where the fetch never completes
+    const timeoutId = setTimeout(() => {
+      if (isLoadingRunnerData) {
+        logDebug('Runner data fetch timed out');
+        isLoadingRunnerData = false;
+        loadingError.classList.remove('hidden');
+        
+        // Create sample data as fallback when timeout occurs
+        const sampleRunners = {
+          "101": { name: "Gus Newberry", dnf: false },
+          "102": { name: "Jane Smith", dnf: false },
+          "103": { name: "Bob Johnson", dnf: false },
+          "104": { name: Alice Williams", dnf: false },
+          "105": { name: "Charlie Brown", dnf: false }
+        };
+        
+        runnersData = sampleRunners;
+        localStorage.setItem('runnersData', JSON.stringify(runnersData));
+        logDebug(`Created sample runner data as fallback after timeout`);
+        
+        // Hide loading screen and proceed with sample data
+        loadingScreen.classList.add('hidden');
+        checkLoginStatus();
+        resolve();
+      }
+    }, DATA_LOAD_TIMEOUT);
+
+    // First try direct fetch from spreadsheet as primary method
+    fetchRunnerDataFromSpreadsheet(forceRefresh)
+      .then(() => {
+        clearTimeout(timeoutId);
         loadingScreen.classList.add('hidden');
         isLoadingRunnerData = false;
         checkLoginStatus();
@@ -1409,211 +1468,128 @@ if (!forceRefresh) {
         if (checkpoint) {
           fetchCheckpointStatsFromSpreadsheet();
         }
+        resolve();
+      })
+      .catch(error => {
+        logDebug('Error fetching runner data from spreadsheet: ' + error);
         
-        return;
-      }
-    }
-  } catch (error) {
-    logDebug('Error loading runners data from localStorage: ' + error);
-  }
-}
-
-// Set a timeout to handle cases where the fetch never completes
-const timeoutId = setTimeout(() => {
-  if (isLoadingRunnerData) {
-    logDebug('Runner data fetch timed out');
-    isLoadingRunnerData = false;
-    loadingError.classList.remove('hidden');
-    
-    // Create sample data as fallback when timeout occurs
-    const sampleRunners = {
-      "101": { name: "Gus Newberry", dnf: false },
-      "102": { name: "Jane Smith", dnf: false },
-      "103": { name: "Bob Johnson", dnf: false },
-      "104": { name: "Alice Williams", dnf: false },
-      "105": { name: "Charlie Brown", dnf: false }
-    };
-    
-    runnersData = sampleRunners;
-    localStorage.setItem('runnersData', JSON.stringify(runnersData));
-    logDebug(`Created sample runner data as fallback after timeout`);
-    
-    // Hide loading screen and proceed with sample data
-    loadingScreen.classList.add('hidden');
-    checkLoginStatus();
-  }
-}, DATA_LOAD_TIMEOUT);
-
-// First try direct fetch from spreadsheet as primary method
-fetchRunnerDataFromSpreadsheet(forceRefresh)
-  .then(() => {
-    clearTimeout(timeoutId);
-    loadingScreen.classList.add('hidden');
-    isLoadingRunnerData = false;
-    checkLoginStatus();
-    
-    // Set up periodic refresh of runner data
-    setupRunnerDataRefresh();
-    
-    // Fetch checkpoint stats if we're logged in
-    if (checkpoint) {
-      fetchCheckpointStatsFromSpreadsheet();
-    }
-  })
-  .catch(error => {
-    logDebug('Error fetching runner data from spreadsheet: ' + error);
-    
-    // Try Apps Script as fallback
-    fetch(`${APPS_SCRIPT_URL}?action=getRunnerData`, {
-      method: 'GET',
-      mode: 'no-cors',
-      cache: 'no-cache'
-    })
-    .then(() => {
-      // Since we can't read the response with no-cors, we'll use sample data
-      clearTimeout(timeoutId);
-      
-      // Create sample data as fallback
-      const sampleRunners = {
-        "101": { name: "Gus Newberry", dnf: false },
-        "102": { name: "Jane Smith", dnf: false },
-        "103": { name: "Bob Johnson", dnf: false },
-        "104": { name: "Alice Williams", dnf: false },
-        "105": { name: "Charlie Brown", dnf: false }
-      };
-      
-      runnersData = sampleRunners;
-      localStorage.setItem('runnersData', JSON.stringify(runnersData));
-      logDebug(`Created sample runner data as fallback after Apps Script attempt`);
-      
-      // Hide loading screen and proceed with sample data
-      loadingScreen.classList.add('hidden');
-      isLoadingRunnerData = false;
-      checkLoginStatus();
-      
-      // Set up periodic refresh of runner data
-      setupRunnerDataRefresh();
-    })
-    .catch(error => {
-      clearTimeout(timeoutId);
-      logDebug('All runner data fetch methods failed: ' + error);
-      
-      // Show error and let user proceed with sample data
-      loadingError.classList.remove('hidden');
-      
-      // Create sample data as last resort
-      const sampleRunners = {
-        "101": { name: "Gus Newberry", dnf: false },
-        "102": { name: "Jane Smith", dnf: false },
-        "103": { name: "Bob Johnson", dnf: false },
-        "104": { name: "Alice Williams", dnf: false },
-        "105": { name: "Charlie Brown", dnf: false }
-      };
-      
-      runnersData = sampleRunners;
-      localStorage.setItem('runnersData', JSON.stringify(runnersData));
-      logDebug(`Created sample runner data as final fallback`);
-      
-      // We still need to hide the loading screen and proceed
-      isLoadingRunnerData = false;
-      loadingScreen.classList.add('hidden');
-      checkLoginStatus();
-    });
+        // Use sample data as fallback
+        clearTimeout(timeoutId);
+        
+        // Create sample data as fallback
+        const sampleRunners = {
+          "101": { name: "Gus Newberry", dnf: false },
+          "102": { name: "Jane Smith", dnf: false },
+          "103": { name: "Bob Johnson", dnf: false },
+          "104": { name: "Alice Williams", dnf: false },
+          "105": { name: "Charlie Brown", dnf: false }
+        };
+        
+        runnersData = sampleRunners;
+        localStorage.setItem('runnersData', JSON.stringify(runnersData));
+        logDebug(`Created sample runner data as fallback after error`);
+        
+        // Hide loading screen and proceed with sample data
+        loadingScreen.classList.add('hidden');
+        isLoadingRunnerData = false;
+        checkLoginStatus();
+        resolve();
+      });
   });
 }
 
 // Fetch runner data directly from the spreadsheet
 function fetchRunnerDataFromSpreadsheet(forceRefresh = false) {
-return new Promise((resolve, reject) => {
-  logDebug('Fetching runner data directly from spreadsheet');
-  
-  // Add a cache-busting parameter to ensure we get fresh data
-  const cacheBuster = new Date().getTime();
-  
-  // Fetch directly from the spreadsheet using the Google Visualization API
-  const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${RUNNERS_SHEET_ID}/gviz/tq?tqx=out:json&cacheBuster=${cacheBuster}`;
-  
-  fetch(spreadsheetUrl)
-    .then(response => {
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return response.text();
-    })
-    .then(text => {
-      try {
-        // The response is not pure JSON, it's wrapped in a callback
-        // We need to extract the JSON part
-        const jsonStart = text.indexOf('{');
-        const jsonEnd = text.lastIndexOf('}') + 1;
-        if (jsonStart === -1 || jsonEnd === 0) {
-          throw new Error('Invalid response format - could not find JSON data');
+  return new Promise((resolve, reject) => {
+    logDebug('Fetching runner data directly from spreadsheet');
+    
+    // Add a cache-busting parameter to ensure we get fresh data
+    const cacheBuster = new Date().getTime();
+    
+    // Fetch directly from the spreadsheet using the Google Visualization API
+    const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${RUNNERS_SHEET_ID}/gviz/tq?tqx=out:json&cacheBuster=${cacheBuster}`;
+    
+    fetch(spreadsheetUrl)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
-        const jsonString = text.substring(jsonStart, jsonEnd);
-        return JSON.parse(jsonString);
-      } catch (e) {
-        throw new Error(`Error parsing spreadsheet response: ${e.message}`);
-      }
-    })
-    .then(data => {
-      if (data && data.table && data.table.rows) {
-        const runnerMap = {};
-        const rows = data.table.rows;
-        const headers = data.table.cols.map(col => col.label);
-        
-        // Find column indices
-        const bibIndex = headers.findIndex(h => h && h.toLowerCase().includes('bib'));
-        const nameIndex = headers.findIndex(h => h && h.toLowerCase().includes('name'));
-        const statusIndex = headers.findIndex(h => h === 'DNF' || (h && h.toLowerCase().includes('status')));
-        
-        if (bibIndex === -1 || nameIndex === -1) {
-          throw new Error('Could not find required columns in spreadsheet');
-        }
-        
-        for (let i = 0; i < rows.length; i++) {
-          const row = rows[i].c;
-          if (row && row[bibIndex] && row[bibIndex].v) {
-            const bib = row[bibIndex].v.toString();
-            const name = row[nameIndex] && row[nameIndex].v ? row[nameIndex].v.toString() : 'Unknown';
-            let dnf = false;
-            
-            // Check for DNF in status column
-            if (statusIndex !== -1 && row[statusIndex] && row[statusIndex].v) {
-              const status = row[statusIndex].v.toString().toUpperCase();
-              dnf = (status === 'DNF' || status === 'DNS' || status === 'TRUE');
-            }
-            
-            runnerMap[bib] = {
-              name: name,
-              dnf: dnf
-            };
+        return response.text();
+      })
+      .then(text => {
+        try {
+          // The response is not pure JSON, it's wrapped in a callback
+          // We need to extract the JSON part
+          const jsonStart = text.indexOf('{');
+          const jsonEnd = text.lastIndexOf('}') + 1;
+          if (jsonStart === -1 || jsonEnd === 0) {
+            throw new Error('Invalid response format - could not find JSON data');
           }
+          const jsonString = text.substring(jsonStart, jsonEnd);
+          return JSON.parse(jsonString);
+        } catch (e) {
+          throw new Error(`Error parsing spreadsheet response: ${e.message}`);
         }
-        
-        if (Object.keys(runnerMap).length === 0) {
-          throw new Error('No runner data found in spreadsheet');
+      })
+      .then(data => {
+        if (data && data.table && data.table.rows) {
+          const runnerMap = {};
+          const rows = data.table.rows;
+          const headers = data.table.cols.map(col => col.label);
+          
+          // Find column indices
+          const bibIndex = headers.findIndex(h => h && h.toLowerCase().includes('bib'));
+          const nameIndex = headers.findIndex(h => h && h.toLowerCase().includes('name'));
+          const statusIndex = headers.findIndex(h => h === 'DNF' || (h && h.toLowerCase().includes('status')));
+          
+          if (bibIndex === -1 || nameIndex === -1) {
+            throw new Error('Could not find required columns in spreadsheet');
+          }
+          
+          for (let i = 0; i < rows.length; i++) {
+            const row = rows[i].c;
+            if (row && row[bibIndex] && row[bibIndex].v) {
+              const bib = row[bibIndex].v.toString();
+              const name = row[nameIndex] && row[nameIndex].v ? row[nameIndex].v.toString() : 'Unknown';
+              let dnf = false;
+              
+              // Check for DNF in status column
+              if (statusIndex !== -1 && row[statusIndex] && row[statusIndex].v) {
+                const status = row[statusIndex].v.toString().toUpperCase();
+                dnf = (status === 'DNF' || status === 'DNS' || status === 'TRUE');
+              }
+              
+              runnerMap[bib] = {
+                name: name,
+                dnf: dnf
+              };
+            }
+          }
+          
+          if (Object.keys(runnerMap).length === 0) {
+            throw new Error('No runner data found in spreadsheet');
+          }
+          
+          // Update the last DNF check timestamp
+          lastDnfCheck = Date.now();
+          
+          runnersData = runnerMap;
+          localStorage.setItem('runnersData', JSON.stringify(runnersData));
+          logDebug(`Loaded ${Object.keys(runnersData).length} runners directly from spreadsheet`);
+          
+          // Update recent scans UI to reflect any DNF changes
+          updateRecentScansUI();
+          
+          resolve();
+        } else {
+          throw new Error('Invalid spreadsheet data format');
         }
-        
-        // Update the last DNF check timestamp
-        lastDnfCheck = Date.now();
-        
-        runnersData = runnerMap;
-        localStorage.setItem('runnersData', JSON.stringify(runnersData));
-        logDebug(`Loaded ${Object.keys(runnersData).length} runners directly from spreadsheet`);
-        
-        // Update recent scans UI to reflect any DNF changes
-        updateRecentScansUI();
-        
-        resolve();
-      } else {
-        throw new Error('Invalid spreadsheet data format');
-      }
-    })
-    .catch(error => {
-      logDebug('Error fetching runner data from spreadsheet: ' + error);
-      reject(error);
-    });
-});
+      })
+      .catch(error => {
+        logDebug('Error fetching runner data from spreadsheet: ' + error);
+        reject(error);
+      });
+  });
 }
 
 // Set up periodic refresh of runner data
