@@ -1,9 +1,11 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏃</text></svg>">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com;">
+<meta name="theme-color" content="#28a745">
+<link rel="manifest" href="manifest.json">
 <title>Tiger Claw Timing System</title>
 <style>
 /* Basic styling */
@@ -469,10 +471,95 @@ border-top-color: #28a745;
 animation: spin 1s ease-in-out infinite;
 margin-left: 5px;
 }
+
+/* Offline mode banner */
+.offline-banner {
+background-color: #dc3545;
+color: white;
+text-align: center;
+padding: 5px;
+font-weight: bold;
+margin-bottom: 10px;
+border-radius: 5px;
+}
+
+/* QR Code Generator */
+#qr-generator {
+margin-top: 20px;
+padding: 15px;
+background-color: #f8f9fa;
+border: 1px solid #ddd;
+border-radius: 5px;
+}
+
+#qr-generator h3 {
+margin-top: 0;
+margin-bottom: 15px;
+}
+
+#generated-qr {
+margin: 15px auto;
+max-width: 200px;
+}
+
+#generated-qr img {
+width: 100%;
+height: auto;
+}
+
+.download-btn {
+background-color: #007bff;
+}
+
+/* Admin section */
+#admin-section {
+margin-top: 20px;
+padding: 15px;
+background-color: #f8f9fa;
+border: 1px solid #ddd;
+border-radius: 5px;
+}
+
+#admin-section h3 {
+margin-top: 0;
+margin-bottom: 15px;
+}
+
+/* Install prompt */
+.install-prompt {
+background-color: #e9f7ef;
+border: 1px solid #28a745;
+border-radius: 5px;
+padding: 10px;
+margin: 10px 0;
+text-align: center;
+}
+
+.install-btn {
+background-color: #28a745;
+color: white;
+border: none;
+border-radius: 5px;
+padding: 8px 15px;
+font-size: 14px;
+margin-top: 10px;
+cursor: pointer;
+}
 </style>
 </head>
 <body>
 <div id="tiger-claw-app">
+<!-- Offline Banner -->
+<div id="offline-banner" class="offline-banner hidden">
+  You are currently offline. Scans will be saved and uploaded when connection is restored.
+</div>
+
+<!-- Install Prompt -->
+<div id="install-prompt" class="install-prompt hidden">
+  Add this app to your home screen for better offline access
+  <button id="install-btn" class="install-btn">Install App</button>
+</div>
+
 <!-- Loading Screen -->
 <div id="loading-screen">
 <div class="app-header">
@@ -517,6 +604,34 @@ margin-left: 5px;
   
   <button type="submit" id="login-button">Login</button>
 </form>
+
+<!-- QR Code Generator (Admin) -->
+<div id="admin-section">
+  <h3>Admin Tools</h3>
+  <button id="show-qr-generator">Generate Checkpoint QR Codes</button>
+</div>
+
+<div id="qr-generator" class="hidden">
+  <h3>Checkpoint QR Code Generator</h3>
+  <div class="form-group">
+    <label for="qr-checkpoint-select">Select Checkpoint</label>
+    <select id="qr-checkpoint-select">
+      <option value="">Select checkpoint</option>
+      <option value="GREEN CHECKPOINT">GREEN CHECKPOINT</option>
+      <option value="PINK LOOP TOP">PINK LOOP TOP</option>
+      <option value="PINK LOOP BOTTOM">PINK LOOP BOTTOM</option>
+      <option value="YELLOW LOOP TOP">YELLOW LOOP TOP</option>
+      <option value="YELLOW LOOP BOTTOM">YELLOW LOOP BOTTOM</option>
+      <option value="WHITE LOOP TOP">WHITE LOOP TOP</option>
+      <option value="WHITE LOOP BOTTOM">WHITE LOOP BOTTOM</option>
+      <option value="RED CHECKPOINT">RED CHECKPOINT</option>
+      <option value="FINISHLINE">FINISHLINE</option>
+    </select>
+  </div>
+  <button id="generate-qr">Generate QR Code</button>
+  <div id="generated-qr" class="hidden"></div>
+  <button id="download-qr" class="download-btn hidden">Download QR Code</button>
+</div>
 
 <!-- Debug panel toggle -->
 <div style="margin-top: 20px; text-align: center;">
@@ -605,10 +720,11 @@ margin-left: 5px;
   <button id="refresh-runners" style="background-color: #007bff; margin-top: 10px; font-size: 12px;">Refresh Runner Data</button>
 </div>
 </div>
-</div>
 
 <!-- Include the HTML5 QR Code Scanner library directly in the HTML -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<!-- Include QR Code Generator library -->
+<script src="https://unpkg.com/qrcode@1.5.1/build/qrcode.min.js"></script>
 
 <script>
 // Main application code
@@ -647,6 +763,17 @@ const forceUploadBtn = document.getElementById('force-upload');
 const clearDataBtn = document.getElementById('clear-data');
 const refreshButton = document.getElementById('refresh-button');
 const refreshRunnersBtn = document.getElementById('refresh-runners');
+const offlineBanner = document.getElementById('offline-banner');
+const installPrompt = document.getElementById('install-prompt');
+const installBtn = document.getElementById('install-btn');
+
+// QR Generator elements
+const showQrGeneratorBtn = document.getElementById('show-qr-generator');
+const qrGenerator = document.getElementById('qr-generator');
+const qrCheckpointSelect = document.getElementById('qr-checkpoint-select');
+const generateQrBtn = document.getElementById('generate-qr');
+const generatedQr = document.getElementById('generated-qr');
+const downloadQrBtn = document.getElementById('download-qr');
 
 // Checkpoint stats elements
 const checkpointStats = document.getElementById('checkpoint-stats');
@@ -680,6 +807,8 @@ let alreadyScannedRunners = new Set(); // Track which runners have already been 
 let isLoadingRunnerData = false; // Flag to prevent multiple simultaneous data loads
 let isRefreshingStats = false; // Flag to prevent multiple simultaneous stats refreshes
 let lastDnfCheck = 0; // Track when we last checked for DNF updates
+let periodicUploadInterval = null; // Interval for periodic upload attempts
+let deferredInstallPrompt = null; // Store the install prompt event
 
 // Constants
 const CORRECT_PASSWORD = "threeloops";
@@ -687,9 +816,128 @@ const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzdjHT6H6gPpM-C
 const RUNNER_DATA_REFRESH_INTERVAL = 2 * 60 * 1000; // 2 minutes
 const CHECKPOINT_STATS_REFRESH_INTERVAL = 30 * 1000; // 30 seconds
 const DNF_CHECK_INTERVAL = 60 * 1000; // 1 minute
+const PERIODIC_UPLOAD_INTERVAL = 30 * 1000; // 30 seconds
 const RUNNERS_SHEET_ID = "19ysJEfg5dDTUe6q-JXngWbUAziGmrn0jGilGy8SkcYg"; // Your runners spreadsheet ID
 const RESULTS_SHEET_ID = "1StRgcagtoZs6x-TRCQMAWiTIqXKq__6_Gvcj8ysUz5c"; // Your results spreadsheet ID
 const DATA_LOAD_TIMEOUT = 30000; // 30 seconds timeout for data loading
+
+// Check for URL parameters (for QR code login)
+function checkUrlParameters() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const checkpointParam = urlParams.get('checkpoint');
+  const passwordParam = urlParams.get('password');
+  
+  if (checkpointParam && passwordParam) {
+    logDebug(`Found URL parameters: checkpoint=${checkpointParam}`);
+    
+    // Auto-fill the login form
+    const checkpointOption = Array.from(checkpointSelect.options).find(
+      option => option.value === checkpointParam
+    );
+    
+    if (checkpointOption) {
+      checkpointSelect.value = checkpointParam;
+      passwordInput.value = passwordParam;
+      
+      // Auto login after a short delay
+      setTimeout(() => {
+        handleLogin();
+      }, 500);
+    }
+  }
+}
+
+// Register service worker for offline support
+function registerServiceWorker() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('service-worker.js')
+      .then(registration => {
+        logDebug('Service Worker registered with scope: ' + registration.scope);
+      })
+      .catch(error => {
+        logDebug('Service Worker registration failed: ' + error);
+      });
+  }
+}
+
+// Listen for beforeinstallprompt event
+window.addEventListener('beforeinstallprompt', (e) => {
+  // Prevent Chrome 67 and earlier from automatically showing the prompt
+  e.preventDefault();
+  // Stash the event so it can be triggered later
+  deferredInstallPrompt = e;
+  // Show the install button
+  installPrompt.classList.remove('hidden');
+});
+
+// Install button click handler
+installBtn.addEventListener('click', () => {
+  if (deferredInstallPrompt) {
+    // Show the install prompt
+    deferredInstallPrompt.prompt();
+    
+    // Wait for the user to respond to the prompt
+    deferredInstallPrompt.userChoice.then((choiceResult) => {
+      if (choiceResult.outcome === 'accepted') {
+        logDebug('User accepted the install prompt');
+        installPrompt.classList.add('hidden');
+      } else {
+        logDebug('User dismissed the install prompt');
+      }
+      deferredInstallPrompt = null;
+    });
+  }
+});
+
+// QR Code Generator
+showQrGeneratorBtn.addEventListener('click', function() {
+  qrGenerator.classList.toggle('hidden');
+});
+
+generateQrBtn.addEventListener('click', function() {
+  const selectedCheckpoint = qrCheckpointSelect.value;
+  
+  if (!selectedCheckpoint) {
+    alert('Please select a checkpoint');
+    return;
+  }
+  
+  // Create a URL with checkpoint and password parameters
+  const appUrl = window.location.href.split('?')[0]; // Remove any existing parameters
+  const qrUrl = `${appUrl}?checkpoint=${encodeURIComponent(selectedCheckpoint)}&password=${encodeURIComponent(CORRECT_PASSWORD)}`;
+  
+  // Generate QR code
+  generatedQr.innerHTML = '';
+  QRCode.toCanvas(
+    document.createElement('canvas'),
+    qrUrl,
+    { width: 200, margin: 1 },
+    function(error, canvas) {
+      if (error) {
+        alert('Error generating QR code: ' + error);
+        return;
+      }
+      
+      generatedQr.appendChild(canvas);
+      generatedQr.classList.remove('hidden');
+      downloadQrBtn.classList.remove('hidden');
+      
+      // Store the URL for download
+      downloadQrBtn.setAttribute('data-url', qrUrl);
+    }
+  );
+});
+
+downloadQrBtn.addEventListener('click', function() {
+  const canvas = generatedQr.querySelector('canvas');
+  if (canvas) {
+    const selectedCheckpoint = qrCheckpointSelect.value;
+    const link = document.createElement('a');
+    link.download = `checkpoint-qr-${selectedCheckpoint.replace(/\s+/g, '-').toLowerCase()}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  }
+});
 
 // Retry loading button
 retryLoadingBtn.addEventListener('click', function() {
@@ -733,6 +981,25 @@ function handleLogin() {
   
   // Fetch fresh checkpoint stats
   fetchCheckpointStats(true);
+  
+  // Start periodic upload attempts
+  startPeriodicUploadAttempts();
+}
+
+// Start periodic upload attempts
+function startPeriodicUploadAttempts() {
+  // Clear any existing interval
+  if (periodicUploadInterval) {
+    clearInterval(periodicUploadInterval);
+  }
+  
+  // Set up new interval
+  periodicUploadInterval = setInterval(() => {
+    if (isOnline && pendingUploads.length > 0) {
+      logDebug('Periodic upload attempt');
+      uploadPendingScans();
+    }
+  }, PERIODIC_UPLOAD_INTERVAL);
 }
 
 // Clear session data when logging in
@@ -912,8 +1179,7 @@ function updateStatsWithDnfCheck() {
 function logDebug(message) {
   const timestamp = new Date().toLocaleTimeString();
   if (debugInfo) {
-    debugInfo.textContent = `[${timestamp}] ${message}
-` + debugInfo.textContent;
+    debugInfo.textContent = `[${timestamp}] ${message}\n` + debugInfo.textContent;
   }
   console.log(message);
 }
@@ -992,7 +1258,6 @@ refreshStatsBtn.addEventListener('click', function() {
   });
 });
 
-  
 // Clear all data from localStorage
 function clearAllData() {
   try {
@@ -1030,6 +1295,12 @@ function clearAllData() {
 
 // Initialize the application
 function init() {
+  // Register service worker
+  registerServiceWorker();
+  
+  // Check for URL parameters (for QR code login)
+  checkUrlParameters();
+  
   // Load data from localStorage
   loadPendingScans();
   loadProcessedScans();
@@ -1038,6 +1309,7 @@ function init() {
   
   // Set initial online status
   isOnline = navigator.onLine;
+  updateOfflineBanner();
   
   // Set up online/offline event listeners
   window.addEventListener('online', handleOnlineStatusChange);
@@ -1083,6 +1355,15 @@ function init() {
     setTimeout(() => {
       uploadPendingScans(true);
     }, 3000);
+  }
+}
+
+// Update offline banner
+function updateOfflineBanner() {
+  if (!isOnline) {
+    offlineBanner.classList.remove('hidden');
+  } else {
+    offlineBanner.classList.add('hidden');
   }
 }
 
@@ -1162,6 +1443,7 @@ function handleOnlineStatusChange() {
   
   logDebug(`Connection status changed: ${wasOnline ? 'online' : 'offline'} -> ${isOnline ? 'online' : 'offline'}`);
   updateConnectionStatus();
+  updateOfflineBanner();
   
   // If we're back online and have offline entries, try to sync them
   if (isOnline && !wasOnline && pendingUploads.length > 0) {
@@ -1618,6 +1900,7 @@ function updateConnectionStatus() {
   // First check navigator.onLine
   isOnline = navigator.onLine;
   updateConnectionStatusUI();
+  updateOfflineBanner();
   
   // If we're online and have pending uploads, try to upload them
   if (isOnline && pendingUploads.length > 0) {
@@ -1641,6 +1924,9 @@ function checkLoginStatus() {
     
     // Fetch already scanned runners
     fetchAlreadyScannedRunners();
+    
+    // Start periodic upload attempts
+    startPeriodicUploadAttempts();
   } else {
     loginScreen.classList.remove('hidden');
   }
@@ -1654,6 +1940,7 @@ function showScannerScreen() {
   checkpointDisplay.textContent = checkpoint;
   updateConnectionStatus();
   fetchCheckpointStats();
+  setupCheckpointStatsRefresh();
 }
 
 // Show login screen
@@ -1682,6 +1969,11 @@ logoutButton.addEventListener('click', function() {
   if (checkpointStatsRefreshInterval) {
     clearInterval(checkpointStatsRefreshInterval);
     checkpointStatsRefreshInterval = null;
+  }
+  
+  if (periodicUploadInterval) {
+    clearInterval(periodicUploadInterval);
+    periodicUploadInterval = null;
   }
   
   localStorage.removeItem('tigerClawCheckpoint');
