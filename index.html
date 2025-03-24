@@ -189,14 +189,14 @@ border-radius: 50%;
 }
 
 .flash-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(40, 167, 69, 0.7);
-  z-index: 9999;
-  display: none;
+position: fixed;
+top: 0;
+left: 0;
+width: 100%;
+height: 100%;
+background-color: rgba(40, 167, 69, 0.7);
+z-index: 9999;
+display: none;
 }
 
 .pending-uploads {
@@ -668,25 +668,15 @@ Add this app to your home screen for better offline access
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
 <script>
-// CRITICAL: Force the loading screen to hide after a very short delay
-// This ensures we never get stuck on the loading screen
-window.addEventListener('load', function() {
-  console.log("Window loaded - forcing loading screen to hide in 1 second");
-  setTimeout(function() {
-    document.getElementById('loading-screen').classList.add('hidden');
-    document.getElementById('login-screen').classList.remove('hidden');
-    console.log("Loading screen forcibly hidden");
-  }, 1000);
-});
-
 // Main application code
 document.addEventListener('DOMContentLoaded', function() {
-// CRITICAL: Force the loading screen to hide immediately on DOMContentLoaded
+// CRITICAL: Force the loading screen to hide after a reasonable delay
+// This ensures we never get stuck on the loading screen
 setTimeout(function() {
   document.getElementById('loading-screen').classList.add('hidden');
   document.getElementById('login-screen').classList.remove('hidden');
-  console.log("Loading screen forcibly hidden from DOMContentLoaded");
-}, 500);
+  console.log("Loading screen forcibly hidden after timeout");
+}, 10000); // 10 seconds max wait time
 
 // DOM Elements
 const loadingScreen = document.getElementById('loading-screen');
@@ -741,14 +731,7 @@ let isOnline = navigator.onLine;
 let html5QrCode = null;
 let checkpoint = '';
 let pendingUploads = [];
-// Create sample runner data
-let runnersData = {
-  "101": { name: "Gus Newberry", dnf: false },
-  "102": { name: "Jane Smith", dnf: false },
-  "103": { name: "Bob Johnson", dnf: false },
-  "104": { name: "Alice Williams", dnf: false },
-  "105": { name: "Charlie Brown", dnf: false }
-}; 
+let runnersData = {}; // Will store all runners data
 let recentScans = []; // Store recent scans for display
 let lastUploadAttempt = 0; // Track last upload attempt time
 let debugMode = false; // Debug mode flag
@@ -768,6 +751,7 @@ let lastDnfCheck = 0; // Track when we last checked for DNF updates
 let periodicUploadInterval = null; // Interval for periodic upload attempts
 let deferredInstallPrompt = null; // Store the install prompt event
 let dataLoadTimeoutId = null; // Store the timeout ID for data loading
+let dataLoadAttempted = false; // Flag to track if we've attempted to load data
 
 // Constants
 const CORRECT_PASSWORD = "threeloops";
@@ -778,7 +762,7 @@ const DNF_CHECK_INTERVAL = 60 * 1000; // 1 minute
 const PERIODIC_UPLOAD_INTERVAL = 30 * 1000; // 30 seconds
 const RUNNERS_SHEET_ID = "19ysJEfg5dDTUe6q-JXngWbUAziGmrn0jGilGy8SkcYg"; // Your runners spreadsheet ID
 const RESULTS_SHEET_ID = "1StRgcagtoZs6x-TRCQMAWiTIqXKq__6_Gvcj8ysUz5c"; // Your results spreadsheet ID
-const DATA_LOAD_TIMEOUT = 5000; // 5 seconds timeout for data loading (reduced from 10 seconds)
+const DATA_LOAD_TIMEOUT = 10000; // 10 seconds timeout for data loading
 
 // Check for URL parameters (for QR code login)
 function checkUrlParameters() {
@@ -851,9 +835,7 @@ if (deferredInstallPrompt) {
 // Retry loading button
 retryLoadingBtn.addEventListener('click', function() {
 loadingError.classList.add('hidden');
-// Skip data loading and go straight to login
-loadingScreen.classList.add('hidden');
-loginScreen.classList.remove('hidden');
+fetchRunnerData(true);
 });
 
 // Handle login form submission
@@ -886,6 +868,12 @@ clearSessionData();
 checkpoint = selectedCheckpoint;
 localStorage.setItem('tigerClawCheckpoint', checkpoint);
 showScannerScreen();
+
+// Fetch already scanned runners at this checkpoint
+fetchAlreadyScannedRunners();
+
+// Fetch fresh checkpoint stats
+fetchCheckpointStats(true);
 
 // Start periodic upload attempts
 startPeriodicUploadAttempts();
@@ -930,6 +918,159 @@ updateRecentScansUI();
 logDebug('Session data cleared for new login');
 }
 
+// Fetch already scanned runners at this checkpoint
+function fetchAlreadyScannedRunners() {
+if (!checkpoint || !isOnline) return;
+
+logDebug(`Fetching already scanned runners at checkpoint: ${checkpoint}`);
+
+// Use fetch API to get checkpoint stats with no-cors mode
+fetch(`${APPS_SCRIPT_URL}?action=getCheckpointStats&checkpoint=${encodeURIComponent(checkpoint)}`, {
+  method: 'GET',
+  mode: 'no-cors', // Use no-cors to avoid CORS errors
+  cache: 'no-cache'
+})
+.then(() => {
+  // Since we can't read the response with no-cors, we'll use the spreadsheet API directly
+  fetchCheckpointStatsFromSpreadsheet();
+})
+.catch(error => {
+  logDebug('Error fetching already scanned runners: ' + error);
+  // We'll rely on the checkpoint stats to update this information
+  fetchCheckpointStatsFromSpreadsheet();
+});
+}
+
+function fetchCheckpointStatsFromSpreadsheet() {
+if (!checkpoint || !isOnline) return;
+
+logDebug(`Fetching checkpoint stats from spreadsheet for: ${checkpoint}`);
+
+// Add a cache-busting parameter to ensure we get fresh data
+const cacheBuster = new Date().getTime();
+
+// Fetch directly from the results spreadsheet using the Google Visualization API
+const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${RESULTS_SHEET_ID}/gviz/tq?tqx=out:json&sheet=Sheet1&cacheBuster=${cacheBuster}`;
+
+fetch(spreadsheetUrl)
+  .then(response => response.text())
+  .then(text => {
+    // The response is not pure JSON, it's wrapped in a callback
+    // We need to extract the JSON part
+    const jsonStart = text.indexOf('{');
+    const jsonEnd = text.lastIndexOf('}') + 1;
+    const jsonString = text.substring(jsonStart, jsonEnd);
+    return JSON.parse(jsonString);
+  })
+  .then(data => {
+    if (data && data.table && data.table.rows) {
+      // IMPORTANT: Clear the existing set of scanned runners
+      // This ensures deleted entries are properly reflected
+      alreadyScannedRunners = new Set();
+      
+      const rows = data.table.rows;
+      const headers = data.table.cols.map(col => col.label);
+      
+      // Find column indices
+      const bibIndex = headers.findIndex(h => h.toLowerCase().includes('bib'));
+      const checkpointIndex = headers.findIndex(h => h.toLowerCase().includes('checkpoint'));
+      
+      if (bibIndex === -1 || checkpointIndex === -1) {
+        throw new Error('Could not find required columns in spreadsheet');
+      }
+      
+      // Process each row to find scans for this checkpoint
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i].c;
+        if (row && row[bibIndex] && row[bibIndex].v && row[checkpointIndex] && row[checkpointIndex].v) {
+          const bib = row[bibIndex].v.toString();
+          const scanCheckpoint = row[checkpointIndex].v.toString();
+          
+          if (scanCheckpoint === checkpoint) {
+            alreadyScannedRunners.add(bib);
+          }
+        }
+      }
+      
+      logDebug(`Loaded ${alreadyScannedRunners.size} already scanned runners from spreadsheet`);
+      
+      // Reset processed scans for runners that no longer have entries
+      // This allows them to be scanned again if their entry was deleted
+      resetProcessedScansForDeletedEntries();
+      
+      // Calculate and update stats
+      updateStatsWithDnfCheck();
+    } else {
+      throw new Error('Invalid spreadsheet data format');
+    }
+  })
+  .catch(error => {
+    logDebug('Error fetching checkpoint stats from spreadsheet: ' + error);
+    // Calculate stats locally as fallback
+    updateStatsWithDnfCheck();
+  })
+  .finally(() => {
+    // Hide the refreshing indicator
+    statsRefreshing.classList.add('hidden');
+    isRefreshingStats = false;
+  });
+}
+
+// Reset processed scans for runners that no longer have entries in the results spreadsheet
+function resetProcessedScansForDeletedEntries() {
+// Create a list of keys to remove
+const keysToRemove = [];
+
+// Check each processed scan
+for (const key in processedScans) {
+  // Keys are in the format "bib-checkpoint"
+  const parts = key.split('-');
+  if (parts.length === 2) {
+    const bib = parts[0];
+    const scanCheckpoint = parts[1];
+    
+    // If this is for our current checkpoint and the runner is not in alreadyScannedRunners,
+    // then their entry was likely deleted from the spreadsheet
+    if (scanCheckpoint === checkpoint && !alreadyScannedRunners.has(bib)) {
+      keysToRemove.push(key);
+    }
+  }
+}
+
+// Remove the keys
+keysToRemove.forEach(key => {
+  delete processedScans[key];
+  delete scanTimestamps[key];
+  logDebug(`Reset processed scan for ${key} - entry was deleted from spreadsheet`);
+});
+
+// Save the updated processed scans
+if (keysToRemove.length > 0) {
+  saveProcessedScans();
+  saveScanTimestamps();
+}
+}
+
+// Update stats with DNF check
+function updateStatsWithDnfCheck() {
+// First refresh runner data to get latest DNF status
+if (Date.now() - lastDnfCheck > DNF_CHECK_INTERVAL) {
+  fetchRunnerDataFromSpreadsheet(true).then(() => {
+    // After runner data is refreshed, calculate stats
+    const stats = calculateLocalCheckpointStats();
+    updateCheckpointStatsUI(stats);
+  }).catch(() => {
+    // If there's an error, still calculate stats with current data
+    const stats = calculateLocalCheckpointStats();
+    updateCheckpointStatsUI(stats);
+  });
+} else {
+  // Just calculate stats with current data
+  const stats = calculateLocalCheckpointStats();
+  updateCheckpointStatsUI(stats);
+}
+}
+
 // Log to debug panel
 function logDebug(message) {
 const timestamp = new Date().toLocaleTimeString();
@@ -961,8 +1102,7 @@ uploadPendingScans(true);
 // Refresh runner data manually
 refreshRunnersBtn.addEventListener('click', function() {
 logDebug('Manually refreshing runner data');
-// We don't need to fetch data, just log it
-logDebug('Using sample runner data');
+fetchRunnerData(true);
 });
 
 // Clear all data
@@ -983,6 +1123,12 @@ logDebug(`Current connection status: ${currentOnlineStatus ? 'online' : 'offline
 if (currentOnlineStatus) {
   showMessage('Checking for pending uploads...');
   uploadPendingScans(true);
+  
+  // Also refresh runner data
+  fetchRunnerData(true);
+  
+  // Fetch already scanned runners
+  fetchAlreadyScannedRunners();
 } else {
   showMessage('No internet connection available', true);
 }
@@ -996,13 +1142,17 @@ logDebug('Manual checkpoint stats refresh requested');
 isRefreshingStats = true;
 statsRefreshing.classList.remove('hidden');
 
-// Calculate stats with current data
-const stats = calculateLocalCheckpointStats();
-updateCheckpointStatsUI(stats);
+// Clear the existing set of scanned runners to force a complete refresh
+alreadyScannedRunners = new Set();
 
-// Hide the refreshing indicator
-statsRefreshing.classList.add('hidden');
-isRefreshingStats = false;
+// Force refresh runner data first to get latest DNF status
+fetchRunnerDataFromSpreadsheet(true).then(() => {
+  // Then fetch checkpoint stats with a forced refresh
+  fetchCheckpointStatsFromSpreadsheet();
+}).catch(() => {
+  // If there's an error, still try to fetch checkpoint stats
+  fetchCheckpointStatsFromSpreadsheet();
+});
 });
 
 // Clear all data from localStorage
@@ -1010,22 +1160,30 @@ function clearAllData() {
 try {
   localStorage.removeItem('pendingUploads');
   localStorage.removeItem('recentScans');
+  localStorage.removeItem('runnersData');
   localStorage.removeItem('processedScans');
   localStorage.removeItem('scanTimestamps');
   localStorage.removeItem('uploadedScans');
-
+  
   pendingUploads = [];
   recentScans = [];
+  runnersData = {};
   processedScans = {};
   scanTimestamps = {};
   uploadedScans = {};
   alreadyScannedRunners = new Set();
-
+  
   updatePendingUploadsUI();
   updateRecentScansUI();
-
+  
   logDebug('All data cleared successfully');
   showMessage('All data cleared successfully');
+  
+  // Fetch fresh runner data
+  fetchRunnerData(true);
+  
+  // Fetch already scanned runners
+  fetchAlreadyScannedRunners();
 } catch (error) {
   logDebug('Error clearing data: ' + error);
   showMessage('Error clearing data', true);
@@ -1054,15 +1212,38 @@ updateOfflineBanner();
 window.addEventListener('online', handleOnlineStatusChange);
 window.addEventListener('offline', handleOnlineStatusChange);
 
-// CRITICAL: Skip data loading and go straight to login
-loadingScreen.classList.add('hidden');
-loginScreen.classList.remove('hidden');
+// Try to load from localStorage first
+try {
+  const storedData = localStorage.getItem('runnersData');
+  if (storedData) {
+    const parsedData = JSON.parse(storedData);
+    if (parsedData && Object.keys(parsedData).length > 0) {
+      // We have data, use it
+      runnersData = parsedData;
+      logDebug(`Loaded ${Object.keys(runnersData).length} runners from localStorage at init`);
+      
+      // Check for pending uploads that need to be processed
+      if (pendingUploads.length > 0) {
+        logDebug(`Found ${pendingUploads.length} pending uploads at startup`);
+        updatePendingUploadsUI();
+      }
+      
+      // Hide loading screen and check login status
+      loadingScreen.classList.add('hidden');
+      checkLoginStatus();
+      
+      // Set up periodic refresh of runner data
+      setupRunnerDataRefresh();
+      
+      return; // Skip fetching data since we already have it
+    }
+  }
+} catch (error) {
+  logDebug('Error loading runners data from localStorage at init: ' + error);
+}
 
-// Try to load recent scans
-loadRecentScans();
-
-// Check if user is already logged in
-checkLoginStatus();
+// Try to fetch fresh data
+fetchRunnerData(true);
 }
 
 // Update offline banner
@@ -1160,6 +1341,12 @@ if (isOnline && !wasOnline && pendingUploads.length > 0) {
     uploadPendingScans(true);
   }, 2000);
 }
+
+// If we're back online, refresh runner data
+if (isOnline && !wasOnline) {
+  fetchRunnerData(true);
+  fetchCheckpointStatsFromSpreadsheet();
+}
 }
 
 // Load pending scans from localStorage
@@ -1175,6 +1362,248 @@ try {
   logDebug('Error loading pending scans: ' + error);
   pendingUploads = [];
 }
+}
+
+// Load recent scans from localStorage - only load if we're already logged in
+function loadRecentScans() {
+if (!checkpoint) return; // Don't load if not logged in
+
+try {
+  const storedScans = localStorage.getItem('recentScans');
+  if (storedScans) {
+    recentScans = JSON.parse(storedScans);
+    logDebug(`Loaded ${recentScans.length} recent scans from localStorage`);
+    updateRecentScansUI();
+  }
+} catch (error) {
+  logDebug('Error loading recent scans: ' + error);
+  recentScans = [];
+}
+}
+
+// Fetch runner data from Apps Script
+function fetchRunnerData(forceRefresh = false) {
+// If we're already loading data, don't start another request
+if (isLoadingRunnerData) return Promise.resolve();
+
+isLoadingRunnerData = true;
+dataLoadAttempted = true;
+logDebug('Fetching runner data...');
+
+return new Promise((resolve, reject) => {
+  // Try to load from localStorage first if not forcing refresh
+  if (!forceRefresh) {
+    try {
+      const storedData = localStorage.getItem('runnersData');
+      if (storedData) {
+        const parsedData = JSON.parse(storedData);
+        if (parsedData && Object.keys(parsedData).length > 0) {
+          runnersData = parsedData;
+          logDebug(`Loaded ${Object.keys(runnersData).length} runners from localStorage`);
+          
+          // Make sure loading screen is hidden
+          loadingScreen.classList.add('hidden');
+          isLoadingRunnerData = false;
+          
+          // Check login status
+          checkLoginStatus();
+          
+          // Set up periodic refresh of runner data
+          setupRunnerDataRefresh();
+          
+          // Fetch checkpoint stats if we're logged in
+          if (checkpoint) {
+            fetchCheckpointStatsFromSpreadsheet();
+          }
+          
+          resolve();
+          return;
+        }
+      }
+    } catch (error) {
+      logDebug('Error loading runners data from localStorage: ' + error);
+    }
+  }
+  
+  // Clear any existing timeout
+  if (dataLoadTimeoutId) {
+    clearTimeout(dataLoadTimeoutId);
+  }
+  
+  // Set a timeout to handle cases where the fetch never completes
+  dataLoadTimeoutId = setTimeout(() => {
+    logDebug('Runner data fetch timed out');
+    loadingError.classList.remove('hidden');
+    isLoadingRunnerData = false;
+    
+    reject(new Error('Data load timeout'));
+  }, DATA_LOAD_TIMEOUT);
+  
+  // Try to fetch from spreadsheet
+  fetchRunnerDataFromSpreadsheet(forceRefresh)
+    .then(() => {
+      clearTimeout(dataLoadTimeoutId);
+      dataLoadTimeoutId = null;
+      
+      // Make sure loading screen is hidden
+      loadingScreen.classList.add('hidden');
+      isLoadingRunnerData = false;
+      
+      // Check login status
+      checkLoginStatus();
+      
+      // Set up periodic refresh of runner data
+      setupRunnerDataRefresh();
+      
+      // Fetch checkpoint stats if we're logged in
+      if (checkpoint) {
+        fetchCheckpointStatsFromSpreadsheet();
+      }
+      
+      resolve();
+    })
+    .catch(error => {
+      logDebug('Error fetching runner data from spreadsheet: ' + error);
+      
+      clearTimeout(dataLoadTimeoutId);
+      dataLoadTimeoutId = null;
+      
+      // Show error message
+      loadingError.classList.remove('hidden');
+      isLoadingRunnerData = false;
+      
+      reject(error);
+    });
+});
+}
+
+// Fetch runner data directly from the spreadsheet
+function fetchRunnerDataFromSpreadsheet(forceRefresh = false) {
+return new Promise((resolve, reject) => {
+  logDebug('Fetching runner data directly from spreadsheet');
+  
+  // Add a cache-busting parameter to ensure we get fresh data
+  const cacheBuster = new Date().getTime();
+  
+  // Fetch directly from the spreadsheet using the Google Visualization API
+  const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${RUNNERS_SHEET_ID}/gviz/tq?tqx=out:json&cacheBuster=${cacheBuster}`;
+  
+  fetch(spreadsheetUrl)
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.text();
+    })
+    .then(text => {
+      try {
+        // The response is not pure JSON, it's wrapped in a callback
+        // We need to extract the JSON part
+        const jsonStart = text.indexOf('{');
+        const jsonEnd = text.lastIndexOf('}') + 1;
+        if (jsonStart === -1 || jsonEnd === 0) {
+          throw new Error('Invalid response format - could not find JSON data');
+        }
+        const jsonString = text.substring(jsonStart, jsonEnd);
+        return JSON.parse(jsonString);
+      } catch (e) {
+        throw new Error(`Error parsing spreadsheet response: ${e.message}`);
+      }
+    })
+    .then(data => {
+      if (data && data.table && data.table.rows) {
+        const runnerMap = {};
+        const rows = data.table.rows;
+        const headers = data.table.cols.map(col => col.label);
+        
+        // Find column indices
+        const bibIndex = headers.findIndex(h => h && h.toLowerCase().includes('bib'));
+        const nameIndex = headers.findIndex(h => h && h.toLowerCase().includes('name'));
+        const statusIndex = headers.findIndex(h => h === 'DNF' || (h && h.toLowerCase().includes('status')));
+        
+        if (bibIndex === -1 || nameIndex === -1) {
+          throw new Error('Could not find required columns in spreadsheet');
+        }
+        
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i].c;
+          if (row && row[bibIndex] && row[bibIndex].v) {
+            const bib = row[bibIndex].v.toString();
+            const name = row[nameIndex] && row[nameIndex].v ? row[nameIndex].v.toString() : 'Unknown';
+            let dnf = false;
+            
+            // Check for DNF in status column
+            if (statusIndex !== -1 && row[statusIndex] && row[statusIndex].v) {
+              const status = row[statusIndex].v.toString().toUpperCase();
+              dnf = (status === 'DNF' || status === 'DNS' || status === 'TRUE');
+            }
+            
+            runnerMap[bib] = {
+              name: name,
+              dnf: dnf
+            };
+          }
+        }
+        
+        if (Object.keys(runnerMap).length === 0) {
+          throw new Error('No runner data found in spreadsheet');
+        }
+        
+        // Update the last DNF check timestamp
+        lastDnfCheck = Date.now();
+        
+        runnersData = runnerMap;
+        localStorage.setItem('runnersData', JSON.stringify(runnersData));
+        logDebug(`Loaded ${Object.keys(runnersData).length} runners directly from spreadsheet`);
+        
+        // Update recent scans UI to reflect any DNF changes
+        updateRecentScansUI();
+        
+        resolve();
+      } else {
+        throw new Error('Invalid spreadsheet data format');
+      }
+    })
+    .catch(error => {
+      logDebug('Error fetching runner data from spreadsheet: ' + error);
+      reject(error);
+    });
+});
+}
+
+// Set up periodic refresh of runner data
+function setupRunnerDataRefresh() {
+// Clear any existing interval
+if (runnerDataRefreshInterval) {
+  clearInterval(runnerDataRefreshInterval);
+}
+
+// Set up new interval
+runnerDataRefreshInterval = setInterval(() => {
+  if (isOnline) {
+    logDebug('Periodic runner data refresh');
+    fetchRunnerData(true);
+  }
+}, RUNNER_DATA_REFRESH_INTERVAL);
+}
+
+// Fetch checkpoint stats
+function fetchCheckpointStats(forceRefresh = false) {
+if (!checkpoint || !isOnline) return;
+
+if (forceRefresh) {
+  // Show refreshing indicator
+  statsRefreshing.classList.remove('hidden');
+  isRefreshingStats = true;
+}
+
+logDebug(`Fetching stats for checkpoint: ${checkpoint}`);
+
+// Update UI to show loading
+statsText.textContent = 'Loading checkpoint stats...';
+
+// Fetch directly from spreadsheet
+fetchCheckpointStatsFromSpreadsheet();
 }
 
 // Calculate checkpoint stats locally based on our data
@@ -1241,8 +1670,7 @@ if (checkpointStatsRefreshInterval) {
 checkpointStatsRefreshInterval = setInterval(() => {
   if (isOnline && checkpoint) {
     logDebug('Periodic checkpoint stats refresh');
-    const stats = calculateLocalCheckpointStats();
-    updateCheckpointStatsUI(stats);
+    fetchCheckpointStats();
   }
 }, CHECKPOINT_STATS_REFRESH_INTERVAL);
 }
@@ -1332,6 +1760,9 @@ if (savedCheckpoint) {
   // Load recent scans after login
   loadRecentScans();
   
+  // Fetch already scanned runners
+  fetchAlreadyScannedRunners();
+  
   // Start periodic upload attempts
   startPeriodicUploadAttempts();
 } else {
@@ -1346,8 +1777,7 @@ loadingScreen.classList.add('hidden');
 scannerScreen.classList.remove('hidden');
 checkpointDisplay.textContent = checkpoint;
 updateConnectionStatus();
-const stats = calculateLocalCheckpointStats();
-updateCheckpointStatsUI(stats);
+fetchCheckpointStats();
 setupCheckpointStatsRefresh();
 }
 
@@ -1693,316 +2123,315 @@ try {
 }
 
 function vibrate() {
-  try {
-    // Try standard vibration API first with a stronger pattern
-    if (navigator.vibrate) {
-      // Use a more noticeable vibration pattern (200ms on, 100ms off, 200ms on)
-      navigator.vibrate([200, 100, 200]);
-      logDebug("Standard vibration triggered");
-    }
-    
-    // Try to force audio to enable haptic feedback on iOS
-    // This works because playing audio can trigger the haptic system on iOS
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    
-    // Set up a short, inaudible tone
-    oscillator.frequency.value = 1;
-    gainNode.gain.value = 0.01; // Very low volume, almost inaudible
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    
-    // Play the tone briefly
-    oscillator.start();
-    setTimeout(() => {
-      oscillator.stop();
-      logDebug("Audio-based haptic feedback attempted");
-    }, 50);
-  } catch (e) {
-    logDebug("Error triggering haptic feedback: " + e);
+try {
+  // Try standard vibration API first with a stronger pattern
+  if (navigator.vibrate) {
+    // Use a more noticeable vibration pattern (200ms on, 100ms off, 200ms on)
+    navigator.vibrate([200, 100, 200]);
+    logDebug("Standard vibration triggered");
   }
+  
+  // Try to force audio to enable haptic feedback on iOS
+  // This works because playing audio can trigger the haptic system on iOS
+  const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  const oscillator = audioContext.createOscillator();
+  const gainNode = audioContext.createGain();
+  
+  // Set up a short, inaudible tone
+  oscillator.frequency.value = 1;
+  gainNode.gain.value = 0.01; // Very low volume, almost inaudible
+  
+  oscillator.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+  
+  // Play the tone briefly
+  oscillator.start();
+  setTimeout(() => {
+    oscillator.stop();
+    logDebug("Audio-based haptic feedback attempted");
+  }, 50);
+} catch (e) {
+  logDebug("Error triggering haptic feedback: " + e);
+}
 }
 
 // Show a message to the user
 function showMessage(message, isError = false) {
-  messageDisplay.textContent = message;
-  messageDisplay.classList.remove('hidden');
-  
-  if (isError) {
-    messageDisplay.style.color = '#dc3545';
-  } else {
-    messageDisplay.style.color = '#28a745';
-  }
-  
-  // Hide the message after a few seconds
-  setTimeout(() => {
-    messageDisplay.classList.add('hidden');
-  }, 3000);
+messageDisplay.textContent = message;
+messageDisplay.classList.remove('hidden');
+
+if (isError) {
+  messageDisplay.style.color = '#dc3545';
+} else {
+  messageDisplay.style.color = '#28a745';
+}
+
+// Hide the message after a few seconds
+setTimeout(() => {
+  messageDisplay.classList.add('hidden');
+}, 3000);
 }
 
 // Show the flash overlay that covers the entire screen
 function showFlash() {
-  flashOverlay.style.display = 'block';
-  setTimeout(() => {
-    flashOverlay.style.display = 'none';
-  }, 500);
+flashOverlay.style.display = 'block';
+setTimeout(() => {
+  flashOverlay.style.display = 'none';
+}, 500);
 }
 
 // Extract bib number from QR code
 function extractBibFromQR(qrText) {
-  // Try to extract a number from the QR code text
-  // First, check if it's just a number
-  if (/^\d+$/.test(qrText)) {
-    return qrText;
-  }
-  
-  // Check if it's in a format like "BIB:123"
-  const bibMatch = qrText.match(/BIB:(\d+)/i);
-  if (bibMatch) {
-    return bibMatch[1];
-  }
-  
-  // Check if it contains a number anywhere
-  const numberMatch = qrText.match(/\d+/);
-  if (numberMatch) {
-    return numberMatch[0];
-  }
-  
-  return null;
+// Try to extract a number from the QR code text
+// First, check if it's just a number
+if (/^\d+$/.test(qrText)) {
+  return qrText;
+}
+
+// Check if it's in a format like "BIB:123"
+const bibMatch = qrText.match(/BIB:(\d+)/i);
+if (bibMatch) {
+  return bibMatch[1];
+}
+
+// Check if it contains a number anywhere
+const numberMatch = qrText.match(/\d+/);
+if (numberMatch) {
+  return numberMatch[0];
+}
+
+return null;
 }
 
 // Process a scanned bib number
 function processScannedBib(bib) {
-  // Check if this bib exists in our runner data
-  if (!runnersData[bib]) {
-    showMessage(`Unknown bib number: ${bib}`, true);
+// Check if this bib exists in our runner data
+if (!runnersData[bib]) {
+  showMessage(`Unknown bib number: ${bib}`, true);
+  return;
+}
+
+// Check if runner is marked as DNF
+if (runnersData[bib].dnf) {
+  showMessage(`Runner #${bib} is marked as DNF`, true);
+  return;
+}
+
+// Check if we've already processed this bib at this checkpoint
+const scanKey = `${bib}-${checkpoint}`;
+const now = Date.now();
+
+if (processedScans[scanKey]) {
+  // We've seen this bib before, but allow re-scanning after 30 seconds
+  const lastScanTime = scanTimestamps[scanKey] || 0;
+  if (now - lastScanTime < 30000) {
+    showMessage(`Bib #${bib} already scanned at this checkpoint`, true);
     return;
   }
-  
-  // Check if runner is marked as DNF
-  if (runnersData[bib].dnf) {
-    showMessage(`Runner #${bib} is marked as DNF`, true);
-    return;
-  }
-  
-  // Check if we've already processed this bib at this checkpoint
-  const scanKey = `${bib}-${checkpoint}`;
-  const now = Date.now();
-  
-  if (processedScans[scanKey]) {
-    // We've seen this bib before, but allow re-scanning after 30 seconds
-    const lastScanTime = scanTimestamps[scanKey] || 0;
-    if (now - lastScanTime < 30000) {
-      showMessage(`Bib #${bib} already scanned at this checkpoint`, true);
-      return;
-    }
-  }
-  
-  // Mark this bib as processed at this checkpoint
-  processedScans[scanKey] = true;
-  scanTimestamps[scanKey] = now;
-  saveProcessedScans();
-  saveScanTimestamps();
-  
-  // Create scan record
-  const scan = {
-    bib: bib,
-    name: runnersData[bib].name,
-    checkpoint: checkpoint,
-    timestamp: now
-  };
-  
-  // Add to recent scans
-  recentScans.unshift(scan);
-  if (recentScans.length > 20) {
-    recentScans.pop();
-  }
-  
-  // Save recent scans
+}
+
+// Mark this bib as processed at this checkpoint
+processedScans[scanKey] = true;
+scanTimestamps[scanKey] = now;
+saveProcessedScans();
+saveScanTimestamps();
+
+// Create scan record
+const scan = {
+  bib: bib,
+  name: runnersData[bib].name,
+  checkpoint: checkpoint,
+  timestamp: now
+};
+
+// Add to recent scans
+recentScans.unshift(scan);
+if (recentScans.length > 20) {
+  recentScans.pop();
+}
+
+// Save recent scans
+try {
+  localStorage.setItem('recentScans', JSON.stringify(recentScans));
+} catch (e) {
+  logDebug("Error saving recent scans: " + e);
+}
+
+// Update UI
+updateRecentScansUI();
+
+// Try to upload immediately if online
+if (isOnline) {
+  uploadScan(scan);
+} else {
+  // Otherwise add to pending uploads
+  pendingUploads.push(scan);
   try {
-    localStorage.setItem('recentScans', JSON.stringify(recentScans));
+    localStorage.setItem('pendingUploads', JSON.stringify(pendingUploads));
   } catch (e) {
-    logDebug("Error saving recent scans: " + e);
+    logDebug("Error saving pending uploads: " + e);
   }
+  updatePendingUploadsUI();
+  showMessage(`Bib #${bib} saved offline. Will upload when connection is restored.`);
+}
+}
+
+// Upload a single scan
+function uploadScan(scan) {
+// Check if we've already uploaded this scan
+const scanId = `${scan.bib}-${scan.checkpoint}-${scan.timestamp}`;
+if (uploadedScans[scanId]) {
+  logDebug(`Scan ${scanId} already uploaded, skipping`);
+  return Promise.resolve();
+}
+
+logDebug(`Uploading scan: Bib #${scan.bib} at ${scan.checkpoint}`);
+
+// Prepare data for upload
+const formData = new FormData();
+formData.append('action', 'recordScan');
+formData.append('bib', scan.bib);
+formData.append('name', scan.name);
+formData.append('checkpoint', scan.checkpoint);
+formData.append('timestamp', scan.timestamp);
+
+// Use fetch API to upload the scan
+return fetch(APPS_SCRIPT_URL, {
+  method: 'POST',
+  mode: 'no-cors', // Use no-cors to avoid CORS errors
+  body: formData
+})
+.then(() => {
+  // Mark as uploaded
+  uploadedScans[scanId] = true;
+  saveUploadedScans();
   
-  // Update UI
-  updateRecentScansUI();
+  // Add to already scanned runners
+  alreadyScannedRunners.add(scan.bib);
   
-  // Try to upload immediately if online
-  if (isOnline) {
-    uploadScan(scan);
-  } else {
-    // Otherwise add to pending uploads
-    pendingUploads.push(scan);
+  // Update stats
+  const stats = calculateLocalCheckpointStats();
+  updateCheckpointStatsUI(stats);
+  
+  showMessage(`Bib #${scan.bib} uploaded successfully`);
+  return true;
+})
+.catch(error => {
+  logDebug(`Error uploading scan: ${error}`);
+  showMessage(`Error uploading bib #${scan.bib}. Will retry later.`, true);
+  return false;
+});
+}
+
+// Upload all pending scans
+function uploadPendingScans(force = false) {
+if (!isOnline || pendingUploads.length === 0 || isUploadingPendingScans) {
+  return;
+}
+
+// Set flag to prevent multiple simultaneous uploads
+isUploadingPendingScans = true;
+
+logDebug(`Attempting to upload ${pendingUploads.length} pending scans`);
+
+// Create a copy of the pending uploads
+const scansToUpload = [...pendingUploads];
+const uploadPromises = [];
+
+// Try to upload each scan
+scansToUpload.forEach(scan => {
+  uploadPromises.push(
+    uploadScan(scan)
+      .then(success => {
+        if (success) {
+          // Remove from pending uploads
+          const index = pendingUploads.findIndex(s => 
+            s.bib === scan.bib && 
+            s.checkpoint === scan.checkpoint && 
+            s.timestamp === scan.timestamp
+          );
+          
+          if (index !== -1) {
+            pendingUploads.splice(index, 1);
+          }
+        }
+        return success;
+      })
+  );
+});
+
+// Wait for all uploads to complete
+Promise.all(uploadPromises)
+  .then(results => {
+    const successCount = results.filter(Boolean).length;
+    logDebug(`Uploaded ${successCount} of ${scansToUpload.length} pending scans`);
+    
+    // Save updated pending uploads
     try {
       localStorage.setItem('pendingUploads', JSON.stringify(pendingUploads));
     } catch (e) {
       logDebug("Error saving pending uploads: " + e);
     }
+    
+    // Update UI
     updatePendingUploadsUI();
-    showMessage(`Bib #${bib} saved offline. Will upload when connection is restored.`);
-  }
-}
-
-// Upload a single scan
-function uploadScan(scan) {
-  // Check if we've already uploaded this scan
-  const scanId = `${scan.bib}-${scan.checkpoint}-${scan.timestamp}`;
-  if (uploadedScans[scanId]) {
-    logDebug(`Scan ${scanId} already uploaded, skipping`);
-    return Promise.resolve();
-  }
-  
-  logDebug(`Uploading scan: Bib #${scan.bib} at ${scan.checkpoint}`);
-  
-  // Prepare data for upload
-  const formData = new FormData();
-  formData.append('action', 'recordScan');
-  formData.append('bib', scan.bib);
-  formData.append('name', scan.name);
-  formData.append('checkpoint', scan.checkpoint);
-  formData.append('timestamp', scan.timestamp);
-  
-  // Use fetch API to upload the scan
-  return fetch(APPS_SCRIPT_URL, {
-    method: 'POST',
-    mode: 'no-cors', // Use no-cors to avoid CORS errors
-    body: formData
-  })
-  .then(() => {
-    // Mark as uploaded
-    uploadedScans[scanId] = true;
-    saveUploadedScans();
     
-    // Add to already scanned runners
-    alreadyScannedRunners.add(scan.bib);
-    
-    // Update stats
-    const stats = calculateLocalCheckpointStats();
-    updateCheckpointStatsUI(stats);
-    
-    showMessage(`Bib #${scan.bib} uploaded successfully`);
-    return true;
+    // If we uploaded any scans, refresh the checkpoint stats
+    if (successCount > 0) {
+      fetchCheckpointStats(true);
+    }
   })
   .catch(error => {
-    logDebug(`Error uploading scan: ${error}`);
-    showMessage(`Error uploading bib #${scan.bib}. Will retry later.`, true);
-    return false;
+    logDebug(`Error in batch upload: ${error}`);
+  })
+  .finally(() => {
+    isUploadingPendingScans = false;
   });
-}
-
-// Upload all pending scans
-function uploadPendingScans(force = false) {
-  if (!isOnline || pendingUploads.length === 0 || isUploadingPendingScans) {
-    return;
-  }
-  
-  // Set flag to prevent multiple simultaneous uploads
-  isUploadingPendingScans = true;
-  
-  logDebug(`Attempting to upload ${pendingUploads.length} pending scans`);
-  
-  // Create a copy of the pending uploads
-  const scansToUpload = [...pendingUploads];
-  const uploadPromises = [];
-  
-  // Try to upload each scan
-  scansToUpload.forEach(scan => {
-    uploadPromises.push(
-      uploadScan(scan)
-        .then(success => {
-          if (success) {
-            // Remove from pending uploads
-            const index = pendingUploads.findIndex(s => 
-              s.bib === scan.bib && 
-              s.checkpoint === scan.checkpoint && 
-              s.timestamp === scan.timestamp
-            );
-            
-            if (index !== -1) {
-              pendingUploads.splice(index, 1);
-            }
-          }
-          return success;
-        })
-    );
-  });
-  
-  // Wait for all uploads to complete
-  Promise.all(uploadPromises)
-    .then(results => {
-      const successCount = results.filter(Boolean).length;
-      logDebug(`Uploaded ${successCount} of ${scansToUpload.length} pending scans`);
-      
-      // Save updated pending uploads
-      try {
-        localStorage.setItem('pendingUploads', JSON.stringify(pendingUploads));
-      } catch (e) {
-        logDebug("Error saving pending uploads: " + e);
-      }
-      
-      // Update UI
-      updatePendingUploadsUI();
-      
-      // If we uploaded any scans, refresh the checkpoint stats
-      if (successCount > 0) {
-        const stats = calculateLocalCheckpointStats();
-        updateCheckpointStatsUI(stats);
-      }
-    })
-    .catch(error => {
-      logDebug(`Error in batch upload: ${error}`);
-    })
-    .finally(() => {
-      isUploadingPendingScans = false;
-    });
 }
 
 // Handle successful QR code scan
 function onScanSuccess(decodedText, decodedResult) {
-  // Check if we're still scanning
-  if (!isScanning) return;
+// Check if we're still scanning
+if (!isScanning) return;
+
+// Process the scanned QR code
+logDebug("QR code scanned: " + decodedText);
+
+// Try to extract bib number from QR code
+const bib = extractBibFromQR(decodedText);
+
+if (bib) {
+  // Process the bib number
+  processScannedBib(bib);
   
-  // Process the scanned QR code
-  logDebug("QR code scanned: " + decodedText);
-  
-  // Try to extract bib number from QR code
-  const bib = extractBibFromQR(decodedText);
-  
-  if (bib) {
-    // Process the bib number
-    processScannedBib(bib);
-    
-    // Show success feedback
-    showFlash();
-    playBeep();
-    vibrate();
-  } else {
-    showMessage("Invalid QR code format", true);
-  }
+  // Show success feedback
+  showFlash();
+  playBeep();
+  vibrate();
+} else {
+  showMessage("Invalid QR code format", true);
+}
 }
 
 // Handle manual bib entry
 manualSubmitButton.addEventListener('click', function() {
-  const bib = bibInput.value.trim();
-  
-  if (!bib) {
-    showMessage('Please enter a bib number', true);
-    return;
-  }
-  
-  if (!/^\d+$/.test(bib)) {
-    showMessage('Bib number must be numeric', true);
-    return;
-  }
-  
-  // Process the manually entered bib
-  processScannedBib(bib);
-  
-  // Clear the input
-  bibInput.value = '';
+const bib = bibInput.value.trim();
+
+if (!bib) {
+  showMessage('Please enter a bib number', true);
+  return;
+}
+
+if (!/^\d+$/.test(bib)) {
+  showMessage('Bib number must be numeric', true);
+  return;
+}
+
+// Process the manually entered bib
+processScannedBib(bib);
+
+// Clear the input
+bibInput.value = '';
 });
 
 // Initialize the application
