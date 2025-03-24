@@ -939,12 +939,23 @@ function fetchAlreadyScannedRunners() {
 
 // Fetch checkpoint stats directly from the spreadsheet
 function fetchCheckpointStatsFromSpreadsheet() {
-  if (!checkpoint || !isOnline) return;
+  if (!checkpoint || !isOnline) {
+    // If offline, calculate stats locally
+    const stats = calculateLocalCheckpointStats();
+    updateCheckpointStatsUI(stats);
+    statsRefreshing.classList.add('hidden');
+    isRefreshingStats = false;
+    return;
+  }
   
   logDebug(`Fetching checkpoint stats from spreadsheet for: ${checkpoint}`);
   
   // Add a cache-busting parameter to ensure we get fresh data
   const cacheBuster = new Date().getTime();
+  
+  // IMPORTANT: Clear the existing set of scanned runners before fetching new data
+  // This ensures deleted entries are properly reflected
+  alreadyScannedRunners = new Set();
   
   // Fetch directly from the results spreadsheet using the Google Visualization API
   const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${RESULTS_SHEET_ID}/gviz/tq?tqx=out:json&sheet=Sheet1&cacheBuster=${cacheBuster}`;
@@ -961,10 +972,6 @@ function fetchCheckpointStatsFromSpreadsheet() {
     })
     .then(data => {
       if (data && data.table && data.table.rows) {
-        // IMPORTANT: Clear the existing set of scanned runners
-        // This ensures deleted entries are properly reflected
-        alreadyScannedRunners = new Set();
-        
         const rows = data.table.rows;
         const headers = data.table.cols.map(col => col.label);
         
@@ -995,22 +1002,141 @@ function fetchCheckpointStatsFromSpreadsheet() {
         // This allows them to be scanned again if their entry was deleted
         resetProcessedScansForDeletedEntries();
         
-        // Calculate and update stats
-        updateStatsWithDnfCheck();
+        // Now fetch runner data to get accurate total count and DNF status
+        return fetchRunnerDataForStats();
       } else {
         throw new Error('Invalid spreadsheet data format');
       }
     })
+    .then(() => {
+      // Calculate and update stats with the fresh data
+      const stats = calculateLocalCheckpointStats();
+      updateCheckpointStatsUI(stats);
+    })
     .catch(error => {
       logDebug('Error fetching checkpoint stats from spreadsheet: ' + error);
       // Calculate stats locally as fallback
-      updateStatsWithDnfCheck();
+      const stats = calculateLocalCheckpointStats();
+      updateCheckpointStatsUI(stats);
     })
     .finally(() => {
       // Hide the refreshing indicator
       statsRefreshing.classList.add('hidden');
       isRefreshingStats = false;
     });
+}
+
+// Fetch runner data specifically for stats updates
+function fetchRunnerDataForStats() {
+  return new Promise((resolve, reject) => {
+    if (!isOnline) {
+      resolve(); // Use existing data if offline
+      return;
+    }
+    
+    logDebug('Fetching runner data for stats update');
+    
+    // Add a cache-busting parameter to ensure we get fresh data
+    const cacheBuster = new Date().getTime();
+    
+    // Fetch directly from the spreadsheet using the Google Visualization API
+    const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${RUNNERS_SHEET_ID}/gviz/tq?tqx=out:json&cacheBuster=${cacheBuster}`;
+    
+    fetch(spreadsheetUrl)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.text();
+      })
+      .then(text => {
+        try {
+          // The response is not pure JSON, it's wrapped in a callback
+          // We need to extract the JSON part
+          const jsonStart = text.indexOf('{');
+          const jsonEnd = text.lastIndexOf('}') + 1;
+          if (jsonStart === -1 || jsonEnd === 0) {
+            throw new Error('Invalid response format - could not find JSON data');
+          }
+          const jsonString = text.substring(jsonStart, jsonEnd);
+          return JSON.parse(jsonString);
+        } catch (e) {
+          throw new Error(`Error parsing spreadsheet response: ${e.message}`);
+        }
+      })
+      .then(data => {
+        if (data && data.table && data.table.rows) {
+          const runnerMap = {};
+          const rows = data.table.rows;
+          const headers = data.table.cols.map(col => col.label);
+          
+          // Find column indices
+          const bibIndex = headers.findIndex(h => h && h.toLowerCase().includes('bib'));
+          const nameIndex = headers.findIndex(h => h && h.toLowerCase().includes('name'));
+          const statusIndex = headers.findIndex(h => h === 'DNF' || (h && h.toLowerCase().includes('status')));
+          
+          if (bibIndex === -1 || nameIndex === -1) {
+            throw new Error('Could not find required columns in spreadsheet');
+          }
+          
+          for (let i = 0; i < rows.length; i++) {
+            const row = rows[i].c;
+            if (row && row[bibIndex] && row[bibIndex].v) {
+              const bib = row[bibIndex].v.toString();
+              const name = row[nameIndex] && row[nameIndex].v ? row[nameIndex].v.toString() : 'Unknown';
+              let dnf = false;
+              
+              // Check for DNF in status column
+              if (statusIndex !== -1 && row[statusIndex] && row[statusIndex].v) {
+                const status = row[statusIndex].v.toString().toUpperCase();
+                dnf = (status === 'DNF' || status === 'DNS' || status === 'TRUE');
+              }
+              
+              runnerMap[bib] = {
+                name: name,
+                dnf: dnf
+              };
+            }
+          }
+          
+          if (Object.keys(runnerMap).length === 0) {
+            throw new Error('No runner data found in spreadsheet');
+          }
+          
+          // Update the last DNF check timestamp
+          lastDnfCheck = Date.now();
+          
+          runnersData = runnerMap;
+          localStorage.setItem('runnersData', JSON.stringify(runnersData));
+          logDebug(`Updated ${Object.keys(runnersData).length} runners for stats calculation`);
+          
+          resolve();
+        } else {
+          throw new Error('Invalid spreadsheet data format');
+        }
+      })
+      .catch(error => {
+        logDebug('Error fetching runner data for stats: ' + error);
+        // Continue with existing data
+        resolve();
+      });
+  });
+}
+
+// Set up periodic refresh of checkpoint stats
+function setupCheckpointStatsRefresh() {
+  // Clear any existing interval
+  if (checkpointStatsRefreshInterval) {
+    clearInterval(checkpointStatsRefreshInterval);
+  }
+  
+  // Set up new interval - refresh every 5 seconds
+  checkpointStatsRefreshInterval = setInterval(() => {
+    if (isOnline && checkpoint) {
+      logDebug('Periodic checkpoint stats refresh');
+      fetchCheckpointStatsFromSpreadsheet();
+    }
+  }, 5000); // Changed from 30 seconds to 5 seconds
 }
 
 // Reset processed scans for runners that no longer have entries in the results spreadsheet
@@ -1035,34 +1161,43 @@ function resetProcessedScansForDeletedEntries() {
   }
   
   // Remove the keys
-  keysToRemove.forEach(key => {
-    delete processedScans[key];
-    delete scanTimestamps[key];
-    logDebug(`Reset processed scan for ${key} - entry was deleted from spreadsheet`);
-  });
-  
-  // Save the updated processed scans
   if (keysToRemove.length > 0) {
+    logDebug(`Resetting ${keysToRemove.length} processed scans for deleted entries`);
+    
+    keysToRemove.forEach(key => {
+      delete processedScans[key];
+      delete scanTimestamps[key];
+      logDebug(`Reset processed scan for ${key} - entry was deleted from spreadsheet`);
+    });
+    
+    // Save the updated processed scans
     saveProcessedScans();
     saveScanTimestamps();
   }
 }
 
-// Update stats with DNF check
-function updateStatsWithDnfCheck() {
-  // First refresh runner data to get latest DNF status
-  if (Date.now() - lastDnfCheck > DNF_CHECK_INTERVAL) {
-    fetchRunnerDataFromSpreadsheet(true).then(() => {
-      // After runner data is refreshed, calculate stats
-      const stats = calculateLocalCheckpointStats();
-      updateCheckpointStatsUI(stats);
+// Refresh checkpoint stats button
+refreshStatsBtn.addEventListener('click', function() {
+  if (isRefreshingStats) return; // Prevent multiple simultaneous refreshes
+  
+  logDebug('Manual checkpoint stats refresh requested');
+  isRefreshingStats = true;
+  statsRefreshing.classList.remove('hidden');
+  
+  // Clear the existing set of scanned runners to force a complete refresh
+  alreadyScannedRunners = new Set();
+  
+  // Force a complete refresh of both runner data and checkpoint stats
+  fetchRunnerDataForStats()
+    .then(() => {
+      // Then fetch checkpoint stats with a forced refresh
+      fetchCheckpointStatsFromSpreadsheet();
+    })
+    .catch(() => {
+      // If there's an error, still try to fetch checkpoint stats
+      fetchCheckpointStatsFromSpreadsheet();
     });
-  } else {
-    // Just calculate stats with current data
-    const stats = calculateLocalCheckpointStats();
-    updateCheckpointStatsUI(stats);
-  }
-}
+});
 
 // Log to debug panel
 function logDebug(message) {
@@ -1137,14 +1272,16 @@ refreshStatsBtn.addEventListener('click', function() {
   // Clear the existing set of scanned runners to force a complete refresh
   alreadyScannedRunners = new Set();
   
-  // Force refresh runner data first to get latest DNF status
-  fetchRunnerDataFromSpreadsheet(true).then(() => {
-    // Then fetch checkpoint stats with a forced refresh
-    fetchCheckpointStatsFromSpreadsheet();
-  }).catch(() => {
-    // If there's an error, still try to fetch checkpoint stats
-    fetchCheckpointStatsFromSpreadsheet();
-  });
+  // Force a complete refresh of both runner data and checkpoint stats
+  fetchRunnerDataForStats()
+    .then(() => {
+      // Then fetch checkpoint stats with a forced refresh
+      fetchCheckpointStatsFromSpreadsheet();
+    })
+    .catch(() => {
+      // If there's an error, still try to fetch checkpoint stats
+      fetchCheckpointStatsFromSpreadsheet();
+    });
 });
 
 // Clear all data from localStorage
@@ -1721,9 +1858,9 @@ function setupCheckpointStatsRefresh() {
   checkpointStatsRefreshInterval = setInterval(() => {
     if (isOnline && checkpoint) {
       logDebug('Periodic checkpoint stats refresh');
-      fetchCheckpointStats();
+      fetchCheckpointStatsFromSpreadsheet();
     }
-  }, CHECKPOINT_STATS_REFRESH_INTERVAL);
+  }, 5000); // Changed from 30 seconds to 5 seconds
 }
 
 // Update recent scans UI
