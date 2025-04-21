@@ -918,9 +918,6 @@ const installBtn = document.getElementById('install-btn');
 
 
   // DOM elements for installation
-const androidInstallBtn = document.getElementById("android-install-btn");
-const iosInstallBtn = document.getElementById("ios-install-btn");
-const iosInstructions = document.getElementById("ios-install-instructions");
 const persistentInstallBtn = document.createElement("button");
 const scannerInstallPrompt = document.getElementById('scanner-install-prompt');
 const scannerInstallBtn = document.getElementById('scanner-install-btn');
@@ -1660,6 +1657,35 @@ function init() {
   // Update install prompts
   updateInstallPrompts();
 
+  // ADD THIS CODE HERE - Set up scanner screen install buttons
+  const scannerAndroidInstall = document.getElementById('scanner-android-install');
+  const scannerIosInstall = document.getElementById('scanner-ios-install');
+  const scannerIosInstructions = document.getElementById('scanner-ios-instructions');
+
+  if (scannerAndroidInstall) {
+    scannerAndroidInstall.addEventListener('click', triggerInstall);
+    // Hide Android button on iOS
+    if (isIOS()) {
+      scannerAndroidInstall.classList.add('hidden');
+    }
+  }
+
+  if (scannerIosInstall) {
+    scannerIosInstall.addEventListener('click', () => {
+      scannerIosInstructions.classList.toggle('hidden');
+    });
+    // Hide iOS button on Android
+    if (!isIOS()) {
+      scannerIosInstall.classList.add('hidden');
+    }
+  }
+
+  // Hide both buttons if app is already installed
+  if (window.matchMedia('(display-mode: standalone)').matches || 
+      window.navigator.standalone === true) {
+    if (scannerAndroidInstall) scannerAndroidInstall.classList.add('hidden');
+    if (scannerIosInstall) scannerIosInstall.classList.add('hidden');
+  }
   
   // Register service worker
   registerServiceWorker();
@@ -1734,29 +1760,6 @@ if (window.matchMedia('(display-mode: standalone)').matches ||
   }
 }
 
-// Add this to your init() function
-// Set up scanner screen install buttons
-const scannerAndroidInstall = document.getElementById('scanner-android-install');
-const scannerIosInstall = document.getElementById('scanner-ios-install');
-const scannerIosInstructions = document.getElementById('scanner-ios-instructions');
-
-if (scannerAndroidInstall) {
-  scannerAndroidInstall.addEventListener('click', triggerInstall);
-  // Hide Android button on iOS
-  if (isIOS()) {
-    scannerAndroidInstall.classList.add('hidden');
-  }
-}
-
-if (scannerIosInstall) {
-  scannerIosInstall.addEventListener('click', () => {
-    scannerIosInstructions.classList.toggle('hidden');
-  });
-  // Hide iOS button on Android
-  if (!isIOS()) {
-    scannerIosInstall.classList.add('hidden');
-  }
-}
 
 // Hide both buttons if app is already installed
 if (window.matchMedia('(display-mode: standalone)').matches || 
