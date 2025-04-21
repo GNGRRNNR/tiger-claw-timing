@@ -1003,17 +1003,19 @@ function registerServiceWorker() {
   }
 }
 
-  // Function to show appropriate install prompts on both screens
+// Function to show appropriate install prompts on both screens
 function updateInstallPrompts() {
   if (deferredInstallPrompt && !isIOS()) {
     // Show install prompts on both screens
     if (installPrompt) installPrompt.classList.remove('hidden');
-    if (scannerInstallPrompt) scannerInstallPrompt.classList.remove('hidden');
+    // Remove this line - scannerInstallPrompt doesn't exist
+    // if (scannerInstallPrompt) scannerInstallPrompt.classList.remove('hidden');
     if (persistentInstallBtn) persistentInstallBtn.classList.remove('hidden');
     logDebug("Install prompts shown on all screens");
   } else if (isIOS()) {
     // Show iOS-specific instructions
-    if (iosInstallPrompt) iosInstallPrompt.classList.remove('hidden');
+    // Remove this line - iosInstallPrompt doesn't exist
+    // if (iosInstallPrompt) iosInstallPrompt.classList.remove('hidden');
     if (iosInstructions) iosInstructions.classList.remove('hidden');
     logDebug("iOS install instructions shown");
   }
@@ -1680,12 +1682,6 @@ function init() {
     }
   }
 
-  // Hide both buttons if app is already installed
-  if (window.matchMedia('(display-mode: standalone)').matches || 
-      window.navigator.standalone === true) {
-    if (scannerAndroidInstall) scannerAndroidInstall.classList.add('hidden');
-    if (scannerIosInstall) scannerIosInstall.classList.add('hidden');
-  }
 
   
   // Register service worker
@@ -1708,13 +1704,14 @@ function init() {
   window.addEventListener('online', handleOnlineStatusChange);
   window.addEventListener('offline', handleOnlineStatusChange);
   
-  // Check if the app is already installed
+// Check if the app is already installed
 if (window.matchMedia('(display-mode: standalone)').matches || 
     window.navigator.standalone === true) {
   logDebug("App is already installed, hiding install prompts");
   // App is already installed, hide all install prompts
   if (installPrompt) installPrompt.classList.add("hidden");
-  if (scannerInstallPrompt) scannerInstallPrompt.classList.add("hidden");
+  // Remove this line - scannerInstallPrompt doesn't exist
+  // if (scannerInstallPrompt) scannerInstallPrompt.classList.add("hidden");
   if (persistentInstallBtn) persistentInstallBtn.classList.add("hidden");
 }
   
@@ -1761,13 +1758,6 @@ if (window.matchMedia('(display-mode: standalone)').matches ||
   }
 }
 
-
-// Hide both buttons if app is already installed
-if (window.matchMedia('(display-mode: standalone)').matches || 
-    window.navigator.standalone === true) {
-  if (scannerAndroidInstall) scannerAndroidInstall.classList.add('hidden');
-  if (scannerIosInstall) scannerIosInstall.classList.add('hidden');
-}
 
   
 
