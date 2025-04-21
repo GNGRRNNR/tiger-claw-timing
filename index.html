@@ -746,6 +746,13 @@ cursor: pointer;
     <button id="refresh-stats" class="refresh-stats">Refresh Stats</button>
     <span id="stats-refreshing" class="stats-refreshing hidden"></span>
   </div>
+
+  <!-- Installation prompt for scanner screen -->
+<div id="scanner-install-prompt" class="install-prompt hidden">
+  <strong>📱 Install Tiger Claw Timing</strong>
+  <p>Add this app to your home screen for offline access and faster scanning</p>
+  <button id="scanner-install-btn" class="install-btn">Install Now</button>
+</div>
   
   <!-- Connection status and refresh button -->
   <div class="connection-container">
@@ -853,12 +860,15 @@ const offlineBanner = document.getElementById('offline-banner');
 const installPrompt = document.getElementById('install-prompt');
 const installBtn = document.getElementById('install-btn');
 
+
   // DOM elements for installation
 const androidInstallBtn = document.getElementById("android-install-btn");
 const iosInstallBtn = document.getElementById("ios-install-btn");
 const iosInstructions = document.getElementById("ios-install-instructions");
 const qrCodeContainer = document.getElementById("qr-code-container");
 const persistentInstallBtn = document.createElement("button");
+const scannerInstallPrompt = document.getElementById('scanner-install-prompt');
+const scannerInstallBtn = document.getElementById('scanner-install-btn');
 
 // Checkpoint stats elements
 const checkpointStats = document.getElementById('checkpoint-stats');
@@ -947,6 +957,22 @@ function registerServiceWorker() {
   }
 }
 
+  // Function to show appropriate install prompts on both screens
+function updateInstallPrompts() {
+  if (deferredInstallPrompt && !isIOS()) {
+    // Show install prompts on both screens
+    if (installPrompt) installPrompt.classList.remove('hidden');
+    if (scannerInstallPrompt) scannerInstallPrompt.classList.remove('hidden');
+    if (persistentInstallBtn) persistentInstallBtn.classList.remove('hidden');
+    logDebug("Install prompts shown on all screens");
+  } else if (isIOS()) {
+    // Show iOS-specific instructions
+    if (iosInstallPrompt) iosInstallPrompt.classList.remove('hidden');
+    if (iosInstructions) iosInstructions.classList.remove('hidden');
+    logDebug("iOS install instructions shown");
+  }
+}
+
   // Set up persistent install button
 function setupPersistentInstallButton() {
   persistentInstallBtn.className = "persistent-install-btn hidden";
@@ -1008,7 +1034,7 @@ function showAppropriateInstallInstructions() {
   generateQRCode();
 }
 
-// Function to trigger installation
+// Modify the triggerInstall function to hide all prompts
 function triggerInstall() {
   if (deferredInstallPrompt) {
     // Show the install prompt
@@ -1018,9 +1044,10 @@ function triggerInstall() {
     deferredInstallPrompt.userChoice.then((choiceResult) => {
       if (choiceResult.outcome === "accepted") {
         logDebug("User accepted the install prompt");
-        // Hide install buttons
-        installPrompt.classList.add("hidden");
-        persistentInstallBtn.classList.add("hidden");
+        // Hide all install buttons
+        if (installPrompt) installPrompt.classList.add("hidden");
+        if (scannerInstallPrompt) scannerInstallPrompt.classList.add("hidden");
+        if (persistentInstallBtn) persistentInstallBtn.classList.add("hidden");
       } else {
         logDebug("User dismissed the install prompt");
       }
@@ -1038,14 +1065,13 @@ window.addEventListener("beforeinstallprompt", (e) => {
 
   // Stash the event so it can be triggered later
   deferredInstallPrompt = e;
-
-  // Show install buttons (but not on iOS)
-  if (!isIOS()) {
-    installPrompt.classList.remove("hidden");
-    persistentInstallBtn.classList.remove("hidden");
-    logDebug("Install prompt detected and saved");
-  }
+  
+  // Update all install prompts
+  updateInstallPrompts();
+  
+  logDebug("Install prompt detected and saved");
 });
+  
 
 // Check if app is already installed
 window.addEventListener("appinstalled", (evt) => {
@@ -1073,6 +1099,11 @@ installBtn.addEventListener('click', () => {
     });
   }
 });
+
+// Add click handler for scanner install button
+if (scannerInstallBtn) {
+  scannerInstallBtn.addEventListener('click', triggerInstall);
+}
 
 // Retry loading button
 retryLoadingBtn.addEventListener('click', function() {
@@ -1119,6 +1150,20 @@ function handleLogin() {
   
   // Start periodic upload attempts
   startPeriodicUploadAttempts();
+}
+
+// Modify the showScannerScreen function to update install prompts
+function showScannerScreen() {
+  loginScreen.classList.add('hidden');
+  loadingScreen.classList.add('hidden');
+  scannerScreen.classList.remove('hidden');
+  checkpointDisplay.textContent = checkpoint;
+  updateConnectionStatus();
+  fetchCheckpointStats();
+  setupCheckpointStatsRefresh();
+  
+  // Update install prompts when showing scanner screen
+  updateInstallPrompts();
 }
 
 // Start periodic upload attempts
@@ -1571,11 +1616,14 @@ function clearAllData() {
 // Initialize the application
 function init() {
 
-  // Set up persistent install button
-setupPersistentInstallButton();
-
-// Set up installation instructions
-showAppropriateInstallInstructions();
+// Set up persistent install button
+  setupPersistentInstallButton();
+  
+  // Set up installation instructions
+  showAppropriateInstallInstructions();
+  
+  // Update install prompts
+  updateInstallPrompts();
 
   
   // Register service worker
