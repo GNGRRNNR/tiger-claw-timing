@@ -551,19 +551,27 @@ cursor: pointer;
   background-color: #218838;
 }
 
-/* Persistent Install Button */
 .persistent-install-btn {
   background-color: #28a745;
   color: white;
   border: none;
   border-radius: 5px;
-  padding: 8px 15px;
-  font-size: 14px;
+  padding: 10px 15px;
+  font-size: 16px;
   position: fixed;
   bottom: 20px;
   right: 20px;
-  z-index: 100;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.persistent-install-btn::before {
+  content: "📱";
+  margin-right: 8px;
+  font-size: 18px;
 }
 
 /* Download Section */
@@ -973,14 +981,20 @@ function updateInstallPrompts() {
   }
 }
 
-  // Set up persistent install button
-function setupPersistentInstallButton() {
+  function setupPersistentInstallButton() {
   persistentInstallBtn.className = "persistent-install-btn hidden";
-  persistentInstallBtn.textContent = "📱 Install App";
+  persistentInstallBtn.textContent = "Install App";
   document.body.appendChild(persistentInstallBtn);
   
   // Add click handler
   persistentInstallBtn.addEventListener("click", triggerInstall);
+  
+  // Make sure it's visible if we have an install prompt
+  if (deferredInstallPrompt && !isIOS()) {
+    persistentInstallBtn.classList.remove("hidden");
+  }
+  
+  logDebug("Persistent install button set up");
 }
 
 // Detect iOS
@@ -1645,6 +1659,16 @@ function init() {
   // Set up online/offline event listeners
   window.addEventListener('online', handleOnlineStatusChange);
   window.addEventListener('offline', handleOnlineStatusChange);
+  
+  // Check if the app is already installed
+if (window.matchMedia('(display-mode: standalone)').matches || 
+    window.navigator.standalone === true) {
+  logDebug("App is already installed, hiding install prompts");
+  // App is already installed, hide all install prompts
+  if (installPrompt) installPrompt.classList.add("hidden");
+  if (scannerInstallPrompt) scannerInstallPrompt.classList.add("hidden");
+  if (persistentInstallBtn) persistentInstallBtn.classList.add("hidden");
+}
   
   // Check if we already have runner data in localStorage
   try {
