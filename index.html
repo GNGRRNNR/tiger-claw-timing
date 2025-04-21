@@ -1224,9 +1224,6 @@ function fetchAlreadyScannedRunners() {
   if (!checkpoint || !isOnline) return;
   
   logDebug(`Fetching already scanned runners at checkpoint: ${checkpoint}`);
-    return;
-  
-  logDebug(`Fetching already scanned runners at checkpoint: ${checkpoint}`);
   
   // Use fetch API to get checkpoint stats with no-cors mode
   fetch(`${APPS_SCRIPT_URL}?action=getCheckpointStats&checkpoint=${encodeURIComponent(checkpoint)}`, {
