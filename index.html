@@ -9,6 +9,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="Tiger Claw">
+<meta name="mobile-web-app-capable" content="yes">
 <link rel="apple-touch-icon" href="icons/icon-192x192.png">
 
 <link rel="manifest" href="manifest.json">
@@ -696,8 +697,7 @@ cursor: pointer;
   
   <div class="form-group">
     <label for="password-input">Password</label>
-    <input type="password" id="password-input" placeholder="Enter password">
-    <div id="login-error" class="error-message hidden"></div>
+    <input type="password" id="password-input" placeholder="Enter password" autocomplete="current-password">    <div id="login-error" class="error-message hidden"></div>
   </div>
   
   <button type="submit" id="login-button">Login</button>
