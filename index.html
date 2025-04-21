@@ -916,12 +916,6 @@ const offlineBanner = document.getElementById('offline-banner');
 const installPrompt = document.getElementById('install-prompt');
 const installBtn = document.getElementById('install-btn');
 
-
-  // DOM elements for installation
-const persistentInstallBtn = document.createElement("button");
-const scannerInstallPrompt = document.getElementById('scanner-install-prompt');
-const scannerInstallBtn = document.getElementById('scanner-install-btn');
-
 // Checkpoint stats elements
 const checkpointStats = document.getElementById('checkpoint-stats');
 const statsText = document.getElementById('stats-text');
@@ -1053,17 +1047,17 @@ function isAndroid() {
 
 
 // Show appropriate install instructions based on platform
-function showAppropriateInstallInstructions() {
+function showAppropriateInstallInstructions(androidBtn, iosBtn, iosInstructionsElement) {
   if (isIOS()) {
-    if (iosInstallBtn) {
-      iosInstallBtn.addEventListener("click", () => {
-        iosInstructions.classList.toggle("hidden");
+    if (iosBtn) {
+      iosBtn.addEventListener("click", () => {
+        iosInstructionsElement.classList.toggle("hidden");
       });
     }
   } else {
     // For Android and other platforms, use the install prompt
-    if (androidInstallBtn) {
-      androidInstallBtn.addEventListener("click", triggerInstall);
+    if (androidBtn) {
+      androidBtn.addEventListener("click", triggerInstall);
     }
   }
 }
@@ -1648,16 +1642,22 @@ function clearAllData() {
 // Initialize the application
 function init() {
 
-// Set up persistent install button
+// DOM elements for installation
+  const androidInstallBtn = document.getElementById("android-install-btn");
+  const iosInstallBtn = document.getElementById("ios-install-btn");
+  const iosInstructions = document.getElementById("ios-install-instructions");
+  const persistentInstallBtn = document.createElement("button");
+  
+  // Set up persistent install button
   setupPersistentInstallButton();
   
-  // Set up installation instructions
-  showAppropriateInstallInstructions();
+  // Set up installation instructions - pass the elements as parameters
+  showAppropriateInstallInstructions(androidInstallBtn, iosInstallBtn, iosInstructions);
   
   // Update install prompts
   updateInstallPrompts();
 
-  // ADD THIS CODE HERE - Set up scanner screen install buttons
+  // Set up scanner screen install buttons
   const scannerAndroidInstall = document.getElementById('scanner-android-install');
   const scannerIosInstall = document.getElementById('scanner-ios-install');
   const scannerIosInstructions = document.getElementById('scanner-ios-instructions');
@@ -1686,6 +1686,7 @@ function init() {
     if (scannerAndroidInstall) scannerAndroidInstall.classList.add('hidden');
     if (scannerIosInstall) scannerIosInstall.classList.add('hidden');
   }
+
   
   // Register service worker
   registerServiceWorker();
