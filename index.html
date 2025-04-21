@@ -873,7 +873,6 @@ const installBtn = document.getElementById('install-btn');
 const androidInstallBtn = document.getElementById("android-install-btn");
 const iosInstallBtn = document.getElementById("ios-install-btn");
 const iosInstructions = document.getElementById("ios-install-instructions");
-const qrCodeContainer = document.getElementById("qr-code-container");
 const persistentInstallBtn = document.createElement("button");
 const scannerInstallPrompt = document.getElementById('scanner-install-prompt');
 const scannerInstallBtn = document.getElementById('scanner-install-btn');
@@ -1023,9 +1022,7 @@ function showAppropriateInstallInstructions() {
     }
   }
 
-  // Generate QR code for easy sharing
-  generateQRCode();
-}
+
 
 // Modify the triggerInstall function to hide all prompts
 function triggerInstall() {
