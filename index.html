@@ -1007,27 +1007,6 @@ function isAndroid() {
   return /Android/.test(navigator.userAgent);
 }
 
-// Generate QR code for the current page
-function generateQRCode() {
-  if (typeof QRCode !== "undefined") {
-    try {
-      // Clear previous QR code
-      qrCodeContainer.innerHTML = "";
-
-      // Generate new QR code with the current URL
-      new QRCode(qrCodeContainer, {
-        text: window.location.href,
-        width: 150,
-        height: 150,
-        colorDark: "#28a745",
-        colorLight: "#ffffff",
-        correctLevel: QRCode.CorrectLevel.H,
-      });
-    } catch (e) {
-      logDebug("Error generating QR code: " + e);
-    }
-  }
-}
 
 // Show appropriate install instructions based on platform
 function showAppropriateInstallInstructions() {
