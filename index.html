@@ -642,6 +642,42 @@ cursor: pointer;
   margin-bottom: 8px;
 }
 
+/* Add this to your existing CSS */
+.install-icons {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.icon-button {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  padding: 8px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.icon-button:hover {
+  background-color: #218838;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.platform-icon {
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+  
+
   
 </style>
 </head>
@@ -740,6 +776,15 @@ cursor: pointer;
 <div class="app-header">
   <h1>TIGER CLAW TIMING</h1>
   <div id="checkpoint-display" style="font-weight: bold; font-size: 18px; margin: 10px 0;"></div>
+
+<div class="install-icons">
+  <button id="scanner-android-install" class="icon-button" title="Install on Android">
+    <span class="platform-icon">🤖</span> Install App
+  </button>
+  <button id="scanner-ios-install" class="icon-button" title="Install on iOS">
+    <span class="platform-icon">🍎</span> Install App
+  </button>
+</div>
   
   <!-- Checkpoint Stats -->
   <div id="checkpoint-stats" class="checkpoint-stats">
@@ -755,12 +800,15 @@ cursor: pointer;
     <span id="stats-refreshing" class="stats-refreshing hidden"></span>
   </div>
 
-  <!-- Installation prompt for scanner screen -->
-<div id="scanner-install-prompt" class="install-prompt hidden">
-  <strong>📱 Install Tiger Claw Timing</strong>
-  <p>Add this app to your home screen for offline access and faster scanning</p>
-  <button id="scanner-install-btn" class="install-btn">Install Now</button>
+<div id="scanner-ios-instructions" class="ios-instructions hidden">
+  <ol>
+    <li>Tap the share button <span style="font-size: 1.2em;">⎙</span> at the bottom of your screen</li>
+    <li>Scroll down and tap "Add to Home Screen"</li>
+    <li>Tap "Add" in the top right corner</li>
+  </ol>
 </div>
+
+
   
   <!-- Connection status and refresh button -->
   <div class="connection-container">
@@ -1685,6 +1733,39 @@ if (window.matchMedia('(display-mode: standalone)').matches ||
     }, 3000);
   }
 }
+
+// Add this to your init() function
+// Set up scanner screen install buttons
+const scannerAndroidInstall = document.getElementById('scanner-android-install');
+const scannerIosInstall = document.getElementById('scanner-ios-install');
+const scannerIosInstructions = document.getElementById('scanner-ios-instructions');
+
+if (scannerAndroidInstall) {
+  scannerAndroidInstall.addEventListener('click', triggerInstall);
+  // Hide Android button on iOS
+  if (isIOS()) {
+    scannerAndroidInstall.classList.add('hidden');
+  }
+}
+
+if (scannerIosInstall) {
+  scannerIosInstall.addEventListener('click', () => {
+    scannerIosInstructions.classList.toggle('hidden');
+  });
+  // Hide iOS button on Android
+  if (!isIOS()) {
+    scannerIosInstall.classList.add('hidden');
+  }
+}
+
+// Hide both buttons if app is already installed
+if (window.matchMedia('(display-mode: standalone)').matches || 
+    window.navigator.standalone === true) {
+  if (scannerAndroidInstall) scannerAndroidInstall.classList.add('hidden');
+  if (scannerIosInstall) scannerIosInstall.classList.add('hidden');
+}
+
+  
 
 // Update offline banner
 function updateOfflineBanner() {
