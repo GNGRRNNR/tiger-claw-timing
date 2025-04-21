@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com;">
 <meta name="theme-color" content="#28a745">
+  <!-- Add these to your <head> section -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Tiger Claw">
+<link rel="apple-touch-icon" href="icons/icon-192x192.png">
+
 <link rel="manifest" href="manifest.json">
 <title>Tiger Claw Timing System</title>
 <style>
@@ -516,6 +522,118 @@ font-size: 14px;
 margin-top: 10px;
 cursor: pointer;
 }
+
+/* Enhanced Install Prompt Styles */
+.install-prompt {
+  background-color: #e9f7ef;
+  border: 2px solid #28a745;
+  border-radius: 8px;
+  padding: 15px;
+  margin: 15px 0;
+  text-align: center;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.install-btn {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  padding: 10px 20px;
+  font-size: 16px;
+  font-weight: bold;
+  margin-top: 10px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.install-btn:hover {
+  background-color: #218838;
+}
+
+/* Persistent Install Button */
+.persistent-install-btn {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  padding: 8px 15px;
+  font-size: 14px;
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Download Section */
+.download-section {
+  background-color: #f8f9fa;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 15px;
+  margin: 20px 0;
+  text-align: center;
+}
+
+.download-section h3 {
+  color: #1e7e34;
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+
+.download-section p {
+  margin-bottom: 15px;
+  font-size: 14px;
+}
+
+.platform-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.platform-button {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  padding: 10px 15px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 120px;
+}
+
+.platform-button:hover {
+  background-color: #218838;
+}
+
+.platform-icon {
+  margin-right: 8px;
+  font-size: 18px;
+}
+
+/* iOS-specific install instructions */
+.ios-instructions {
+  text-align: left;
+  margin: 15px auto;
+  max-width: 280px;
+  font-size: 14px;
+}
+
+.ios-instructions ol {
+  padding-left: 20px;
+}
+
+.ios-instructions li {
+  margin-bottom: 8px;
+}
+
+  
 </style>
 </head>
 <body>
@@ -576,6 +694,35 @@ cursor: pointer;
   
   <button type="submit" id="login-button">Login</button>
 </form>
+
+<!-- Download Section (add this to the login screen) -->
+<div class="download-section">
+  <h3>📱 Download Tiger Claw Timing App</h3>
+  <p>Install this app on your device for offline access and faster scanning</p>
+  
+  <div class="platform-buttons">
+    <button id="android-install-btn" class="platform-button">
+      <span class="platform-icon">🤖</span> Android
+    </button>
+    <button id="ios-install-btn" class="platform-button">
+      <span class="platform-icon">🍎</span> iPhone/iPad
+    </button>
+  </div>
+  
+  <div id="ios-install-instructions" class="ios-instructions hidden">
+    <ol>
+      <li>Tap the share button <span style="font-size: 1.2em;">⎙</span> at the bottom of your screen</li>
+      <li>Scroll down and tap "Add to Home Screen"</li>
+      <li>Tap "Add" in the top right corner</li>
+    </ol>
+  </div>
+  
+  <div id="qr-download" style="margin-top: 15px;">
+    <p>Or scan this QR code with your mobile device:</p>
+    <div id="qr-code-container" style="margin: 10px auto; width: 150px; height: 150px;"></div>
+  </div>
+</div>
+
 
 <!-- Debug panel toggle -->
 <div style="margin-top: 20px; text-align: center;">
@@ -709,6 +856,13 @@ const offlineBanner = document.getElementById('offline-banner');
 const installPrompt = document.getElementById('install-prompt');
 const installBtn = document.getElementById('install-btn');
 
+  // DOM elements for installation
+const androidInstallBtn = document.getElementById("android-install-btn");
+const iosInstallBtn = document.getElementById("ios-install-btn");
+const iosInstructions = document.getElementById("ios-install-instructions");
+const qrCodeContainer = document.getElementById("qr-code-container");
+const persistentInstallBtn = document.createElement("button");
+
 // Checkpoint stats elements
 const checkpointStats = document.getElementById('checkpoint-stats');
 const statsText = document.getElementById('stats-text');
@@ -719,6 +873,7 @@ const refreshStatsBtn = document.getElementById('refresh-stats');
 const statsRefreshing = document.getElementById('stats-refreshing');
 
 // Application state
+let deferredInstallPrompt = null; // Store the install prompt event
 let isScanning = false;
 let isOnline = navigator.onLine;
 let html5QrCode = null;
@@ -796,14 +951,112 @@ function registerServiceWorker() {
   }
 }
 
-// Listen for beforeinstallprompt event
-window.addEventListener('beforeinstallprompt', (e) => {
+  // Set up persistent install button
+function setupPersistentInstallButton() {
+  persistentInstallBtn.className = "persistent-install-btn hidden";
+  persistentInstallBtn.textContent = "📱 Install App";
+  document.body.appendChild(persistentInstallBtn);
+  
+  // Add click handler
+  persistentInstallBtn.addEventListener("click", triggerInstall);
+}
+
+// Detect iOS
+function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+}
+
+// Detect Android
+function isAndroid() {
+  return /Android/.test(navigator.userAgent);
+}
+
+// Generate QR code for the current page
+function generateQRCode() {
+  if (typeof QRCode !== "undefined") {
+    try {
+      // Clear previous QR code
+      qrCodeContainer.innerHTML = "";
+
+      // Generate new QR code with the current URL
+      new QRCode(qrCodeContainer, {
+        text: window.location.href,
+        width: 150,
+        height: 150,
+        colorDark: "#28a745",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.H,
+      });
+    } catch (e) {
+      logDebug("Error generating QR code: " + e);
+    }
+  }
+}
+
+// Show appropriate install instructions based on platform
+function showAppropriateInstallInstructions() {
+  if (isIOS()) {
+    if (iosInstallBtn) {
+      iosInstallBtn.addEventListener("click", () => {
+        iosInstructions.classList.toggle("hidden");
+      });
+    }
+  } else {
+    // For Android and other platforms, use the install prompt
+    if (androidInstallBtn) {
+      androidInstallBtn.addEventListener("click", triggerInstall);
+    }
+  }
+
+  // Generate QR code for easy sharing
+  generateQRCode();
+}
+
+// Function to trigger installation
+function triggerInstall() {
+  if (deferredInstallPrompt) {
+    // Show the install prompt
+    deferredInstallPrompt.prompt();
+
+    // Wait for the user to respond to the prompt
+    deferredInstallPrompt.userChoice.then((choiceResult) => {
+      if (choiceResult.outcome === "accepted") {
+        logDebug("User accepted the install prompt");
+        // Hide install buttons
+        installPrompt.classList.add("hidden");
+        persistentInstallBtn.classList.add("hidden");
+      } else {
+        logDebug("User dismissed the install prompt");
+      }
+      deferredInstallPrompt = null;
+    });
+  } else {
+    showMessage("App installation not available or already installed", true);
+  }
+}
+  
+// Enhanced beforeinstallprompt event handler
+window.addEventListener("beforeinstallprompt", (e) => {
   // Prevent Chrome 67 and earlier from automatically showing the prompt
   e.preventDefault();
+
   // Stash the event so it can be triggered later
   deferredInstallPrompt = e;
-  // Show the install button
-  installPrompt.classList.remove('hidden');
+
+  // Show install buttons (but not on iOS)
+  if (!isIOS()) {
+    installPrompt.classList.remove("hidden");
+    persistentInstallBtn.classList.remove("hidden");
+    logDebug("Install prompt detected and saved");
+  }
+});
+
+// Check if app is already installed
+window.addEventListener("appinstalled", (evt) => {
+  logDebug("App was installed");
+  // Hide install buttons
+  installPrompt.classList.add("hidden");
+  persistentInstallBtn.classList.add("hidden");
 });
 
 // Install button click handler
@@ -1321,6 +1574,14 @@ function clearAllData() {
 
 // Initialize the application
 function init() {
+
+  // Set up persistent install button
+setupPersistentInstallButton();
+
+// Set up installation instructions
+showAppropriateInstallInstructions();
+
+  
   // Register service worker
   registerServiceWorker();
   
