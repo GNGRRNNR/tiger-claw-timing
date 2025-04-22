@@ -744,6 +744,7 @@ You are currently offline. Scans will be saved and uploaded when connection is r
 
 <!-- Scanner Screen -->
 <!-- In the scanner-screen div, move the install-icons div to the top -->
+<!-- Scanner Screen -->
 <div id="scanner-screen" class="hidden">
   <div class="install-icons">
     <button id="scanner-android-install" class="icon-button" title="Install on Android">
@@ -757,11 +758,89 @@ You are currently offline. Scans will be saved and uploaded when connection is r
   <div class="app-header">
     <h1>TIGER CLAW TIMING</h1>
     <div id="checkpoint-display" style="font-weight: bold; font-size: 18px; margin: 10px 0;"></div>
-    
-    <!-- Rest of the header content -->
+
+    <!-- Checkpoint Stats -->
+    <div id="checkpoint-stats" class="checkpoint-stats">
+      <div id="stats-text">Loading checkpoint stats...</div>
+      <div class="progress-bar">
+        <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%"></div>
+      </div>
+      <div class="stats-numbers">
+        <span id="scanned-count">0 scanned</span>
+        <span id="remaining-count">0 remaining</span>
+      </div>
+      <button id="refresh-stats" class="refresh-stats">Refresh Stats</button>
+      <span id="stats-refreshing" class="stats-refreshing hidden"></span>
+    </div>
+
+    <div id="scanner-ios-instructions" class="ios-instructions hidden">
+      <ol>
+        <li>Tap the share button <span style="font-size: 1.2em;">⎙</span> at the bottom of your screen</li>
+        <li>Scroll down and tap "Add to Home Screen"</li>
+        <li>Tap "Add" in the top right corner</li>
+      </ol>
+    </div>
+
+    <!-- Connection status and refresh button -->
+    <div class="connection-container">
+      <div id="connection-status" class="connection-status">
+        <span id="status-icon" class="status-icon">●</span>
+        <span id="status-text">CHECKING CONNECTION...</span>
+      </div>
+      <button id="refresh-button">Refresh Connection</button>
+    </div>
   </div>
-  
-  <!-- Rest of the scanner screen content -->
+
+  <button id="scan-button" class="scan-button">START SCANNING</button>
+
+  <!-- HTML5QrCode scanner container -->
+  <div id="scanner-container" class="scanner-container hidden">
+    <div id="qr-reader"></div>
+    <div class="targeting-overlay"></div>
+    <div id="flash-overlay" class="flash-overlay"></div>
+    <div id="camera-loading" class="camera-loading">
+      <div class="spinner"></div>
+      <div>Starting camera...</div>
+    </div>
+    <div class="camera-instructions">Align QR code within the target</div>
+  </div>
+
+  <!-- Native camera fallback -->
+  <div id="native-camera-container" class="hidden">
+    <video id="native-camera-video" autoplay playsinline></video>
+    <canvas id="native-camera-canvas"></canvas>
+    <div class="camera-instructions">Align QR code within the target</div>
+  </div>
+
+  <div id="message" class="success-message hidden"></div>
+
+  <div class="form-group manual-entry-section" style="margin-top: 20px;">
+    <h2>Manual Entry</h2>
+    <div class="form-group">
+      <label for="bib-input">Bib Number (required)</label>
+      <input type="tel" id="bib-input" inputmode="numeric" pattern="[0-9]*" placeholder="Enter bib number">
+    </div>
+
+    <button id="manual-submit-button">SUBMIT</button>
+  </div>
+
+  <div id="pending-uploads" class="pending-uploads hidden"></div>
+
+  <div id="recent-scans" class="recent-scans">
+    <h3>Recent Scans</h3>
+    <div id="scans-list"></div>
+  </div>
+
+  <button id="logout-button" style="background-color: #6c757d; margin-top: 20px;">Logout</button>
+
+  <!-- Debug panel (hidden by default) -->
+  <div id="debug-panel" class="debug-panel hidden">
+    <h4>Debug Info</h4>
+    <pre id="debug-info"></pre>
+    <button id="force-upload" style="background-color: #6c757d; margin-top: 10px; font-size: 12px;">Force Upload Pending Scans</button>
+    <button id="clear-data" style="background-color: #dc3545; margin-top: 10px; font-size: 12px;">Clear All Data</button>
+    <button id="refresh-runners" style="background-color: #007bff; margin-top: 10px; font-size: 12px;">Refresh Runner Data</button>
+  </div>
 </div>
 
 <div class="install-icons">
