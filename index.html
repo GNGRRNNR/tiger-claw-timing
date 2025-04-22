@@ -1307,6 +1307,7 @@ function fetchAlreadyScannedRunners() {
 }
 
 // Fetch checkpoint stats directly from the spreadsheet
+// Fetch checkpoint stats directly from the spreadsheet
 function fetchCheckpointStatsFromSpreadsheet() {
   if (!checkpoint || !isOnline) {
     // If offline, calculate stats locally
@@ -1344,12 +1345,17 @@ function fetchCheckpointStatsFromSpreadsheet() {
         const rows = data.table.rows;
         const headers = data.table.cols.map(col => col.label);
         
-        // Find column indices
-        const bibIndex = headers.findIndex(h => h.toLowerCase().includes('bib'));
-        const checkpointIndex = headers.findIndex(h => h.toLowerCase().includes('checkpoint'));
+        logDebug(`Found spreadsheet columns: ${headers.join(', ')}`);
+        
+        // Find column indices using your exact column names
+        const bibIndex = headers.findIndex(h => h === "BIB NUMBER");
+        const checkpointIndex = headers.findIndex(h => h === "CHECKPOINT");
+        
+        logDebug(`Column indices found: bib=${bibIndex}, checkpoint=${checkpointIndex}`);
         
         if (bibIndex === -1 || checkpointIndex === -1) {
-          throw new Error('Could not find required columns in spreadsheet');
+          logDebug(`Could not find required columns. Available: ${headers.join(', ')}`);
+          throw new Error(`Could not find required columns. Available: ${headers.join(', ')}`);
         }
         
         // Process each row to find scans for this checkpoint
@@ -1361,6 +1367,7 @@ function fetchCheckpointStatsFromSpreadsheet() {
             
             if (scanCheckpoint === checkpoint) {
               alreadyScannedRunners.add(bib);
+              logDebug(`Found already scanned runner: Bib #${bib} at ${checkpoint}`);
             }
           }
         }
@@ -1395,6 +1402,8 @@ function fetchCheckpointStatsFromSpreadsheet() {
     });
 }
 
+
+  
 // Fetch runner data specifically for stats updates
 function fetchRunnerDataForStats() {
   return new Promise((resolve, reject) => {
@@ -1439,13 +1448,17 @@ function fetchRunnerDataForStats() {
           const rows = data.table.rows;
           const headers = data.table.cols.map(col => col.label);
           
-          // Find column indices
-          const bibIndex = headers.findIndex(h => h && h.toLowerCase().includes('bib'));
-          const nameIndex = headers.findIndex(h => h && h.toLowerCase().includes('name'));
-          const statusIndex = headers.findIndex(h => h === 'DNF' || (h && h.toLowerCase().includes('status')));
+          logDebug(`Found runner list columns: ${headers.join(', ')}`);
+          
+          // Find column indices using your exact column names
+          const bibIndex = headers.findIndex(h => h === "BIB NUMBER");
+          const nameIndex = headers.findIndex(h => h === "RUNNER NAME");
+          const statusIndex = headers.findIndex(h => h === "STATUS");
+          
+          logDebug(`Runner list column indices: bib=${bibIndex}, name=${nameIndex}, status=${statusIndex}`);
           
           if (bibIndex === -1 || nameIndex === -1) {
-            throw new Error('Could not find required columns in spreadsheet');
+            throw new Error('Could not find required columns in runner list spreadsheet');
           }
           
           for (let i = 0; i < rows.length; i++) {
@@ -1491,6 +1504,8 @@ function fetchRunnerDataForStats() {
       });
   });
 }
+
+  
 
 // Set up periodic refresh of checkpoint stats
 function setupCheckpointStatsRefresh() {
@@ -2440,7 +2455,6 @@ function processScan(bibNumber) {
     isRescan = true;
     const lastScanTime = new Date(scanTimestamps[scanKey]).toLocaleTimeString();
     logDebug(`Rescan of Bib #${bibNumber} (previous scan at ${lastScanTime})`);
-    showMessage(`Updating scan for Bib #${bibNumber} (previous: ${lastScanTime})`);
     
     // Remove previous scan from recent scans
     recentScans = recentScans.filter(scan => !(scan.bib === bibNumber && scan.checkpoint === checkpoint));
@@ -2516,7 +2530,6 @@ function processScan(bibNumber) {
   fetchCheckpointStats();
 }
 
-
   
 // Update recent scans UI
 function updateRecentScansUI() {
@@ -2568,6 +2581,7 @@ function updatePendingUploadsUI() {
 }
 
 // Upload pending scans
+// Upload pending scans
 function uploadPendingScans(force = false) {
   if (!isOnline || pendingUploads.length === 0) {
     return;
@@ -2587,10 +2601,16 @@ function uploadPendingScans(force = false) {
   // Create a copy of the pending uploads
   const uploadsToProcess = [...pendingUploads];
   
-  // Prepare the data for upload
+  // Prepare the data for upload with your exact column names
   const uploadData = {
     action: 'recordScans',
-    scans: uploadsToProcess
+    scans: uploadsToProcess,
+    columnMappings: {
+      bib: "BIB NUMBER",
+      name: "RUNNER NAME",
+      checkpoint: "CHECKPOINT",
+      timestamp: "TIMESTAMP"
+    }
   };
   
   // Log the data being sent
@@ -2629,6 +2649,7 @@ function uploadPendingScans(force = false) {
     isUploadingPendingScans = false;
   });
 }
+  
   
 
 // Show message
