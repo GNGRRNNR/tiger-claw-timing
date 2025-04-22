@@ -688,6 +688,17 @@ font-size: 16px;
       <h1>TIGER CLAW TIMING SYSTEM</h1>
     </div>
 
+
+    <div class="form-group">
+  <label for="event-select">Select Event</label>
+  <select id="event-select">
+    <option value="">Select event</option>
+    <option value="50K">50K</option>
+    <option value="ASCENT">ASCENT</option>
+  </select>
+</div>
+
+    
     <form id="login-form">
       <div class="form-group">
         <label for="checkpoint-select">Select Checkpoint</label>
@@ -763,6 +774,7 @@ font-size: 16px;
   <div class="app-header">
     <!-- 1. Tiger Claw Timing and checkpoint indicator at the top -->
     <h1>TIGER CLAW TIMING</h1>
+    <div id="event-display" style="font-weight: bold; font-size: 18px; margin: 5px 0;"></div>
     <div id="checkpoint-display" style="font-weight: bold; font-size: 18px; margin: 10px 0;"></div>
 
     <!-- 2. Connection status and refresh button side by side -->
@@ -909,6 +921,8 @@ const offlineBanner = document.getElementById('offline-banner');
 const installPrompt = document.getElementById('install-prompt');
 const installBtn = document.getElementById('install-btn');
 const iosInstructions = document.getElementById('ios-install-instructions');
+const eventSelect = document.getElementById('event-select');
+const eventDisplay = document.getElementById('event-display');
 
 // Checkpoint stats elements
 const checkpointStats = document.getElementById('checkpoint-stats');
@@ -947,10 +961,11 @@ let periodicUploadInterval = null; // Interval for periodic upload attempts
 let dataLoadTimeoutId = null; // Store the timeout ID for data loading
 let dataLoadAttempted = false; // Flag to track if we've attempted to load data
 let persistentInstallBtn = null; // Store the persistent install button element
-
+let event = '';
+  
 // Constants
 const CORRECT_PASSWORD = "threeloops";
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyAetKgLktlUQsRCWymDn3dDs3QAiukG-cMhJGccX-2yV4Ojo4pdhaJxtYOpEp6CLK3/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby12SPznI16peC6hiTWjumq-6QhHrx2wtWy8mIvpCUq3neAS4zI3wdj2YhF-bAzNgg/exec";
 const RUNNER_DATA_REFRESH_INTERVAL = 2 * 60 * 1000; // 2 minutes
 const CHECKPOINT_STATS_REFRESH_INTERVAL = 30 * 1000; // 30 seconds
 const DNF_CHECK_INTERVAL = 60 * 1000; // 1 minute
@@ -1054,12 +1069,14 @@ function uploadScanDirectly(scan) {
   logDebug(`Attempting direct upload for bib #${scan.bib}`);
   
   // Create a simple test row with the scan data
-  const rowData = [
-    scan.timestamp,  // Column A: TIMESTAMP
-    scan.bib,        // Column B: BIB NUMBER
-    scan.name,       // Column C: RUNNER NAME
-    scan.checkpoint  // Column D: CHECKPOINT
-  ];
+const rowData = [
+  scan.timestamp,  // Column A: TIMESTAMP
+  scan.bib,        // Column B: BIB NUMBER
+  scan.name,       // Column C: RUNNER NAME
+  scan.event,      // Column D: EVENT (Add this line)
+  scan.checkpoint  // Column E: CHECKPOINT (was D before)
+];
+  
   
   // Create a simple form data object
   const formData = new FormData();
@@ -1453,10 +1470,16 @@ loginForm.addEventListener('submit', function(event) {
   handleLogin();
 });
 
-// Handle login
 function handleLogin() {
+  const selectedEvent = eventSelect.value;
   const selectedCheckpoint = checkpointSelect.value;
   const password = passwordInput.value;
+
+  if (!selectedEvent) {
+    loginError.textContent = 'Please select an event';
+    loginError.classList.remove('hidden');
+    return;
+  }
 
   if (!selectedCheckpoint) {
     loginError.textContent = 'Please select a checkpoint';
@@ -1473,8 +1496,10 @@ function handleLogin() {
   // Clear old session data
   clearSessionData();
 
-  // Save checkpoint and show scanner screen
+  // Save event and checkpoint and show scanner screen
+  event = selectedEvent;
   checkpoint = selectedCheckpoint;
+  localStorage.setItem('tigerClawEvent', event);
   localStorage.setItem('tigerClawCheckpoint', checkpoint);
   showScannerScreen();
 
@@ -1488,14 +1513,18 @@ function handleLogin() {
   startPeriodicUploadAttempts();
 }
 
+  
+
 function showScannerScreen() {
   loginScreen.classList.add('hidden');
   loadingScreen.classList.add('hidden');
   scannerScreen.classList.remove('hidden');
   checkpointDisplay.textContent = checkpoint;
+  eventDisplay.textContent = event;
   updateConnectionStatus();
   fetchCheckpointStats();
   setupCheckpointStatsRefresh();
+  
 
   // Update install prompts when showing scanner screen
   updateInstallPrompts();
@@ -2210,10 +2239,11 @@ function updateConnectionStatus() {
   }
 }
 
-// Check if user is already logged in
 function checkLoginStatus() {
+  const savedEvent = localStorage.getItem('tigerClawEvent');
   const savedCheckpoint = localStorage.getItem('tigerClawCheckpoint');
-  if (savedCheckpoint) {
+  if (savedEvent && savedCheckpoint) {
+    event = savedEvent;
     checkpoint = savedCheckpoint;
     showScannerScreen();
     
@@ -2712,6 +2742,7 @@ function processScan(bibNumber) {
     showMessage(`Bib #${bibNumber} is marked as DNF`, true);
     return;
   }
+
   
   // Create scan key
   const scanKey = `${bibNumber}-${checkpoint}`;
@@ -2743,16 +2774,17 @@ function processScan(bibNumber) {
   // Add to already scanned runners set
   alreadyScannedRunners.add(bibNumber);
   
-  // Create scan record
-  const timestamp = new Date().toISOString();
-  const scan = {
-    bib: bibNumber,
-    name: runnersData[bibNumber].name,
-    checkpoint: checkpoint,
-    timestamp: timestamp,
-    uploaded: false,
-    isRescan: isRescan
-  };
+// Create scan record
+const timestamp = new Date().toISOString();
+const scan = {
+  bib: bibNumber,
+  name: runnersData[bibNumber].name,
+  event: event,  // Add this line
+  checkpoint: checkpoint,
+  timestamp: timestamp,
+  uploaded: false,
+  isRescan: isRescan
+};
   
   // Add to recent scans
   recentScans.unshift(scan);
@@ -2868,17 +2900,18 @@ function uploadPendingScans(force = false) {
   // Create a copy of the pending uploads
   const uploadsToProcess = [...pendingUploads];
   
-  // Prepare the data for upload with your exact column names
-  const uploadData = {
-    action: 'recordScans',
-    scans: uploadsToProcess,
-    columnMappings: {
-      bib: "BIB NUMBER",
-      name: "RUNNER NAME",
-      checkpoint: "CHECKPOINT",
-      timestamp: "TIMESTAMP"
-    }
-  };
+ // Prepare the data for upload with your exact column names
+const uploadData = {
+  action: 'recordScans',
+  scans: uploadsToProcess,
+  columnMappings: {
+    bib: "BIB NUMBER",
+    name: "RUNNER NAME",
+    event: "EVENT",  // Add this line
+    checkpoint: "CHECKPOINT",
+    timestamp: "TIMESTAMP"
+  }
+};
   
   // Log the data being sent
   logDebug(`Upload data: ${JSON.stringify(uploadData).substring(0, 200)}...`);
@@ -2944,9 +2977,11 @@ logoutButton.addEventListener('click', function() {
       stopScanning();
     }
     
-    // Clear checkpoint
-    checkpoint = '';
-    localStorage.removeItem('tigerClawCheckpoint');
+    // Clear event and checkpoint
+event = '';
+checkpoint = '';
+localStorage.removeItem('tigerClawEvent');
+localStorage.removeItem('tigerClawCheckpoint');
     
     // Show login screen
     scannerScreen.classList.add('hidden');
