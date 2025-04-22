@@ -2544,7 +2544,8 @@ function uploadPendingScans(force = false) {
   
   lastUploadAttempt = now;
   
-  logDebug(`Uploading ${pendingUploads.length} pending scans`);
+  logDebug(`Uploading ${pendingUploads.length} pending scans to ${APPS_SCRIPT_URL}`);
+  showMessage(`Uploading ${pendingUploads.length} scans...`);
   
   // Create a copy of the pending uploads
   const uploadsToProcess = [...pendingUploads];
@@ -2555,49 +2556,153 @@ function uploadPendingScans(force = false) {
     scans: uploadsToProcess
   };
   
+  // Log the data being sent
+  logDebug(`Upload data: ${JSON.stringify(uploadData)}`);
+  
   // Use fetch API to upload the data
   fetch(APPS_SCRIPT_URL, {
     method: 'POST',
-    mode: 'no-cors', // Use no-cors to avoid CORS errors
+    mode: 'cors', // Try with cors instead of no-cors
     cache: 'no-cache',
     headers: {
-      'Content-Type': 'text/plain;charset=utf-8',
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify(uploadData)
   })
-  .then(() => {
-    // Since we can't read the response with no-cors, assume success
-    logDebug('Upload successful (assumed)');
+  .then(response => {
+    logDebug(`Upload response status: ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.text();
+  })
+  .then(text => {
+    logDebug(`Upload response: ${text}`);
     
-    // Mark scans as uploaded
-    uploadsToProcess.forEach(scan => {
-      const scanKey = `${scan.bib}-${scan.checkpoint}-${scan.timestamp}`;
-      uploadedScans[scanKey] = true;
-    });
-    
-    // Save uploaded scans
-    saveUploadedScans();
-    
-    // Remove uploaded scans from pending uploads
-    pendingUploads = pendingUploads.filter(scan => {
-      const scanKey = `${scan.bib}-${scan.checkpoint}-${scan.timestamp}`;
-      return !uploadedScans[scanKey];
-    });
-    
-    // Save updated pending uploads
-    savePendingScans();
-    
-    // Update UI
-    updatePendingUploadsUI();
-    
-    // Fetch fresh checkpoint stats
-    fetchCheckpointStats(true);
+    // Try to parse the response as JSON
+    try {
+      const result = JSON.parse(text);
+      if (result.success) {
+        logDebug(`Upload successful: ${result.message || 'Scans recorded'}`);
+        showMessage(`Upload successful: ${uploadsToProcess.length} scans recorded`);
+        
+        // Mark scans as uploaded
+        uploadsToProcess.forEach(scan => {
+          const scanKey = `${scan.bib}-${scan.checkpoint}-${scan.timestamp}`;
+          uploadedScans[scanKey] = true;
+        });
+        
+        // Save uploaded scans
+        saveUploadedScans();
+        
+        // Remove uploaded scans from pending uploads
+        pendingUploads = pendingUploads.filter(scan => {
+          const scanKey = `${scan.bib}-${scan.checkpoint}-${scan.timestamp}`;
+          return !uploadedScans[scanKey];
+        });
+        
+        // Save updated pending uploads
+        savePendingScans();
+        
+        // Update UI
+        updatePendingUploadsUI();
+        
+        // Fetch fresh checkpoint stats
+        fetchCheckpointStats(true);
+      } else {
+        throw new Error(result.message || 'Unknown error');
+      }
+    } catch (e) {
+      // If we can't parse the response as JSON, assume it's a success
+      // (this is for backward compatibility with the existing Apps Script)
+      logDebug('Could not parse response as JSON, assuming success');
+      
+      // Mark scans as uploaded
+      uploadsToProcess.forEach(scan => {
+        const scanKey = `${scan.bib}-${scan.checkpoint}-${scan.timestamp}`;
+        uploadedScans[scanKey] = true;
+      });
+      
+      // Save uploaded scans
+      saveUploadedScans();
+      
+      // Remove uploaded scans from pending uploads
+      pendingUploads = pendingUploads.filter(scan => {
+        const scanKey = `${scan.bib}-${scan.checkpoint}-${scan.timestamp}`;
+        return !uploadedScans[scanKey];
+      });
+      
+      // Save updated pending uploads
+      savePendingScans();
+      
+      // Update UI
+      updatePendingUploadsUI();
+      
+      // Fetch fresh checkpoint stats
+      fetchCheckpointStats(true);
+    }
   })
   .catch(error => {
-    logDebug('Error uploading scans: ' + error);
+    logDebug(`Error uploading scans: ${error}`);
+    showMessage(`Upload failed: ${error.message}`, true);
+    
+    // If using cors mode fails, try again with no-cors as fallback
+    if (error.message.includes('CORS')) {
+      logDebug('Retrying with no-cors mode');
+      
+      fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors', // Fallback to no-cors
+        cache: 'no-cache',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
+        body: JSON.stringify(uploadData)
+      })
+      .then(() => {
+        // Since we can't read the response with no-cors, assume success
+        logDebug('Upload with no-cors successful (assumed)');
+        showMessage('Upload completed (no-cors mode)');
+        
+        // Mark scans as uploaded
+        uploadsToProcess.forEach(scan => {
+          const scanKey = `${scan.bib}-${scan.checkpoint}-${scan.timestamp}`;
+          uploadedScans[scanKey] = true;
+        });
+        
+        // Save uploaded scans
+        saveUploadedScans();
+        
+        // Remove uploaded scans from pending uploads
+        pendingUploads = pendingUploads.filter(scan => {
+          const scanKey = `${scan.bib}-${scan.checkpoint}-${scan.timestamp}`;
+          return !uploadedScans[scanKey];
+        });
+        
+        // Save updated pending uploads
+        savePendingScans();
+        
+        // Update UI
+        updatePendingUploadsUI();
+        
+        // Fetch fresh checkpoint stats
+        fetchCheckpointStats(true);
+      })
+      .catch(error => {
+        logDebug(`Error in no-cors fallback: ${error}`);
+        showMessage('Upload failed even with fallback method', true);
+      })
+      .finally(() => {
+        isUploadingPendingScans = false;
+      });
+    } else {
+      isUploadingPendingScans = false;
+    }
   })
   .finally(() => {
-    isUploadingPendingScans = false;
+    if (isUploadingPendingScans) {
+      isUploadingPendingScans = false;
+    }
   });
 }
 
