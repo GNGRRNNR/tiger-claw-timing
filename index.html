@@ -1196,8 +1196,7 @@ function showScannerScreen() {
 
   // Update install prompts when showing scanner screen
   updateInstallPrompts();
-  positionInstallPrompt(); // Add this line
-}
+  positionInstallPrompt();
   
   // Make sure the persistent install button is in the correct container
   if (persistentInstallBtn && persistentInstallBtn.parentNode !== document.querySelector('#scanner-screen .app-header')) {
@@ -1845,7 +1844,7 @@ function handleOnlineStatusChange() {
   }
 }
 
-// Update connection status UI
+// Fix the updateConnectionStatus function
 function updateConnectionStatus() {
   if (isOnline) {
     statusIcon.style.color = '#28a745';
@@ -1853,7 +1852,7 @@ function updateConnectionStatus() {
     statusText.style.color = '#28a745';
   } else {
     statusIcon.style.color = '#dc3545';
-    status.textContent = 'OFFLINE';  // This should be statusText, not status
+    statusText.textContent = 'OFFLINE';  // Fixed: was using status instead of statusText
     statusText.style.color = '#dc3545';
   }
 }
