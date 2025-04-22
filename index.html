@@ -1083,7 +1083,7 @@ function uploadScanDirectly(scan) {
   });
 }
 
-// Replace your uploadPendingScans function with this version
+// Upload pending scans
 function uploadPendingScans(force = false) {
   if (!isOnline || pendingUploads.length === 0 || (isUploadingPendingScans && !force)) {
     return;
@@ -1097,23 +1097,44 @@ function uploadPendingScans(force = false) {
 
   // Process each scan individually
   const uploadPromises = pendingUploads.map(scan => {
-    return uploadScanDirectly(scan)
-      .then(success => {
-        if (success) {
-          // Mark as uploaded
-          const scanKey = `${scan.bib}-${scan.checkpoint}-${scan.timestamp}`;
-          uploadedScans[scanKey] = true;
-          return true;
-        }
-        return false;
-      });
+    // Format the data as expected by the appendRow method
+    // The order should be: [timestamp, bib, name, checkpoint]
+    const rowData = [
+      new Date(scan.timestamp).toISOString(),
+      scan.bib,
+      scan.name,
+      scan.checkpoint
+    ];
+    
+    // Use fetch API to upload the data
+    return fetch(`${APPS_SCRIPT_URL}?action=appendRow&sheetId=${RESULTS_SHEET_ID}`, {
+      method: 'POST',
+      mode: 'no-cors', // Use no-cors to avoid CORS errors
+      cache: 'no-cache',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        data: rowData
+      })
+    })
+    .then(() => {
+      // Mark this scan as uploaded
+      const scanKey = `${scan.bib}-${scan.checkpoint}-${scan.timestamp}`;
+      uploadedScans[scanKey] = true;
+      return scanKey;
+    })
+    .catch(error => {
+      logDebug(`Error uploading scan ${scan.bib}: ${error}`);
+      return null;
+    });
   });
   
   // Wait for all uploads to complete
   Promise.all(uploadPromises)
     .then(results => {
-      const successCount = results.filter(Boolean).length;
-      logDebug(`${successCount} of ${results.length} scans uploaded successfully`);
+      const successfulUploads = results.filter(result => result !== null).length;
+      logDebug(`Successfully uploaded ${successfulUploads} of ${pendingUploads.length} scans`);
       
       // Save uploaded scans
       saveUploadedScans();
@@ -1131,8 +1152,8 @@ function uploadPendingScans(force = false) {
       updatePendingUploadsUI();
       
       // Show message
-      if (successCount > 0) {
-        showMessage(`${successCount} scans uploaded successfully`);
+      if (successfulUploads > 0) {
+        showMessage(`${successfulUploads} scans uploaded successfully`);
       } else {
         showMessage("No scans were uploaded successfully", true);
       }
