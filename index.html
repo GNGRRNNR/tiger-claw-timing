@@ -959,17 +959,35 @@ let dataLoadTimeoutId = null; // Store the timeout ID for data loading
 let dataLoadAttempted = false; // Flag to track if we've attempted to load data
 let persistentInstallBtn = null; // Store the persistent install button element
 let event = '';
+
+  
   
 // Constants
 const CORRECT_PASSWORD = "threeloops";
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby12SPznI16peC6hiTWjumq-6QhHrx2wtWy8mIvpCUq3neAS4zI3wdj2YhF-bAzNgg/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw4viCU1fX87NUhgIVuLu6Vt0BfPM74QJ2kh-ivbkTj06DB6WbRXMfNbuZ3f16eov4w/exec";
 const RUNNER_DATA_REFRESH_INTERVAL = 2 * 60 * 1000; // 2 minutes
 const CHECKPOINT_STATS_REFRESH_INTERVAL = 30 * 1000; // 30 seconds
 const DNF_CHECK_INTERVAL = 60 * 1000; // 1 minute
 const PERIODIC_UPLOAD_INTERVAL = 30 * 1000; // 30 seconds
+
+// Spreadsheet configuration
 const RUNNERS_SHEET_ID = "19ysJEfg5dDTUe6q-JXngWbUAziGmrn0jGilGy8SkcYg"; // Your runners spreadsheet ID
 const RESULTS_SHEET_ID = "1StRgcagtoZs6x-TRCQMAWiTIqXKq__6_Gvcj8ysUz5c"; // Your results spreadsheet ID
+
+// Event-specific sheet names
+const EVENT_CONFIG = {
+  "ASCENT": {
+    RUNNERS_SHEET_NAME: "ASCENT RUNNERS",
+    RESULTS_SHEET_NAME: "ASCENT RESULTS"
+  },
+  "50K": {
+    RUNNERS_SHEET_NAME: "50k RUNNERS",
+    RESULTS_SHEET_NAME: "50k CHECKPOINT SCANS" // or "50k RESULTS" depending on which one you want to use
+  }
+};
+
 const DATA_LOAD_TIMEOUT = 30000; // 30 seconds timeout for data loading
+  
   
 
 // Check for URL parameters (for QR code login)
@@ -1616,8 +1634,17 @@ function fetchCheckpointStatsFromSpreadsheet() {
   alreadyScannedRunners = new Set();
 
   // Fetch directly from the results spreadsheet using the Google Visualization API
-  const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${RESULTS_SHEET_ID}/gviz/tq?tqx=out:json&sheet=Sheet1&cacheBuster=${cacheBuster}`;
+const resultsSheetName = event && EVENT_CONFIG[event]?.RESULTS_SHEET_NAME;
+  
+if (!resultsSheetName) {
+  logDebug(`No results sheet name found for event: ${event}`);
+  showMessage(`Configuration error: Cannot fetch stats for ${event}`, true);
+  return;
+}
 
+const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${RESULTS_SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(resultsSheetName)}&cacheBuster=${cacheBuster}`;
+
+  
   fetch(spreadsheetUrl)
     .then(response => response.text())
     .then(text => {
@@ -2268,6 +2295,16 @@ function fetchRunnerData(forceRefresh = false) {
     return;
   }
   
+  // Get the current event's sheet name
+  const sheetName = event && EVENT_CONFIG[event]?.RUNNERS_SHEET_NAME;
+  
+  if (!sheetName) {
+    logDebug(`No runner sheet name found for event: ${event}`);
+    showMessage(`Configuration error: No data source for ${event}`, true);
+    return;
+  }
+
+  
   // Check if we already have data and it's not a forced refresh
   if (!forceRefresh && Object.keys(runnersData).length > 0) {
     logDebug('Using cached runner data');
@@ -2314,8 +2351,7 @@ function fetchRunnerData(forceRefresh = false) {
   // Add a cache-busting parameter to ensure we get fresh data
   const cacheBuster = new Date().getTime();
   
-  // Fetch directly from the spreadsheet using the Google Visualization API
-  const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${RUNNERS_SHEET_ID}/gviz/tq?tqx=out:json&cacheBuster=${cacheBuster}`;
+  const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${RUNNERS_SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}&cacheBuster=${cacheBuster}`;
   
   fetch(spreadsheetUrl)
     .then(response => {
@@ -2903,18 +2939,31 @@ function uploadPendingScans(force = false) {
   // Create a copy of the pending uploads
   const uploadsToProcess = [...pendingUploads];
   
- // Prepare the data for upload with your exact column names
+ // Get the current event's results sheet name
+const resultsSheetName = event && EVENT_CONFIG[event]?.RESULTS_SHEET_NAME;
+  
+if (!resultsSheetName) {
+  logDebug(`No results sheet name found for event: ${event}`);
+  showMessage(`Configuration error: Cannot upload for ${event}`, true);
+  isUploadingPendingScans = false;
+  return;
+}
+
+// Prepare the data for upload with your exact column names
 const uploadData = {
   action: 'recordScans',
   scans: uploadsToProcess,
+  sheetId: RESULTS_SHEET_ID,
+  sheetName: resultsSheetName, // Pass the correct sheet name
   columnMappings: {
     bib: "BIB NUMBER",
     name: "RUNNER NAME",
-    event: "EVENT",  // Add this line
+    event: "EVENT",
     checkpoint: "CHECKPOINT",
     timestamp: "TIMESTAMP"
   }
 };
+  
   
   // Log the data being sent
   logDebug(`Upload data: ${JSON.stringify(uploadData).substring(0, 200)}...`);
