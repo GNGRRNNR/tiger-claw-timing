@@ -688,33 +688,31 @@ font-size: 16px;
       <h1>TIGER CLAW TIMING SYSTEM</h1>
     </div>
 
+    
+
 
     <div class="form-group">
-  <label for="event-select">Select Event</label>
-  <select id="event-select">
-    <option value="">Select event</option>
-    <option value="50K">50K</option>
-    <option value="ASCENT">ASCENT</option>
+  <label for="location-select">Select Location</label>
+  <select id="location-select">
+    <option value="">Select location</option>
+    <optgroup label="ASCENT">
+      <option value="ASCENT|FINISHLINE">FINISHLINE</option>
+    </optgroup>
+    <optgroup label="50K">
+      <option value="50K|GREEN CHECKPOINT">GREEN CHECKPOINT</option>
+      <option value="50K|PINK LOOP TOP">PINK LOOP TOP</option>
+      <option value="50K|PINK LOOP BOTTOM">PINK LOOP BOTTOM</option>
+      <option value="50K|YELLOW LOOP TOP">YELLOW LOOP TOP</option>
+      <option value="50K|YELLOW LOOP BOTTOM">YELLOW LOOP BOTTOM</option>
+      <option value="50K|WHITE LOOP TOP">WHITE LOOP TOP</option>
+      <option value="50K|WHITE LOOP BOTTOM">WHITE LOOP BOTTOM</option>
+      <option value="50K|RED CHECKPOINT">RED CHECKPOINT</option>
+      <option value="50K|FINISHLINE">FINISHLINE</option>
+    </optgroup>
   </select>
 </div>
 
     
-    <form id="login-form">
-      <div class="form-group">
-        <label for="checkpoint-select">Select Checkpoint</label>
-        <select id="checkpoint-select">
-          <option value="">Select checkpoint</option>
-          <option value="GREEN CHECKPOINT">GREEN CHECKPOINT</option>
-          <option value="PINK LOOP TOP">PINK LOOP TOP</option>
-          <option value="PINK LOOP BOTTOM">PINK LOOP BOTTOM</option>
-          <option value="YELLOW LOOP TOP">YELLOW LOOP TOP</option>
-          <option value="YELLOW LOOP BOTTOM">YELLOW LOOP BOTTOM</option>
-          <option value="WHITE LOOP TOP">WHITE LOOP TOP</option>
-          <option value="WHITE LOOP BOTTOM">WHITE LOOP BOTTOM</option>
-          <option value="RED CHECKPOINT">RED CHECKPOINT</option>
-          <option value="FINISHLINE">FINISHLINE</option>
-        </select>
-      </div>
 
       <div class="form-group">
         <label for="password-input">Password</label>
@@ -889,7 +887,6 @@ const loadingError = document.getElementById('loading-error');
 const retryLoadingBtn = document.getElementById('retry-loading');
 const loginScreen = document.getElementById('login-screen');
 const scannerScreen = document.getElementById('scanner-screen');
-const checkpointSelect = document.getElementById('checkpoint-select');
 const passwordInput = document.getElementById('password-input');
 const loginError = document.getElementById('login-error');
 const loginForm = document.getElementById('login-form');
@@ -921,7 +918,7 @@ const offlineBanner = document.getElementById('offline-banner');
 const installPrompt = document.getElementById('install-prompt');
 const installBtn = document.getElementById('install-btn');
 const iosInstructions = document.getElementById('ios-install-instructions');
-const eventSelect = document.getElementById('event-select');
+const locationSelect = document.getElementById('location-select');
 const eventDisplay = document.getElementById('event-display');
 
 // Checkpoint stats elements
@@ -1471,21 +1468,17 @@ loginForm.addEventListener('submit', function(event) {
 });
 
 function handleLogin() {
-  const selectedEvent = eventSelect.value;
-  const selectedCheckpoint = checkpointSelect.value;
+  const locationValue = locationSelect.value;
   const password = passwordInput.value;
 
-  if (!selectedEvent) {
-    loginError.textContent = 'Please select an event';
+  if (!locationValue) {
+    loginError.textContent = 'Please select a location';
     loginError.classList.remove('hidden');
     return;
   }
 
-  if (!selectedCheckpoint) {
-    loginError.textContent = 'Please select a checkpoint';
-    loginError.classList.remove('hidden');
-    return;
-  }
+  // Split the combined value into event and checkpoint
+  const [selectedEvent, selectedCheckpoint] = locationValue.split('|');
 
   if (password !== CORRECT_PASSWORD) {
     loginError.textContent = 'Incorrect password';
@@ -1512,7 +1505,6 @@ function handleLogin() {
   // Start periodic upload attempts
   startPeriodicUploadAttempts();
 }
-
   
 
 function showScannerScreen() {
@@ -2242,9 +2234,20 @@ function updateConnectionStatus() {
 function checkLoginStatus() {
   const savedEvent = localStorage.getItem('tigerClawEvent');
   const savedCheckpoint = localStorage.getItem('tigerClawCheckpoint');
+  
   if (savedEvent && savedCheckpoint) {
     event = savedEvent;
     checkpoint = savedCheckpoint;
+    
+    // Set the location select value if the user returns to the login screen
+    const combinedValue = `${savedEvent}|${savedCheckpoint}`;
+    // Try to find and select the matching option
+    const options = Array.from(locationSelect.options);
+    const matchingOption = options.find(option => option.value === combinedValue);
+    if (matchingOption) {
+      locationSelect.value = combinedValue;
+    }
+    
     showScannerScreen();
     
     // Fetch already scanned runners at this checkpoint
@@ -2977,11 +2980,15 @@ logoutButton.addEventListener('click', function() {
       stopScanning();
     }
     
-    // Clear event and checkpoint
+// Clear event and checkpoint
 event = '';
 checkpoint = '';
 localStorage.removeItem('tigerClawEvent');
 localStorage.removeItem('tigerClawCheckpoint');
+
+// Reset the location select
+locationSelect.value = '';
+    
     
     // Show login screen
     scannerScreen.classList.add('hidden');
