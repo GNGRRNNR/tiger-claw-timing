@@ -557,22 +557,22 @@ background-color: #28a745;
 color: white;
 border: none;
 border-radius: 5px;
-padding: 10px 15px;
-font-size: 16px;
-position: fixed;
-bottom: 20px;
-right: 20px;
+padding: 5px 10px;
+font-size: 12px;
+position: absolute;
+top: 10px;
+right: 10px;
 z-index: 1000;
-box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 display: flex;
 align-items: center;
 justify-content: center;
 }
-
+  
 .persistent-install-btn::before {
 content: "📱";
-margin-right: 8px;
-font-size: 18px;
+margin-right: 5px;
+font-size: 14px;
 }
 
 /* Download Section */
@@ -1010,11 +1010,19 @@ function updateInstallPrompts() {
   }
 }
 
-// Setup persistent install button
 function setupPersistentInstallButton(btnElement) {
   btnElement.className = "persistent-install-btn hidden";
   btnElement.textContent = "Install App";
-  document.body.appendChild(btnElement);
+  
+  // Instead of adding to body, we'll add it to the scanner screen header
+  const appHeader = document.querySelector('#scanner-screen .app-header');
+  if (appHeader) {
+    appHeader.style.position = 'relative'; // Make sure position is relative for absolute positioning
+    appHeader.appendChild(btnElement);
+  } else {
+    // Fallback to body if app header not found
+    document.body.appendChild(btnElement);
+  }
 
   // Add click handler
   btnElement.addEventListener("click", triggerInstall);
@@ -1026,6 +1034,7 @@ function setupPersistentInstallButton(btnElement) {
 
   logDebug("Persistent install button set up");
 }
+  
 
 // Detect iOS
 function isIOS() {
@@ -1164,7 +1173,6 @@ function handleLogin() {
   startPeriodicUploadAttempts();
 }
 
-// Modify the showScannerScreen function to update install prompts
 function showScannerScreen() {
   loginScreen.classList.add('hidden');
   loadingScreen.classList.add('hidden');
@@ -1176,6 +1184,15 @@ function showScannerScreen() {
 
   // Update install prompts when showing scanner screen
   updateInstallPrompts();
+  
+  // Make sure the persistent install button is in the correct container
+  if (persistentInstallBtn && persistentInstallBtn.parentNode !== document.querySelector('#scanner-screen .app-header')) {
+    const appHeader = document.querySelector('#scanner-screen .app-header');
+    if (appHeader && persistentInstallBtn.parentNode) {
+      persistentInstallBtn.parentNode.removeChild(persistentInstallBtn);
+      appHeader.appendChild(persistentInstallBtn);
+    }
+  }
 }
 
 // Start periodic upload attempts
