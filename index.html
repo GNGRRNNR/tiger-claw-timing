@@ -1097,26 +1097,29 @@ function uploadPendingScans(force = false) {
 
   // Process each scan individually
   const uploadPromises = pendingUploads.map(scan => {
-    // Format the data as expected by the appendRow method
-    // The order should be: [timestamp, bib, name, checkpoint]
+    // Format the data as a simple array in the expected column order
+    // Column A: timestamp, Column B: bib, Column C: name, Column D: checkpoint
     const rowData = [
-      new Date(scan.timestamp).toISOString(),
-      scan.bib,
-      scan.name,
-      scan.checkpoint
+      new Date(scan.timestamp).toISOString(),  // Column A: TIMESTAMP
+      scan.bib,                                // Column B: BIB NUMBER
+      scan.name,                               // Column C: RUNNER NAME
+      scan.checkpoint                          // Column D: CHECKPOINT
     ];
     
+    // Create a simple form data object
+    const formData = new FormData();
+    formData.append('action', 'appendRow');
+    formData.append('sheetId', RESULTS_SHEET_ID);
+    formData.append('data', JSON.stringify(rowData));
+    
+    // Log what we're sending
+    logDebug(`Sending direct upload: ${JSON.stringify(rowData)}`);
+    
     // Use fetch API to upload the data
-    return fetch(`${APPS_SCRIPT_URL}?action=appendRow&sheetId=${RESULTS_SHEET_ID}`, {
+    return fetch(APPS_SCRIPT_URL, {
       method: 'POST',
-      mode: 'no-cors', // Use no-cors to avoid CORS errors
-      cache: 'no-cache',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        data: rowData
-      })
+      mode: 'no-cors',
+      body: formData
     })
     .then(() => {
       // Mark this scan as uploaded
@@ -1125,7 +1128,7 @@ function uploadPendingScans(force = false) {
       return scanKey;
     })
     .catch(error => {
-      logDebug(`Error uploading scan ${scan.bib}: ${error}`);
+      logDebug(`Direct upload error: ${error.message}`);
       return null;
     });
   });
@@ -1134,7 +1137,7 @@ function uploadPendingScans(force = false) {
   Promise.all(uploadPromises)
     .then(results => {
       const successfulUploads = results.filter(result => result !== null).length;
-      logDebug(`Successfully uploaded ${successfulUploads} of ${pendingUploads.length} scans`);
+      logDebug(`${successfulUploads} of ${pendingUploads.length} scans uploaded successfully`);
       
       // Save uploaded scans
       saveUploadedScans();
@@ -1162,7 +1165,7 @@ function uploadPendingScans(force = false) {
       fetchCheckpointStats(true);
     })
     .catch(error => {
-      logDebug(`Error during batch upload: ${error.message}`);
+      logDebug(`Error in batch upload: ${error.message}`);
       showMessage("Error uploading scans", true);
     })
     .finally(() => {
