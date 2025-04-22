@@ -1039,6 +1039,119 @@ function positionInstallPrompt() {
   }
 }
 
+
+
+// Add this function to your JavaScript
+function uploadScanDirectly(scan) {
+  if (!isOnline) {
+    logDebug("Cannot upload scan while offline");
+    return Promise.reject(new Error("Offline"));
+  }
+  
+  logDebug(`Attempting direct upload for bib #${scan.bib}`);
+  
+  // Create a simple test row with the scan data
+  const rowData = [
+    scan.timestamp,  // Column A: TIMESTAMP
+    scan.bib,        // Column B: BIB NUMBER
+    scan.name,       // Column C: RUNNER NAME
+    scan.checkpoint  // Column D: CHECKPOINT
+  ];
+  
+  // Create a simple form data object
+  const formData = new FormData();
+  formData.append('action', 'appendRow');
+  formData.append('sheetId', RESULTS_SHEET_ID);
+  formData.append('data', JSON.stringify(rowData));
+  
+  // Log what we're sending
+  logDebug(`Sending direct upload: ${JSON.stringify(rowData)}`);
+  
+  // Use fetch API to upload the data
+  return fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    body: formData
+  })
+  .then(() => {
+    logDebug(`Direct upload for bib #${scan.bib} sent (no response due to no-cors)`);
+    return true;
+  })
+  .catch(error => {
+    logDebug(`Direct upload error: ${error.message}`);
+    return false;
+  });
+}
+
+// Replace your uploadPendingScans function with this version
+function uploadPendingScans(force = false) {
+  if (!isOnline || pendingUploads.length === 0 || (isUploadingPendingScans && !force)) {
+    return;
+  }
+
+  // Prevent multiple simultaneous uploads
+  isUploadingPendingScans = true;
+  
+  logDebug(`Uploading ${pendingUploads.length} pending scans`);
+  showMessage(`Uploading ${pendingUploads.length} scans...`);
+
+  // Process each scan individually
+  const uploadPromises = pendingUploads.map(scan => {
+    return uploadScanDirectly(scan)
+      .then(success => {
+        if (success) {
+          // Mark as uploaded
+          const scanKey = `${scan.bib}-${scan.checkpoint}-${scan.timestamp}`;
+          uploadedScans[scanKey] = true;
+          return true;
+        }
+        return false;
+      });
+  });
+  
+  // Wait for all uploads to complete
+  Promise.all(uploadPromises)
+    .then(results => {
+      const successCount = results.filter(Boolean).length;
+      logDebug(`${successCount} of ${results.length} scans uploaded successfully`);
+      
+      // Save uploaded scans
+      saveUploadedScans();
+      
+      // Remove uploaded scans from pending uploads
+      pendingUploads = pendingUploads.filter(scan => {
+        const scanKey = `${scan.bib}-${scan.checkpoint}-${scan.timestamp}`;
+        return !uploadedScans[scanKey];
+      });
+      
+      // Save updated pending uploads
+      savePendingScans();
+      
+      // Update UI
+      updatePendingUploadsUI();
+      
+      // Show message
+      if (successCount > 0) {
+        showMessage(`${successCount} scans uploaded successfully`);
+      } else {
+        showMessage("No scans were uploaded successfully", true);
+      }
+      
+      // Fetch fresh checkpoint stats
+      fetchCheckpointStats(true);
+    })
+    .catch(error => {
+      logDebug(`Error during batch upload: ${error.message}`);
+      showMessage("Error uploading scans", true);
+    })
+    .finally(() => {
+      isUploadingPendingScans = false;
+    });
+}
+
+
+  
+
 function setupPersistentInstallButton(btnElement) {
   btnElement.className = "persistent-install-btn hidden";
   btnElement.textContent = "Install App";
