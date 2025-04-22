@@ -1822,7 +1822,7 @@ function updateConnectionStatus() {
     statusText.style.color = '#28a745';
   } else {
     statusIcon.style.color = '#dc3545';
-    status.textContent = 'OFFLINE';
+    status.textContent = 'OFFLINE';  // This should be statusText, not status
     statusText.style.color = '#dc3545';
   }
 }
