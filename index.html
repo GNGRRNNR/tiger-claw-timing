@@ -658,282 +658,195 @@ font-size: 16px;
 <body>
 <div id="flash-overlay" class="flash-overlay"></div>
 <div id="tiger-claw-app">
-<!-- Offline Banner -->
-<div id="offline-banner" class="offline-banner hidden">
-You are currently offline. Scans will be saved and uploaded when connection is restored.
-</div>
-
-<!-- Install Prompt -->
-<div id="install-prompt" class="install-prompt hidden">
-<span>📱 Add this app to your home screen for better offline access</span>
-<button id="install-btn" class="install-btn">Install</button>
-</div>
-
-<!-- Loading Screen -->
-<div id="loading-screen">
-<div class="app-header">
-<h1>TIGER CLAW TIMING SYSTEM</h1>
-<p>Loading runner data...</p>
-<div class="loading-spinner"></div>
-<div id="loading-error" class="loading-error hidden">
-  <p>Error loading runner data. Please try again.</p>
-  <button id="retry-loading">Retry</button>
-</div>
-</div>
-</div>
-
-<!-- Login Screen -->
-<div id="login-screen" class="hidden">
-<div class="app-header">
-<h1>TIGER CLAW TIMING SYSTEM</h1>
-</div>
-
-<form id="login-form">
-<div class="form-group">
-  <label for="checkpoint-select">Select Checkpoint</label>
-  <select id="checkpoint-select">
-    <option value="">Select checkpoint</option>
-    <option value="GREEN CHECKPOINT">GREEN CHECKPOINT</option>
-    <option value="PINK LOOP TOP">PINK LOOP TOP</option>
-    <option value="PINK LOOP BOTTOM">PINK LOOP BOTTOM</option>
-    <option value="YELLOW LOOP TOP">YELLOW LOOP TOP</option>
-    <option value="YELLOW LOOP BOTTOM">YELLOW LOOP BOTTOM</option>
-    <option value="WHITE LOOP TOP">WHITE LOOP TOP</option>
-    <option value="WHITE LOOP BOTTOM">WHITE LOOP BOTTOM</option>
-    <option value="RED CHECKPOINT">RED CHECKPOINT</option>
-    <option value="FINISHLINE">FINISHLINE</option>
-  </select>
-</div>
-
-<div class="form-group">
-  <label for="password-input">Password</label>
-  <input type="password" id="password-input" placeholder="Enter password" autocomplete="current-password">    <div id="login-error" class="error-message hidden"></div>
-</div>
-
-<button type="submit" id="login-button">Login</button>
-</form>
-
-<!-- Download Section (add this to the login screen) -->
-<div class="download-section">
-<h3>📱 Download Tiger Claw Timing App</h3>
-<p>Install this app on your device for offline access and faster scanning</p>
-
-<div class="platform-buttons">
-  <button id="android-install-btn" class="platform-button">
-    <span class="platform-icon">🤖</span> Android
-  </button>
-  <button id="ios-install-btn" class="platform-button">
-    <span class="platform-icon">🍎</span> iPhone/iPad
-  </button>
-</div>
-
-<div id="ios-install-instructions" class="ios-instructions hidden">
-  <ol>
-    <li>Tap the share button <span style="font-size: 1.2em;">⎙</span> at the bottom of your screen</li>
-    <li>Scroll down and tap "Add to Home Screen"</li>
-    <li>Tap "Add" in the top right corner</li>
-  </ol>
-</div>
-</div>
-
-<!-- Debug panel toggle -->
-<div style="margin-top: 20px; text-align: center;">
-<button id="toggle-debug" style="background-color: #6c757d; width: auto; font-size: 12px; padding: 5px 10px;">Show Debug Panel</button>
-</div>
-</div>
-
-<!-- Scanner Screen -->
-<!-- In the scanner-screen div, move the install-icons div to the top -->
-<!-- Scanner Screen -->
-<div id="scanner-screen" class="hidden">
-  <div class="install-icons">
-    <button id="scanner-android-install" class="icon-button" title="Install on Android">
-      <span class="platform-icon">🤖</span> Install App
-    </button>
-    <button id="scanner-ios-install" class="icon-button" title="Install on iOS">
-      <span class="platform-icon">🍎</span> Install App
-    </button>
+  <!-- Offline Banner -->
+  <div id="offline-banner" class="offline-banner hidden">
+    You are currently offline. Scans will be saved and uploaded when connection is restored.
   </div>
-  
-  <div class="app-header">
-    <h1>TIGER CLAW TIMING</h1>
-    <div id="checkpoint-display" style="font-weight: bold; font-size: 18px; margin: 10px 0;"></div>
 
-    <!-- Checkpoint Stats -->
-    <div id="checkpoint-stats" class="checkpoint-stats">
-      <div id="stats-text">Loading checkpoint stats...</div>
-      <div class="progress-bar">
-        <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%"></div>
+  <!-- Install Prompt -->
+  <div id="install-prompt" class="install-prompt hidden">
+    <span>📱 Add this app to your home screen for better offline access</span>
+    <button id="install-btn" class="install-btn">Install</button>
+  </div>
+
+  <!-- Loading Screen -->
+  <div id="loading-screen">
+    <div class="app-header">
+      <h1>TIGER CLAW TIMING SYSTEM</h1>
+      <p>Loading runner data...</p>
+      <div class="loading-spinner"></div>
+      <div id="loading-error" class="loading-error hidden">
+        <p>Error loading runner data. Please try again.</p>
+        <button id="retry-loading">Retry</button>
       </div>
-      <div class="stats-numbers">
-        <span id="scanned-count">0 scanned</span>
-        <span id="remaining-count">0 remaining</span>
+    </div>
+  </div>
+
+  <!-- Login Screen -->
+  <div id="login-screen" class="hidden">
+    <div class="app-header">
+      <h1>TIGER CLAW TIMING SYSTEM</h1>
+    </div>
+
+    <form id="login-form">
+      <div class="form-group">
+        <label for="checkpoint-select">Select Checkpoint</label>
+        <select id="checkpoint-select">
+          <option value="">Select checkpoint</option>
+          <option value="GREEN CHECKPOINT">GREEN CHECKPOINT</option>
+          <option value="PINK LOOP TOP">PINK LOOP TOP</option>
+          <option value="PINK LOOP BOTTOM">PINK LOOP BOTTOM</option>
+          <option value="YELLOW LOOP TOP">YELLOW LOOP TOP</option>
+          <option value="YELLOW LOOP BOTTOM">YELLOW LOOP BOTTOM</option>
+          <option value="WHITE LOOP TOP">WHITE LOOP TOP</option>
+          <option value="WHITE LOOP BOTTOM">WHITE LOOP BOTTOM</option>
+          <option value="RED CHECKPOINT">RED CHECKPOINT</option>
+          <option value="FINISHLINE">FINISHLINE</option>
+        </select>
       </div>
-      <button id="refresh-stats" class="refresh-stats">Refresh Stats</button>
-      <span id="stats-refreshing" class="stats-refreshing hidden"></span>
-    </div>
 
-    <div id="scanner-ios-instructions" class="ios-instructions hidden">
-      <ol>
-        <li>Tap the share button <span style="font-size: 1.2em;">⎙</span> at the bottom of your screen</li>
-        <li>Scroll down and tap "Add to Home Screen"</li>
-        <li>Tap "Add" in the top right corner</li>
-      </ol>
-    </div>
-
-    <!-- Connection status and refresh button -->
-    <div class="connection-container">
-      <div id="connection-status" class="connection-status">
-        <span id="status-icon" class="status-icon">●</span>
-        <span id="status-text">CHECKING CONNECTION...</span>
+      <div class="form-group">
+        <label for="password-input">Password</label>
+        <input type="password" id="password-input" placeholder="Enter password" autocomplete="current-password">
+        <div id="login-error" class="error-message hidden"></div>
       </div>
-      <button id="refresh-button">Refresh Connection</button>
+
+      <!-- Hidden username field for accessibility -->
+      <div class="form-group" style="display:none;">
+        <label for="username-input">Username</label>
+        <input type="text" id="username-input" name="username" autocomplete="username">
+      </div>
+
+      <button type="submit" id="login-button">Login</button>
+    </form>
+
+    <!-- Download Section (add this to the login screen) -->
+    <div class="download-section">
+      <h3>📱 Download Tiger Claw Timing App</h3>
+      <p>Install this app on your device for offline access and faster scanning</p>
+
+      <div class="platform-buttons">
+        <button id="android-install-btn" class="platform-button">
+          <span class="platform-icon">🤖</span> Android
+        </button>
+        <button id="ios-install-btn" class="platform-button">
+          <span class="platform-icon">🍎</span> iPhone/iPad
+        </button>
+      </div>
+
+      <div id="ios-install-instructions" class="ios-instructions hidden">
+        <ol>
+          <li>Tap the share button <span style="font-size: 1.2em;">⎙</span> at the bottom of your screen</li>
+          <li>Scroll down and tap "Add to Home Screen"</li>
+          <li>Tap "Add" in the top right corner</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- Debug panel toggle -->
+    <div style="margin-top: 20px; text-align: center;">
+      <button id="toggle-debug" style="background-color: #6c757d; width: auto; font-size: 12px; padding: 5px 10px;">Show Debug Panel</button>
     </div>
   </div>
 
-  <button id="scan-button" class="scan-button">START SCANNING</button>
-
-  <!-- HTML5QrCode scanner container -->
-  <div id="scanner-container" class="scanner-container hidden">
-    <div id="qr-reader"></div>
-    <div class="targeting-overlay"></div>
-    <div id="flash-overlay" class="flash-overlay"></div>
-    <div id="camera-loading" class="camera-loading">
-      <div class="spinner"></div>
-      <div>Starting camera...</div>
+  <!-- Scanner Screen -->
+  <div id="scanner-screen" class="hidden">
+    <div class="install-icons">
+      <button id="scanner-android-install" class="icon-button" title="Install on Android">
+        <span class="platform-icon">🤖</span> Install App
+      </button>
+      <button id="scanner-ios-install" class="icon-button" title="Install on iOS">
+        <span class="platform-icon">🍎</span> Install App
+      </button>
     </div>
-    <div class="camera-instructions">Align QR code within the target</div>
-  </div>
+    
+    <div class="app-header">
+      <h1>TIGER CLAW TIMING</h1>
+      <div id="checkpoint-display" style="font-weight: bold; font-size: 18px; margin: 10px 0;"></div>
 
-  <!-- Native camera fallback -->
-  <div id="native-camera-container" class="hidden">
-    <video id="native-camera-video" autoplay playsinline></video>
-    <canvas id="native-camera-canvas"></canvas>
-    <div class="camera-instructions">Align QR code within the target</div>
-  </div>
+      <!-- Checkpoint Stats -->
+      <div id="checkpoint-stats" class="checkpoint-stats">
+        <div id="stats-text">Loading checkpoint stats...</div>
+        <div class="progress-bar">
+          <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%"></div>
+        </div>
+        <div class="stats-numbers">
+          <span id="scanned-count">0 scanned</span>
+          <span id="remaining-count">0 remaining</span>
+        </div>
+        <button id="refresh-stats" class="refresh-stats">Refresh Stats</button>
+        <span id="stats-refreshing" class="stats-refreshing hidden"></span>
+      </div>
 
-  <div id="message" class="success-message hidden"></div>
+      <div id="scanner-ios-instructions" class="ios-instructions hidden">
+        <ol>
+          <li>Tap the share button <span style="font-size: 1.2em;">⎙</span> at the bottom of your screen</li>
+          <li>Scroll down and tap "Add to Home Screen"</li>
+          <li>Tap "Add" in the top right corner</li>
+        </ol>
+      </div>
 
-  <div class="form-group manual-entry-section" style="margin-top: 20px;">
-    <h2>Manual Entry</h2>
-    <div class="form-group">
-      <label for="bib-input">Bib Number (required)</label>
-      <input type="tel" id="bib-input" inputmode="numeric" pattern="[0-9]*" placeholder="Enter bib number">
+      <!-- Connection status and refresh button -->
+      <div class="connection-container">
+        <div id="connection-status" class="connection-status">
+          <span id="status-icon" class="status-icon">●</span>
+          <span id="status-text">CHECKING CONNECTION...</span>
+        </div>
+        <button id="refresh-button">Refresh Connection</button>
+      </div>
     </div>
 
-    <button id="manual-submit-button">SUBMIT</button>
+    <button id="scan-button" class="scan-button">START SCANNING</button>
+
+    <!-- HTML5QrCode scanner container -->
+    <div id="scanner-container" class="scanner-container hidden">
+      <div id="qr-reader"></div>
+      <div class="targeting-overlay"></div>
+      <div id="flash-overlay" class="flash-overlay"></div>
+      <div id="camera-loading" class="camera-loading">
+        <div class="spinner"></div>
+        <div>Starting camera...</div>
+      </div>
+      <div class="camera-instructions">Align QR code within the target</div>
+    </div>
+
+    <!-- Native camera fallback -->
+    <div id="native-camera-container" class="hidden">
+      <video id="native-camera-video" autoplay playsinline></video>
+      <canvas id="native-camera-canvas"></canvas>
+      <div class="camera-instructions">Align QR code within the target</div>
+    </div>
+
+    <div id="message" class="success-message hidden"></div>
+
+    <div class="form-group manual-entry-section" style="margin-top: 20px;">
+      <h2>Manual Entry</h2>
+      <div class="form-group">
+        <label for="bib-input">Bib Number (required)</label>
+        <input type="tel" id="bib-input" inputmode="numeric" pattern="[0-9]*" placeholder="Enter bib number">
+      </div>
+
+      <button id="manual-submit-button">SUBMIT</button>
+    </div>
+
+    <div id="pending-uploads" class="pending-uploads hidden"></div>
+
+    <div id="recent-scans" class="recent-scans">
+      <h3>Recent Scans</h3>
+      <div id="scans-list"></div>
+    </div>
+
+    <button id="logout-button" style="background-color: #6c757d; margin-top: 20px;">Logout</button>
+
+    <!-- Debug panel (hidden by default) -->
+    <div id="debug-panel" class="debug-panel hidden">
+      <h4>Debug Info</h4>
+      <pre id="debug-info"></pre>
+      <button id="force-upload" style="background-color: #6c757d; margin-top: 10px; font-size: 12px;">Force Upload Pending Scans</button>
+      <button id="clear-data" style="background-color: #dc3545; margin-top: 10px; font-size: 12px;">Clear All Data</button>
+      <button id="refresh-runners" style="background-color: #007bff; margin-top: 10px; font-size: 12px;">Refresh Runner Data</button>
+    </div>
   </div>
-
-  <div id="pending-uploads" class="pending-uploads hidden"></div>
-
-  <div id="recent-scans" class="recent-scans">
-    <h3>Recent Scans</h3>
-    <div id="scans-list"></div>
-  </div>
-
-  <button id="logout-button" style="background-color: #6c757d; margin-top: 20px;">Logout</button>
-
-  <!-- Debug panel (hidden by default) -->
-  <div id="debug-panel" class="debug-panel hidden">
-    <h4>Debug Info</h4>
-    <pre id="debug-info"></pre>
-    <button id="force-upload" style="background-color: #6c757d; margin-top: 10px; font-size: 12px;">Force Upload Pending Scans</button>
-    <button id="clear-data" style="background-color: #dc3545; margin-top: 10px; font-size: 12px;">Clear All Data</button>
-    <button id="refresh-runners" style="background-color: #007bff; margin-top: 10px; font-size: 12px;">Refresh Runner Data</button>
-  </div>
-</div>
-
-<div class="install-icons">
-<button id="scanner-android-install" class="icon-button" title="Install on Android">
-  <span class="platform-icon">🤖</span> Install App
-</button>
-<button id="scanner-ios-install" class="icon-button" title="Install on iOS">
-  <span class="platform-icon">🍎</span> Install App
-</button>
-</div>
-
-<!-- Checkpoint Stats -->
-<div id="checkpoint-stats" class="checkpoint-stats">
-  <div id="stats-text">Loading checkpoint stats...</div>
-  <div class="progress-bar">
-    <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%"></div>
-  </div>
-  <div class="stats-numbers">
-    <span id="scanned-count">0 scanned</span>
-    <span id="remaining-count">0 remaining</span>
-  </div>
-  <button id="refresh-stats" class="refresh-stats">Refresh Stats</button>
-  <span id="stats-refreshing" class="stats-refreshing hidden"></span>
-</div>
-
-<div id="scanner-ios-instructions" class="ios-instructions hidden">
-<ol>
-  <li>Tap the share button <span style="font-size: 1.2em;">⎙</span> at the bottom of your screen</li>
-  <li>Scroll down and tap "Add to Home Screen"</li>
-  <li>Tap "Add" in the top right corner</li>
-</ol>
-</div>
-
-<!-- Connection status and refresh button -->
-<div class="connection-container">
-  <div id="connection-status" class="connection-status">
-    <span id="status-icon" class="status-icon">●</span>
-    <span id="status-text">CHECKING CONNECTION...</span>
-  </div>
-  <button id="refresh-button">Refresh Connection</button>
-</div>
-</div>
-
-<button id="scan-button" class="scan-button">START SCANNING</button>
-
-<!-- HTML5QrCode scanner container -->
-<div id="scanner-container" class="scanner-container hidden">
-<div id="qr-reader"></div>
-<div class="targeting-overlay"></div>
-<div id="flash-overlay" class="flash-overlay"></div>
-<div id="camera-loading" class="camera-loading">
-  <div class="spinner"></div>
-  <div>Starting camera...</div>
-</div>
-<div class="camera-instructions">Align QR code within the target</div>
-</div>
-
-<!-- Native camera fallback -->
-<div id="native-camera-container" class="hidden">
-<video id="native-camera-video" autoplay playsinline></video>
-<canvas id="native-camera-canvas"></canvas>
-<div class="camera-instructions">Align QR code within the target</div>
-</div>
-
-<div id="message" class="success-message hidden"></div>
-
-<div class="form-group manual-entry-section" style="margin-top: 20px;">
-<h2>Manual Entry</h2>
-<div class="form-group">
-  <label for="bib-input">Bib Number (required)</label>
-  <input type="tel" id="bib-input" inputmode="numeric" pattern="[0-9]*" placeholder="Enter bib number">
-</div>
-
-<button id="manual-submit-button">SUBMIT</button>
-</div>
-
-<div id="pending-uploads" class="pending-uploads hidden"></div>
-
-<div id="recent-scans" class="recent-scans">
-<h3>Recent Scans</h3>
-<div id="scans-list"></div>
-</div>
-
-<button id="logout-button" style="background-color: #6c757d; margin-top: 20px;">Logout</button>
-
-<!-- Debug panel (hidden by default) -->
-<div id="debug-panel" class="debug-panel hidden">
-<h4>Debug Info</h4>
-<pre id="debug-info"></pre>
-<button id="force-upload" style="background-color: #6c757d; margin-top: 10px; font-size: 12px;">Force Upload Pending Scans</button>
-<button id="clear-data" style="background-color: #dc3545; margin-top: 10px; font-size: 12px;">Clear All Data</button>
-<button id="refresh-runners" style="background-color: #007bff; margin-top: 10px; font-size: 12px;">Refresh Runner Data</button>
-</div>
 </div>
 
 <!-- Include the HTML5 QR Code Scanner library directly in the HTML -->
@@ -1099,8 +1012,6 @@ function updateInstallPrompts() {
   }
 }
 
-  
-
 // Update this function to ensure the install prompt is at the top
 function positionInstallPrompt() {
   const installPrompt = document.getElementById('install-prompt');
@@ -1127,7 +1038,6 @@ function positionInstallPrompt() {
     installPrompt.style.borderBottom = '2px solid #0066cc';
   }
 }
-  
 
 function setupPersistentInstallButton(btnElement) {
   btnElement.className = "persistent-install-btn hidden";
@@ -1153,7 +1063,6 @@ function setupPersistentInstallButton(btnElement) {
 
   logDebug("Persistent install button set up");
 }
-  
 
 // Detect iOS
 function isIOS() {
@@ -1867,13 +1776,13 @@ function updateOfflineBanner() {
 // Load uploaded scans from localStorage
 function loadUploadedScans() {
   try {
-    const storedUploadedScans = localStorage.getItem('uploadedScans');
-    if (storedUploadedScans) {
-      uploadedScans = JSON.parse(storedUploadedScans);
-      logDebug(`Loaded uploaded scans tracking data from localStorage`);
+    const storedUploads = localStorage.getItem('uploadedScans');
+    if (storedUploads) {
+      uploadedScans = JSON.parse(storedUploads);
+      logDebug(`Loaded ${Object.keys(uploadedScans).length} uploaded scans from localStorage`);
     }
   } catch (error) {
-    logDebug('Error loading uploaded scans: ' + error);
+    logDebug('Error loading uploaded scans from localStorage: ' + error);
     uploadedScans = {};
   }
 }
@@ -1883,21 +1792,54 @@ function saveUploadedScans() {
   try {
     localStorage.setItem('uploadedScans', JSON.stringify(uploadedScans));
   } catch (error) {
-    logDebug('Error saving uploaded scans: ' + error);
+    logDebug('Error saving uploaded scans to localStorage: ' + error);
+  }
+}
+
+// Load pending scans from localStorage
+function loadPendingScans() {
+  try {
+    const storedScans = localStorage.getItem('pendingUploads');
+    if (storedScans) {
+      pendingUploads = JSON.parse(storedScans);
+      logDebug(`Loaded ${pendingUploads.length} pending scans from localStorage`);
+      updatePendingUploadsUI();
+    }
+  } catch (error) {
+    logDebug('Error loading pending scans from localStorage: ' + error);
+    pendingUploads = [];
+  }
+}
+
+// Save pending scans to localStorage
+function savePendingScans() {
+  try {
+    localStorage.setItem('pendingUploads', JSON.stringify(pendingUploads));
+  } catch (error) {
+    logDebug('Error saving pending scans to localStorage: ' + error);
   }
 }
 
 // Load processed scans from localStorage
 function loadProcessedScans() {
   try {
-    const storedProcessedScans = localStorage.getItem('processedScans');
-    if (storedProcessedScans) {
-      processedScans = JSON.parse(storedProcessedScans);
-      logDebug(`Loaded processed scans tracking data from localStorage`);
+    const storedProcessed = localStorage.getItem('processedScans');
+    if (storedProcessed) {
+      processedScans = JSON.parse(storedProcessed);
+      logDebug(`Loaded ${Object.keys(processedScans).length} processed scans from localStorage`);
     }
   } catch (error) {
-    logDebug('Error loading processed scans: ' + error);
+    logDebug('Error loading processed scans from localStorage: ' + error);
     processedScans = {};
+  }
+}
+
+// Save processed scans to localStorage
+function saveProcessedScans() {
+  try {
+    localStorage.setItem('processedScans', JSON.stringify(processedScans));
+  } catch (error) {
+    logDebug('Error saving processed scans to localStorage: ' + error);
   }
 }
 
@@ -1907,20 +1849,11 @@ function loadScanTimestamps() {
     const storedTimestamps = localStorage.getItem('scanTimestamps');
     if (storedTimestamps) {
       scanTimestamps = JSON.parse(storedTimestamps);
-      logDebug(`Loaded scan timestamps from localStorage`);
+      logDebug(`Loaded ${Object.keys(scanTimestamps).length} scan timestamps from localStorage`);
     }
   } catch (error) {
-    logDebug('Error loading scan timestamps: ' + error);
+    logDebug('Error loading scan timestamps from localStorage: ' + error);
     scanTimestamps = {};
-  }
-}
-
-// Save processed scans to localStorage
-function saveProcessedScans() {
-  try {
-    localStorage.setItem('processedScans', JSON.stringify(processedScans));
-  } catch (error) {
-    logDebug('Error saving processed scans: ' + error);
   }
 }
 
@@ -1929,29 +1862,40 @@ function saveScanTimestamps() {
   try {
     localStorage.setItem('scanTimestamps', JSON.stringify(scanTimestamps));
   } catch (error) {
-    logDebug('Error saving scan timestamps: ' + error);
+    logDebug('Error saving scan timestamps to localStorage: ' + error);
   }
 }
 
-// Handle online/offline status change
+// Handle online/offline status changes
 function handleOnlineStatusChange() {
   const wasOnline = isOnline;
   isOnline = navigator.onLine;
   
-  logDebug(`Connection status changed: ${isOnline ? 'online' : 'offline'}`);
+  logDebug(`Connection status changed: ${wasOnline ? 'online' : 'offline'} -> ${isOnline ? 'online' : 'offline'}`);
   
-  // Update UI
   updateConnectionStatus();
   updateOfflineBanner();
   
-  // If we just came online, try to upload any pending scans
-  if (isOnline && !wasOnline && pendingUploads.length > 0) {
-    logDebug('Connection restored - attempting to upload pending scans');
-    uploadPendingScans();
+  if (isOnline && !wasOnline) {
+    // We just came back online
+    showMessage('Connection restored! Checking for pending uploads...');
+    
+    // Try to upload any pending scans
+    if (pendingUploads.length > 0) {
+      setTimeout(() => {
+        uploadPendingScans(true);
+      }, 1000);
+    }
+    
+    // Refresh runner data
+    fetchRunnerData(true);
+    
+    // Fetch already scanned runners
+    fetchAlreadyScannedRunners();
   }
 }
 
-// Fix the updateConnectionStatus function
+// Update connection status display
 function updateConnectionStatus() {
   if (isOnline) {
     statusIcon.style.color = '#28a745';
@@ -1959,17 +1903,14 @@ function updateConnectionStatus() {
     statusText.style.color = '#28a745';
   } else {
     statusIcon.style.color = '#dc3545';
-    statusText.textContent = 'OFFLINE';  // Fixed: was using status instead of statusText
+    statusText.textContent = 'OFFLINE';
     statusText.style.color = '#dc3545';
   }
 }
 
-
-  
+// Check if user is already logged in
 function checkLoginStatus() {
-  // Check if we have a saved checkpoint
   const savedCheckpoint = localStorage.getItem('tigerClawCheckpoint');
-
   if (savedCheckpoint) {
     checkpoint = savedCheckpoint;
     showScannerScreen();
@@ -1981,63 +1922,66 @@ function checkLoginStatus() {
     startPeriodicUploadAttempts();
   } else {
     loginScreen.classList.remove('hidden');
-    positionInstallPrompt(); // Add this line
+    loadingScreen.classList.add('hidden');
   }
 }
 
-  
-
-// Fetch runner data from spreadsheet
+// Fetch runner data from the spreadsheet
 function fetchRunnerData(forceRefresh = false) {
-  // If we're already loading data, don't start another request
   if (isLoadingRunnerData) {
     logDebug('Already loading runner data, skipping duplicate request');
     return;
   }
-
-  // If we're offline, use cached data
-  if (!isOnline) {
-    logDebug('Offline - using cached runner data');
-    checkLoginStatus();
-    return;
-  }
-
-  // If we have data and aren't forcing a refresh, use the cached data
+  
+  // Check if we already have data and it's not a forced refresh
   if (!forceRefresh && Object.keys(runnersData).length > 0) {
     logDebug('Using cached runner data');
-    checkLoginStatus();
     return;
   }
-
+  
   // Set loading flag
   isLoadingRunnerData = true;
   dataLoadAttempted = true;
-
-  // Set a timeout to handle cases where the fetch never completes
+  
+  // Show loading screen if we don't have any data yet
+  if (Object.keys(runnersData).length === 0) {
+    loadingScreen.classList.remove('hidden');
+    loginScreen.classList.add('hidden');
+    scannerScreen.classList.add('hidden');
+  }
+  
+  // Hide any previous error
+  loadingError.classList.add('hidden');
+  
+  logDebug('Fetching runner data from spreadsheet');
+  
+  // Set a timeout to show an error if the data doesn't load
+  if (dataLoadTimeoutId) {
+    clearTimeout(dataLoadTimeoutId);
+  }
+  
   dataLoadTimeoutId = setTimeout(() => {
     if (isLoadingRunnerData) {
-      logDebug('Runner data fetch timed out');
+      logDebug('Data loading timed out');
       isLoadingRunnerData = false;
       
-      // Show error message
-      loadingError.classList.remove('hidden');
-      
-      // If we have cached data, use it
-      if (Object.keys(runnersData).length > 0) {
-        logDebug('Using cached runner data after timeout');
+      // Show error if we don't have any data
+      if (Object.keys(runnersData).length === 0) {
+        loadingError.classList.remove('hidden');
+      } else {
+        // We have some data, so continue with what we have
+        loadingScreen.classList.add('hidden');
         checkLoginStatus();
       }
     }
   }, DATA_LOAD_TIMEOUT);
-
-  logDebug('Fetching runner data from spreadsheet');
-
+  
   // Add a cache-busting parameter to ensure we get fresh data
   const cacheBuster = new Date().getTime();
-
+  
   // Fetch directly from the spreadsheet using the Google Visualization API
   const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${RUNNERS_SHEET_ID}/gviz/tq?tqx=out:json&cacheBuster=${cacheBuster}`;
-
+  
   fetch(spreadsheetUrl)
     .then(response => {
       if (!response.ok) {
@@ -2112,21 +2056,17 @@ function fetchRunnerData(forceRefresh = false) {
           dataLoadTimeoutId = null;
         }
         
-        // Clear loading flag
-        isLoadingRunnerData = false;
-        
-        // Hide loading screen and show login or scanner screen
+        // Hide loading screen and show appropriate screen
         loadingScreen.classList.add('hidden');
-        loadingError.classList.add('hidden');
         checkLoginStatus();
         
-        // Set up periodic refresh of runner data
+        // Set up runner data refresh interval
         setupRunnerDataRefresh();
         
-        // Update recent scans UI to reflect any DNF changes
-        updateRecentScansUI();
-        
-        return;
+        // Update checkpoint stats with fresh data
+        if (checkpoint) {
+          fetchCheckpointStats(true);
+        }
       } else {
         throw new Error('Invalid spreadsheet data format');
       }
@@ -2134,24 +2074,36 @@ function fetchRunnerData(forceRefresh = false) {
     .catch(error => {
       logDebug('Error fetching runner data: ' + error);
       
-      // Clear the timeout
-      if (dataLoadTimeoutId) {
-        clearTimeout(dataLoadTimeoutId);
-        dataLoadTimeoutId = null;
+      // If we have cached data, use that
+      try {
+        const storedData = localStorage.getItem('runnersData');
+        if (storedData) {
+          const parsedData = JSON.parse(storedData);
+          if (parsedData && Object.keys(parsedData).length > 0) {
+            runnersData = parsedData;
+            logDebug(`Using ${Object.keys(runnersData).length} runners from localStorage after fetch error`);
+            
+            // Hide loading screen and show appropriate screen
+            loadingScreen.classList.add('hidden');
+            checkLoginStatus();
+            return;
+          }
+        }
+      } catch (e) {
+        logDebug('Error loading runners data from localStorage: ' + e);
       }
       
-      // Clear loading flag
-      isLoadingRunnerData = false;
-      
-      // Show error message
-      loadingError.classList.remove('hidden');
-      
-      // If we have cached data, use it
-      if (Object.keys(runnersData).length > 0) {
-        logDebug('Using cached runner data after error');
+      // Show error if we don't have any data
+      if (Object.keys(runnersData).length === 0) {
+        loadingError.classList.remove('hidden');
+      } else {
+        // We have some data, so continue with what we have
         loadingScreen.classList.add('hidden');
         checkLoginStatus();
       }
+    })
+    .finally(() => {
+      isLoadingRunnerData = false;
     });
 }
 
@@ -2161,7 +2113,7 @@ function setupRunnerDataRefresh() {
   if (runnerDataRefreshInterval) {
     clearInterval(runnerDataRefreshInterval);
   }
-
+  
   // Set up new interval
   runnerDataRefreshInterval = setInterval(() => {
     if (isOnline) {
@@ -2171,471 +2123,164 @@ function setupRunnerDataRefresh() {
   }, RUNNER_DATA_REFRESH_INTERVAL);
 }
 
+// Fetch checkpoint stats
+function fetchCheckpointStats(forceRefresh = false) {
+  if (!checkpoint || isRefreshingStats) return;
+  
+  // If it's a forced refresh or we're online, fetch from the spreadsheet
+  if (forceRefresh || isOnline) {
+    isRefreshingStats = true;
+    statsRefreshing.classList.remove('hidden');
+    fetchCheckpointStatsFromSpreadsheet();
+  } else {
+    // Otherwise calculate locally
+    const stats = calculateLocalCheckpointStats();
+    updateCheckpointStatsUI(stats);
+  }
+}
+
 // Calculate checkpoint stats locally
 function calculateLocalCheckpointStats() {
   // Count total runners
   const totalRunners = Object.keys(runnersData).length;
-
+  
   // Count DNF runners
   const dnfRunners = Object.values(runnersData).filter(runner => runner.dnf).length;
-
-  // Count already scanned runners
-  const scannedCount = alreadyScannedRunners.size;
-
-  // Calculate remaining runners (excluding DNFs)
-  const remainingCount = totalRunners - dnfRunners - scannedCount;
-
-  // Calculate progress percentage
-  const progressPercentage = totalRunners > 0 ? (scannedCount / (totalRunners - dnfRunners)) * 100 : 0;
-
+  
+  // Count active runners (total minus DNF)
+  const activeRunners = totalRunners - dnfRunners;
+  
+  // Count scanned runners at this checkpoint
+  const scannedRunners = alreadyScannedRunners.size;
+  
+  // Calculate remaining runners
+  const remainingRunners = Math.max(0, activeRunners - scannedRunners);
+  
+  // Calculate completion percentage
+  const completionPercentage = activeRunners > 0 ? Math.round((scannedRunners / activeRunners) * 100) : 0;
+  
   return {
     totalRunners,
+    activeRunners,
     dnfRunners,
-    scannedCount,
-    remainingCount,
-    progressPercentage: Math.min(100, Math.max(0, progressPercentage))
+    scannedRunners,
+    remainingRunners,
+    completionPercentage
   };
 }
 
 // Update checkpoint stats UI
 function updateCheckpointStatsUI(stats) {
-  if (!statsText || !progressBarFill || !scannedCount || !remainingCount) return;
-
-  // Update stats text
-  statsText.textContent = `${stats.scannedCount} of ${stats.totalRunners - stats.dnfRunners} runners scanned`;
-
-  // Update progress bar
-  progressBarFill.style.width = `${stats.progressPercentage}%`;
-
-  // Update counts
-  scannedCount.textContent = `${stats.scannedCount} scanned`;
-  remainingCount.textContent = `${stats.remainingCount} remaining`;
-
+  statsText.textContent = `${stats.scannedRunners} of ${stats.activeRunners} active runners scanned (${stats.completionPercentage}%)`;
+  progressBarFill.style.width = `${stats.completionPercentage}%`;
+  scannedCount.textContent = `${stats.scannedRunners} scanned`;
+  remainingCount.textContent = `${stats.remainingRunners} remaining`;
+  
   // Update debug info
-  logDebug(`Checkpoint stats: ${stats.scannedCount} scanned, ${stats.remainingCount} remaining, ${stats.dnfRunners} DNF, ${stats.progressPercentage.toFixed(1)}% complete`);
-}
-
-// Fetch checkpoint stats
-function fetchCheckpointStats(forceRefresh = false) {
-  // If we're already refreshing stats, don't start another request
-  if (isRefreshingStats && !forceRefresh) {
-    return;
-  }
-
-  // If we're forcing a refresh, show the refreshing indicator
-  if (forceRefresh) {
-    isRefreshingStats = true;
-    statsRefreshing.classList.remove('hidden');
-  }
-
-  // Calculate stats locally first for immediate feedback
-  const stats = calculateLocalCheckpointStats();
-  updateCheckpointStatsUI(stats);
-
-  // If we're online, fetch the latest stats from the spreadsheet
-  if (isOnline) {
-    fetchCheckpointStatsFromSpreadsheet();
-  } else {
-    // If offline, just hide the refreshing indicator
-    statsRefreshing.classList.add('hidden');
-    isRefreshingStats = false;
-  }
-}
-
-// Load pending scans from localStorage
-function loadPendingScans() {
-  try {
-    const storedPendingUploads = localStorage.getItem('pendingUploads');
-    if (storedPendingUploads) {
-      pendingUploads = JSON.parse(storedPendingUploads);
-      logDebug(`Loaded ${pendingUploads.length} pending uploads from localStorage`);
-      updatePendingUploadsUI();
-    }
-  } catch (error) {
-    logDebug('Error loading pending uploads: ' + error);
-    pendingUploads = [];
-  }
-}
-
-// Save pending scans to localStorage
-function savePendingScans() {
-  try {
-    localStorage.setItem('pendingUploads', JSON.stringify(pendingUploads));
-  } catch (error) {
-    logDebug('Error saving pending uploads: ' + error);
-  }
-}
-
-// Update pending uploads UI
-function updatePendingUploadsUI() {
-  if (pendingUploads.length > 0) {
-    pendingUploadsContainer.textContent = `${pendingUploads.length} scans pending upload`;
-    pendingUploadsContainer.classList.remove('hidden');
-  } else {
-    pendingUploadsContainer.classList.add('hidden');
-  }
-}
-
-// Load recent scans from localStorage
-function loadRecentScans() {
-  try {
-    const storedRecentScans = localStorage.getItem('recentScans');
-    if (storedRecentScans) {
-      recentScans = JSON.parse(storedRecentScans);
-      logDebug(`Loaded ${recentScans.length} recent scans from localStorage`);
-      updateRecentScansUI();
-    }
-  } catch (error) {
-    logDebug('Error loading recent scans: ' + error);
-    recentScans = [];
-  }
-}
-
-// Save recent scans to localStorage
-function saveRecentScans() {
-  try {
-    localStorage.setItem('recentScans', JSON.stringify(recentScans));
-  } catch (error) {
-    logDebug('Error saving recent scans: ' + error);
-  }
-}
-
-// Update recent scans UI
-function updateRecentScansUI() {
-  scansList.innerHTML = '';
-
-  if (recentScans.length === 0) {
-    scansList.innerHTML = '<div class="scan-item">No scans yet</div>';
-    return;
-  }
-
-  // Sort scans by timestamp (newest first)
-  const sortedScans = [...recentScans].sort((a, b) => b.timestamp - a.timestamp);
-
-  // Display the 10 most recent scans
-  const recentToShow = sortedScans.slice(0, 10);
-
-  recentToShow.forEach(scan => {
-    const scanItem = document.createElement('div');
-    scanItem.className = 'scan-item';
-    
-    const bibSpan = document.createElement('span');
-    bibSpan.className = 'scan-bib';
-    
-    // Check if we have runner data for this bib
-    const runner = runnersData[scan.bib];
-    let runnerName = '';
-    let isDnf = false;
-    
-    if (runner) {
-      runnerName = runner.name;
-      isDnf = runner.dnf;
-    }
-    
-    // Format the bib and name
-    bibSpan.textContent = `#${scan.bib}${runnerName ? ' - ' + runnerName : ''}`;
-    
-    // Add DNF indicator if applicable
-    if (isDnf) {
-      const dnfIndicator = document.createElement('span');
-      dnfIndicator.className = 'dnf-indicator';
-      dnfIndicator.textContent = 'DNF';
-      bibSpan.appendChild(dnfIndicator);
-    }
-    
-    const timeSpan = document.createElement('span');
-    timeSpan.className = 'scan-time';
-    
-    // Format the timestamp
-    const scanDate = new Date(scan.timestamp);
-    timeSpan.textContent = scanDate.toLocaleTimeString();
-    
-    scanItem.appendChild(bibSpan);
-    scanItem.appendChild(timeSpan);
-    scansList.appendChild(scanItem);
-  });
-}
-
-// Show message
-function showMessage(message, isError = false) {
-  messageDisplay.textContent = message;
-  messageDisplay.classList.remove('hidden', 'error-message', 'success-message');
-  messageDisplay.classList.add(isError ? 'error-message' : 'success-message');
-
-  // Hide message after 3 seconds
-  setTimeout(() => {
-    messageDisplay.classList.add('hidden');
-  }, 3000);
-}
-
-// Flash the screen
-function flashScreen() {
-  flashOverlay.style.display = 'block';
-  setTimeout(() => {
-    flashOverlay.style.display = 'none';
-  }, 300);
-}
-
-// Process a scan
-function processScan(bib) {
-  // Validate bib number
-  if (!bib || isNaN(parseInt(bib))) {
-    showMessage('Invalid bib number', true);
-    return;
-  }
-
-  // Normalize bib to string
-  bib = bib.toString();
-
-  // Check if this runner exists in our data
-  if (!runnersData[bib]) {
-    showMessage(`Runner #${bib} not found`, true);
-    return;
-  }
-
-  // Check if this runner is marked as DNF
-  if (runnersData[bib].dnf) {
-    showMessage(`Runner #${bib} is marked as DNF`, true);
-    return;
-  }
-
-  // Check if this runner has already been scanned at this checkpoint
-  const scanKey = `${bib}-${checkpoint}`;
-  const currentTime = Date.now();
-
-  // If this scan has been processed before, check if it's a duplicate
-  if (processedScans[scanKey]) {
-    // If it's been less than 5 minutes since the last scan, consider it a duplicate
-    const timeSinceLastScan = currentTime - (scanTimestamps[scanKey] || 0);
-    if (timeSinceLastScan < 5 * 60 * 1000) { // 5 minutes
-      showMessage(`Runner #${bib} already scanned at this checkpoint`, true);
-      return;
-    } else {
-      // It's been more than 5 minutes, allow a rescan
-      logDebug(`Allowing rescan of runner #${bib} after ${Math.round(timeSinceLastScan / 1000 / 60)} minutes`);
-    }
-  }
-
-  // Mark this scan as processed and update the timestamp
-  processedScans[scanKey] = true;
-  scanTimestamps[scanKey] = currentTime;
-  saveProcessedScans();
-  saveScanTimestamps();
-
-  // Add to already scanned runners set
-  alreadyScannedRunners.add(bib);
-
-  // Create scan record
-  const scan = {
-    bib: bib,
-    checkpoint: checkpoint,
-    timestamp: currentTime
-  };
-
-  // Add to recent scans
-  recentScans.unshift(scan);
-  if (recentScans.length > 100) {
-    recentScans.pop(); // Keep only the 100 most recent scans
-  }
-  saveRecentScans();
-
-  // Update recent scans UI
-  updateRecentScansUI();
-
-  // Add to pending uploads
-  pendingUploads.push(scan);
-  savePendingScans();
-  updatePendingUploadsUI();
-
-  // Flash the screen to indicate successful scan
-  flashScreen();
-
-  // Show success message
-  const runnerName = runnersData[bib].name || '';
-  showMessage(`Scanned #${bib}${runnerName ? ' - ' + runnerName : ''}`);
-
-  // Update checkpoint stats
-  fetchCheckpointStats();
-
-  // If we're online, try to upload immediately
-  if (isOnline) {
-    uploadPendingScans();
-  }
-}
-
-// Upload pending scans
-function uploadPendingScans(force = false) {
-  // If we're already uploading or there are no pending uploads, return
-  if (isUploadingPendingScans && !force) {
-    return;
-  }
-
-  // If we're offline, return
-  if (!isOnline) {
-    logDebug('Cannot upload scans while offline');
-    return;
-  }
-
-  // If there are no pending uploads, return
-  if (pendingUploads.length === 0) {
-    logDebug('No pending uploads to process');
-    return;
-  }
-
-  // Set uploading flag
-  isUploadingPendingScans = true;
-
-  // Update last upload attempt time
-  lastUploadAttempt = Date.now();
-
-  logDebug(`Uploading ${pendingUploads.length} pending scans`);
-
-  // Create a copy of the pending uploads
-  const uploadsToProcess = [...pendingUploads];
-
-  // Use fetch API to upload scans
-  fetch(APPS_SCRIPT_URL, {
-    method: 'POST',
-    mode: 'no-cors', // Use no-cors to avoid CORS errors
-    cache: 'no-cache',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      action: 'recordScans',
-      scans: uploadsToProcess
-    })
-  })
-  .then(() => {
-    // Since we can't read the response with no-cors, assume success
-    logDebug('Scans uploaded successfully');
-    
-    // Mark these scans as uploaded
-    uploadsToProcess.forEach(scan => {
-      const uploadKey = `${scan.bib}-${scan.checkpoint}-${scan.timestamp}`;
-      uploadedScans[uploadKey] = true;
-    });
-    saveUploadedScans();
-    
-    // Remove these scans from pending uploads
-    pendingUploads = pendingUploads.filter(scan => {
-      const uploadKey = `${scan.bib}-${scan.checkpoint}-${scan.timestamp}`;
-      return !uploadedScans[uploadKey];
-    });
-    savePendingScans();
-    updatePendingUploadsUI();
-    
-    // Update checkpoint stats
-    fetchCheckpointStats();
-  })
-  .catch(error => {
-    logDebug('Error uploading scans: ' + error);
-  })
-  .finally(() => {
-    // Clear uploading flag
-    isUploadingPendingScans = false;
-  });
+  logDebug(`Checkpoint stats: ${stats.scannedRunners}/${stats.activeRunners} active runners scanned (${stats.completionPercentage}%), ${stats.dnfRunners} DNF`);
 }
 
 // Scan button click handler
 scanButton.addEventListener('click', function() {
   if (isScanning) {
-    stopScanner();
-    scanButton.textContent = 'START SCANNING';
-    scannerScreen.classList.remove('scanner-active');
+    stopScanning();
   } else {
-    startScanner();
-    scanButton.textContent = 'STOP SCANNING';
-    scannerScreen.classList.add('scanner-active');
+    startScanning();
   }
 });
 
-// Start the QR scanner
-function startScanner() {
+// Start scanning
+function startScanning() {
   if (isScanning) return;
-
+  
   isScanning = true;
+  scanButton.textContent = 'STOP SCANNING';
+  scanButton.style.backgroundColor = '#dc3545';
   scannerContainer.classList.remove('hidden');
-  cameraLoading.classList.remove('hidden');
-
-  // Try to use HTML5QrCode first
+  
+  // Add scanner-active class to body for styling
+  document.body.classList.add('scanner-active');
+  
+  // Try HTML5 QR Code scanner first
   try {
     if (!html5QrCode) {
       html5QrCode = new Html5Qrcode("qr-reader");
     }
     
+    // Show camera loading indicator
+    cameraLoading.classList.remove('hidden');
+    
+    // Set a timeout to fall back to native camera if HTML5QrCode takes too long
+    cameraStartTimeout = setTimeout(() => {
+      if (html5QrCode && !html5QrCode.isScanning) {
+        logDebug('HTML5QrCode camera start timed out, falling back to native camera');
+        stopHtml5QrScanner();
+        startNativeCamera();
+      }
+    }, 10000);
+    
+    const qrCodeSuccessCallback = (decodedText, decodedResult) => {
+      handleScanResult(decodedText);
+    };
+    
+    const qrCodeErrorCallback = (errorMessage, error) => {
+      // Ignore errors during scanning
+    };
+    
     const config = {
       fps: 10,
       qrbox: { width: 250, height: 250 },
       aspectRatio: 1.0,
-      disableFlip: false
+      disableFlip: false,
+      videoConstraints: {
+        facingMode: "environment"
+      }
     };
     
     html5QrCode.start(
       { facingMode: "environment" },
       config,
-      onScanSuccess,
-      onScanFailure
-    )
-    .then(() => {
-      logDebug('QR scanner started successfully');
+      qrCodeSuccessCallback,
+      qrCodeErrorCallback
+    ).then(() => {
+      // Camera started successfully
       cameraLoading.classList.add('hidden');
-      useNativeCamera = false;
-    })
-    .catch((err) => {
-      logDebug('Error starting QR scanner: ' + err);
-      
-      // Fall back to native camera API
-      if (!useNativeCamera) {
-        logDebug('Falling back to native camera API');
-        useNativeCamera = true;
-        startNativeCamera();
-      } else {
-        isScanning = false;
-        scannerContainer.classList.add('hidden');
-        showMessage('Failed to start camera. Please check permissions.', true);
+      if (cameraStartTimeout) {
+        clearTimeout(cameraStartTimeout);
+        cameraStartTimeout = null;
       }
+    }).catch((err) => {
+      logDebug('Error starting HTML5QrCode camera: ' + err);
+      // Fall back to native camera
+      startNativeCamera();
     });
-    
-    // Set a timeout to detect if camera fails to start
-    cameraStartTimeout = setTimeout(() => {
-      if (isScanning && !useNativeCamera) {
-        logDebug('Camera start timeout - falling back to native camera API');
-        html5QrCode.stop().catch(() => {});
-        useNativeCamera = true;
-        startNativeCamera();
-      }
-    }, 5000);
   } catch (error) {
-    logDebug('Error initializing QR scanner: ' + error);
-    
-    // Fall back to native camera API
-    useNativeCamera = true;
+    logDebug('Error initializing HTML5QrCode: ' + error);
+    // Fall back to native camera
     startNativeCamera();
   }
 }
 
-// Start native camera
+// Start native camera as fallback
 function startNativeCamera() {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     logDebug('Native camera API not supported');
-    isScanning = false;
-    scannerContainer.classList.add('hidden');
     showMessage('Camera not supported on this device', true);
+    stopScanning();
     return;
   }
-
+  
+  useNativeCamera = true;
   scannerContainer.classList.add('hidden');
   nativeCameraContainer.classList.remove('hidden');
-
-  navigator.mediaDevices.getUserMedia({ 
-    video: { 
+  
+  navigator.mediaDevices.getUserMedia({
+    video: {
       facingMode: 'environment',
       width: { ideal: 1280 },
       height: { ideal: 720 }
-    } 
-  })
-  .then(stream => {
+    }
+  }).then(stream => {
     nativeCameraStream = stream;
     nativeCameraVideo.srcObject = stream;
     nativeCameraVideo.play();
@@ -2648,133 +2293,367 @@ function startNativeCamera() {
     const scanFrame = () => {
       if (!isScanning || !useNativeCamera) return;
       
-      // Adjust canvas size to match video dimensions
-      if (nativeCameraVideo.videoWidth && nativeCameraVideo.videoHeight) {
+      if (nativeCameraVideo.readyState === nativeCameraVideo.HAVE_ENOUGH_DATA) {
         canvas.width = nativeCameraVideo.videoWidth;
         canvas.height = nativeCameraVideo.videoHeight;
-        
-        // Draw current video frame to canvas
         context.drawImage(nativeCameraVideo, 0, 0, canvas.width, canvas.height);
         
-        // Get image data for QR code detection
-        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-        
-        // TODO: Implement QR code detection using a library
-        // For now, we'll just rely on manual entry
+        // Use a library like jsQR here to detect QR codes
+        // For now, we'll just use manual entry
       }
       
-      // Continue scanning
       requestAnimationFrame(scanFrame);
     };
     
-    // Start scanning frames
     scanFrame();
-    
-    cameraLoading.classList.add('hidden');
-    logDebug('Native camera started successfully');
-  })
-  .catch(error => {
-    logDebug('Error starting native camera: ' + error);
-    isScanning = false;
+  }).catch(error => {
+    logDebug('Error accessing camera: ' + error);
+    showMessage('Could not access camera. Please use manual entry.', true);
+    useNativeCamera = false;
     nativeCameraContainer.classList.add('hidden');
-    showMessage('Failed to start camera. Please check permissions.', true);
   });
 }
 
-// Stop the scanner
-function stopScanner() {
-  if (!isScanning) return;
-
+// Stop scanning
+function stopScanning() {
   isScanning = false;
-
-  // Clear camera start timeout
-  if (cameraStartTimeout) {
-    clearTimeout(cameraStartTimeout);
-    cameraStartTimeout = null;
-  }
-
-  // Stop HTML5QrCode scanner
-  if (html5QrCode) {
-    html5QrCode.stop().catch(err => {
-      logDebug('Error stopping QR scanner: ' + err);
-    });
-  }
-
-  // Stop native camera
-  if (nativeCameraStream) {
-    nativeCameraStream.getTracks().forEach(track => track.stop());
-    nativeCameraStream = null;
-  }
-
+  scanButton.textContent = 'START SCANNING';
+  scanButton.style.backgroundColor = '#28a745';
   scannerContainer.classList.add('hidden');
   nativeCameraContainer.classList.add('hidden');
+  
+  // Remove scanner-active class from body
+  document.body.classList.remove('scanner-active');
+  
+  // Stop HTML5 QR Code scanner
+  stopHtml5QrScanner();
+  
+  // Stop native camera
+  stopNativeCamera();
 }
 
-// QR scan success handler
-function onScanSuccess(decodedText, decodedResult) {
-  // Extract bib number from QR code
-  const bib = decodedText.trim();
+// Stop HTML5 QR Code scanner
+function stopHtml5QrScanner() {
+  if (html5QrCode && html5QrCode.isScanning) {
+    html5QrCode.stop().catch(err => {
+      logDebug('Error stopping HTML5QrCode: ' + err);
+    });
+  }
+}
 
-  logDebug(`QR code scanned: ${bib}`);
+// Stop native camera
+function stopNativeCamera() {
+  if (nativeCameraStream) {
+    nativeCameraStream.getTracks().forEach(track => {
+      track.stop();
+    });
+    nativeCameraStream = null;
+  }
+  
+  if (nativeCameraVideo) {
+    nativeCameraVideo.srcObject = null;
+  }
+  
+  useNativeCamera = false;
+}
 
+// Handle scan result
+function handleScanResult(scannedText) {
+  // Check if the scanned text is a valid bib number
+  const bibNumber = extractBibNumber(scannedText);
+  
+  if (!bibNumber) {
+    showMessage('Invalid QR code. Please try again.', true);
+    return;
+  }
+  
   // Process the scan
-  processScan(bib);
+  processScan(bibNumber);
 }
 
-// QR scan failure handler
-function onScanFailure(error) {
-  // We don't need to do anything on failure
-  // console.log(`QR scan error: ${error}`);
+// Extract bib number from scanned text
+function extractBibNumber(scannedText) {
+  // Try to extract a number from the scanned text
+  const matches = scannedText.match(/\d+/);
+  if (matches && matches.length > 0) {
+    return matches[0];
+  }
+  return null;
 }
 
 // Manual submit button click handler
 manualSubmitButton.addEventListener('click', function() {
-  const bib = bibInput.value.trim();
-
-  if (!bib) {
+  const bibNumber = bibInput.value.trim();
+  
+  if (!bibNumber) {
     showMessage('Please enter a bib number', true);
     return;
   }
-
+  
   // Process the scan
-  processScan(bib);
-
+  processScan(bibNumber);
+  
   // Clear the input
   bibInput.value = '';
 });
 
+// Process a scan (either from QR code or manual entry)
+function processScan(bibNumber) {
+  // Check if this is a valid bib number
+  if (!runnersData[bibNumber]) {
+    showMessage(`Bib #${bibNumber} not found in runner data`, true);
+    return;
+  }
+  
+  // Check if the runner is marked as DNF
+  if (runnersData[bibNumber].dnf) {
+    showMessage(`Bib #${bibNumber} is marked as DNF`, true);
+    return;
+  }
+  
+  // Check if we've already processed this scan
+  const scanKey = `${bibNumber}-${checkpoint}`;
+  if (processedScans[scanKey]) {
+    const lastScanTime = new Date(scanTimestamps[scanKey]).toLocaleTimeString();
+    showMessage(`Bib #${bibNumber} already scanned at ${lastScanTime}`, true);
+    return;
+  }
+  
+  // Mark as processed to prevent duplicates
+  processedScans[scanKey] = true;
+  scanTimestamps[scanKey] = new Date().toISOString();
+  saveProcessedScans();
+  saveScanTimestamps();
+  
+  // Add to already scanned runners set
+  alreadyScannedRunners.add(bibNumber);
+  
+  // Create scan record
+  const timestamp = new Date().toISOString();
+  const scan = {
+    bib: bibNumber,
+    name: runnersData[bibNumber].name,
+    checkpoint: checkpoint,
+    timestamp: timestamp,
+    uploaded: false
+  };
+  
+  // Add to recent scans
+  recentScans.unshift(scan);
+  if (recentScans.length > 50) {
+    recentScans.pop();
+  }
+  
+  // Save recent scans to localStorage
+  try {
+    localStorage.setItem('recentScans', JSON.stringify(recentScans));
+  } catch (error) {
+    logDebug('Error saving recent scans to localStorage: ' + error);
+  }
+  
+  // Update UI
+  updateRecentScansUI();
+  
+  // Show success message
+  showMessage(`Scanned Bib #${bibNumber}: ${runnersData[bibNumber].name}`);
+  
+  // Flash the overlay
+  flashOverlay.style.display = 'block';
+  setTimeout(() => {
+    flashOverlay.style.display = 'none';
+  }, 300);
+  
+  // Add to pending uploads
+  pendingUploads.push(scan);
+  savePendingScans();
+  updatePendingUploadsUI();
+  
+  // Try to upload immediately if online
+  if (isOnline) {
+    uploadPendingScans();
+  }
+  
+  // Update checkpoint stats
+  fetchCheckpointStats();
+}
+
+// Update recent scans UI
+function updateRecentScansUI() {
+  scansList.innerHTML = '';
+  
+  if (recentScans.length === 0) {
+    scansList.innerHTML = '<div class="scan-item">No scans yet</div>';
+    return;
+  }
+  
+  recentScans.forEach(scan => {
+    const scanTime = new Date(scan.timestamp).toLocaleTimeString();
+    const scanItem = document.createElement('div');
+    scanItem.className = 'scan-item';
+    
+    const bibSpan = document.createElement('span');
+    bibSpan.className = 'scan-bib';
+    bibSpan.textContent = `#${scan.bib}: ${scan.name}`;
+    
+    // Check if runner is now marked as DNF
+    if (runnersData[scan.bib] && runnersData[scan.bib].dnf) {
+      const dnfIndicator = document.createElement('span');
+      dnfIndicator.className = 'dnf-indicator';
+      dnfIndicator.textContent = 'DNF';
+      bibSpan.appendChild(dnfIndicator);
+    }
+    
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'scan-time';
+    timeSpan.textContent = scanTime;
+    
+    scanItem.appendChild(bibSpan);
+    scanItem.appendChild(timeSpan);
+    scansList.appendChild(scanItem);
+  });
+}
+
+// Update pending uploads UI
+function updatePendingUploadsUI() {
+  if (pendingUploads.length > 0) {
+    pendingUploadsContainer.classList.remove('hidden');
+    pendingUploadsContainer.innerHTML = `
+      <div class="loading-spinner"></div>
+      ${pendingUploads.length} scan${pendingUploads.length > 1 ? 's' : ''} pending upload
+    `;
+  } else {
+    pendingUploadsContainer.classList.add('hidden');
+  }
+}
+
+// Upload pending scans
+function uploadPendingScans(force = false) {
+  if (!isOnline || pendingUploads.length === 0 || isUploadingPendingScans) {
+    return;
+  }
+  
+  // Prevent multiple simultaneous uploads
+  isUploadingPendingScans = true;
+  
+  // Check if we should throttle uploads
+  const now = Date.now();
+  if (!force && now - lastUploadAttempt < 5000) {
+    isUploadingPendingScans = false;
+    return;
+  }
+  
+  lastUploadAttempt = now;
+  
+  logDebug(`Uploading ${pendingUploads.length} pending scans`);
+  
+  // Create a copy of the pending uploads
+  const uploadsToProcess = [...pendingUploads];
+  
+  // Prepare the data for upload
+  const uploadData = {
+    action: 'recordScans',
+    scans: uploadsToProcess
+  };
+  
+  // Use fetch API to upload the data
+  fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    mode: 'no-cors', // Use no-cors to avoid CORS errors
+    cache: 'no-cache',
+    headers: {
+      'Content-Type': 'text/plain;charset=utf-8',
+    },
+    body: JSON.stringify(uploadData)
+  })
+  .then(() => {
+    // Since we can't read the response with no-cors, assume success
+    logDebug('Upload successful (assumed)');
+    
+    // Mark scans as uploaded
+    uploadsToProcess.forEach(scan => {
+      const scanKey = `${scan.bib}-${scan.checkpoint}-${scan.timestamp}`;
+      uploadedScans[scanKey] = true;
+    });
+    
+    // Save uploaded scans
+    saveUploadedScans();
+    
+    // Remove uploaded scans from pending uploads
+    pendingUploads = pendingUploads.filter(scan => {
+      const scanKey = `${scan.bib}-${scan.checkpoint}-${scan.timestamp}`;
+      return !uploadedScans[scanKey];
+    });
+    
+    // Save updated pending uploads
+    savePendingScans();
+    
+    // Update UI
+    updatePendingUploadsUI();
+    
+    // Fetch fresh checkpoint stats
+    fetchCheckpointStats(true);
+  })
+  .catch(error => {
+    logDebug('Error uploading scans: ' + error);
+  })
+  .finally(() => {
+    isUploadingPendingScans = false;
+  });
+}
+
+// Show message
+function showMessage(message, isError = false) {
+  messageDisplay.textContent = message;
+  messageDisplay.classList.remove('hidden');
+  
+  if (isError) {
+    messageDisplay.style.color = '#dc3545';
+  } else {
+    messageDisplay.style.color = '#28a745';
+  }
+  
+  // Hide message after 3 seconds
+  setTimeout(() => {
+    messageDisplay.classList.add('hidden');
+  }, 3000);
+}
+
 // Logout button click handler
 logoutButton.addEventListener('click', function() {
-  // Stop scanner if running
-  if (isScanning) {
-    stopScanner();
-  }
-
-  // Clear checkpoint
-  checkpoint = '';
-  localStorage.removeItem('tigerClawCheckpoint');
-
-  // Show login screen
-  scannerScreen.classList.add('hidden');
-  loginScreen.classList.remove('hidden');
-
-  // Clear any intervals
-  if (runnerDataRefreshInterval) {
-    clearInterval(runnerDataRefreshInterval);
-  }
-
-  if (checkpointStatsRefreshInterval) {
-    clearInterval(checkpointStatsRefreshInterval);
-  }
-
-  if (periodicUploadInterval) {
-    clearInterval(periodicUploadInterval);
+  if (confirm('Are you sure you want to logout?')) {
+    // Stop scanning if active
+    if (isScanning) {
+      stopScanning();
+    }
+    
+    // Clear checkpoint
+    checkpoint = '';
+    localStorage.removeItem('tigerClawCheckpoint');
+    
+    // Show login screen
+    scannerScreen.classList.add('hidden');
+    loginScreen.classList.remove('hidden');
+    
+    // Clear form fields
+    checkpointSelect.value = '';
+    passwordInput.value = '';
+    
+    // Clear any error messages
+    loginError.classList.add('hidden');
+    
+    // Clear intervals
+    if (checkpointStatsRefreshInterval) {
+      clearInterval(checkpointStatsRefreshInterval);
+    }
+    
+    if (periodicUploadInterval) {
+      clearInterval(periodicUploadInterval);
+    }
   }
 });
 
-// Initialize the application
-init();
-});
+// Initialize the application when the DOM is loaded
+document.addEventListener('DOMContentLoaded', init);
 </script>
 </body>
 </html>
