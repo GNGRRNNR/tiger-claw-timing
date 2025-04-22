@@ -1606,36 +1606,44 @@ function fetchAlreadyScannedRunners() {
   });
 }
 
-// Fetch checkpoint stats directly from the spreadsheet
-// Fetch checkpoint stats directly from the spreadsheet
-function fetchCheckpointStatsFromSpreadsheet() {
-  if (!checkpoint || !isOnline) {
-    // If offline, calculate stats locally
-    const stats = calculateLocalCheckpointStats();
-    updateCheckpointStatsUI(stats);
-    statsRefreshing.classList.add('hidden');
-    isRefreshingStats = false;
-    return;
-  }
 
-  logDebug(`Fetching checkpoint stats from spreadsheet for: ${checkpoint}`);
-
-  // Add a cache-busting parameter to ensure we get fresh data
-  const cacheBuster = new Date().getTime();
-
-  // IMPORTANT: Clear the existing set of scanned runners before fetching new data
-  // This ensures deleted entries are properly reflected
-  alreadyScannedRunners = new Set();
-
-  // Fetch directly from the results spreadsheet using the Google Visualization API
-const resultsSheetName = event && EVENT_CONFIG[event]?.RESULTS_SHEET_NAME;
   
-if (!resultsSheetName) {
-  logDebug(`No results sheet name found for event: ${event}`);
-  showMessage(`Configuration error: Cannot fetch stats for ${event}`, true);
-  return;
+function fetchCheckpointStatsFromSpreadsheet() {
+  const eventType = event; // Use the current event in memory
+  const checkpointName = checkpoint;
+
+  logDebug(`Fetching stats for ${eventType} @ ${checkpointName}`);
+
+  fetch(`${APPS_SCRIPT_URL}?action=getCheckpointStats&eventType=${encodeURIComponent(eventType)}&checkpoint=${encodeURIComponent(checkpointName)}`)
+    .then(response => response.json())
+    .then(data => {
+      if (data.success && data.data) {
+        const stats = data.data;
+
+        // Update progress UI
+        statsText.textContent = `${stats.scannedCount} of ${stats.totalRunners} active runners scanned (${stats.scannedPercentage}%)`;
+        progressBarFill.style.width = `${stats.scannedPercentage}%`;
+        scannedCount.textContent = `${stats.scannedCount} scanned`;
+        remainingCount.textContent = `${stats.totalRunners - stats.scannedCount} remaining`;
+
+        logDebug(`Stats updated: ${stats.scannedCount}/${stats.totalRunners} (${stats.scannedPercentage}%)`);
+      } else {
+        logDebug("Failed to load stats (backend returned error): " + data.error);
+      }
+    })
+    .catch(err => {
+      logDebug("Error fetching stats: " + err);
+    })
+    .finally(() => {
+      isRefreshingStats = false;
+      statsRefreshing.classList.add('hidden');
+    });
 }
 
+
+
+
+  
 const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${RESULTS_SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(resultsSheetName)}&cacheBuster=${cacheBuster}`;
 
   
