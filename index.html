@@ -1091,6 +1091,133 @@ function showAppropriateInstallInstructions(androidBtn, iosBtn, iosInstructionsE
 }
 
 
+// Add this function to your JavaScript
+function debugSpreadsheet() {
+  logDebug("Starting spreadsheet debug...");
+  
+  // Check if we're online
+  if (!isOnline) {
+    logDebug("ERROR: Currently offline. Cannot debug spreadsheet connection.");
+    showMessage("Cannot debug spreadsheet while offline", true);
+    return;
+  }
+  
+  // Log the spreadsheet IDs we're using
+  logDebug(`RUNNERS_SHEET_ID: ${RUNNERS_SHEET_ID}`);
+  logDebug(`RESULTS_SHEET_ID: ${RESULTS_SHEET_ID}`);
+  
+  // Try to fetch the results spreadsheet structure
+  const cacheBuster = new Date().getTime();
+  const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${RESULTS_SHEET_ID}/gviz/tq?tqx=out:json&sheet=Sheet1&cacheBuster=${cacheBuster}`;
+  
+  logDebug(`Fetching spreadsheet structure from: ${spreadsheetUrl}`);
+  
+  fetch(spreadsheetUrl)
+    .then(response => {
+      logDebug(`Response status: ${response.status} ${response.statusText}`);
+      return response.text();
+    })
+    .then(text => {
+      logDebug(`Raw response (first 300 chars): ${text.substring(0, 300)}...`);
+      
+      // Try to extract and parse the JSON
+      try {
+        const jsonStart = text.indexOf('{');
+        const jsonEnd = text.lastIndexOf('}') + 1;
+        if (jsonStart === -1 || jsonEnd === 0) {
+          throw new Error('Invalid response format - could not find JSON data');
+        }
+        const jsonString = text.substring(jsonStart, jsonEnd);
+        const data = JSON.parse(jsonString);
+        
+        // Log the column structure
+        if (data && data.table && data.table.cols) {
+          const cols = data.table.cols;
+          logDebug(`Found ${cols.length} columns:`);
+          cols.forEach((col, index) => {
+            logDebug(`Column ${index}: ${col.label || 'UNNAMED'} (${col.type || 'unknown type'})`);
+          });
+          
+          // Check for empty column headers
+          const emptyHeaders = cols.filter(col => !col.label || col.label.trim() === '').length;
+          if (emptyHeaders > 0) {
+            logDebug(`WARNING: Found ${emptyHeaders} empty column headers!`);
+          }
+        } else {
+          logDebug("ERROR: Could not find column structure in response");
+        }
+        
+        // Log the row count
+        if (data && data.table && data.table.rows) {
+          logDebug(`Found ${data.table.rows.length} rows in the spreadsheet`);
+        }
+        
+        // Try to send a test scan
+        logDebug("Attempting to send a test scan...");
+        const testScan = {
+          bib: "TEST",
+          name: "Debug Test",
+          checkpoint: checkpoint || "DEBUG",
+          timestamp: new Date().toISOString(),
+          uploaded: false
+        };
+        
+        const uploadData = {
+          action: 'recordScans',
+          scans: [testScan],
+          debug: true
+        };
+        
+        return fetch(APPS_SCRIPT_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          cache: 'no-cache',
+          headers: {
+            'Content-Type': 'text/plain;charset=utf-8',
+          },
+          body: JSON.stringify(uploadData)
+        });
+      } catch (error) {
+        logDebug(`Error parsing spreadsheet data: ${error.message}`);
+        throw error;
+      }
+    })
+    .then(() => {
+      logDebug("Test scan sent (no response available due to no-cors mode)");
+      showMessage("Debug test completed - check debug panel for results");
+    })
+    .catch(error => {
+      logDebug(`Spreadsheet debug error: ${error.message}`);
+      showMessage("Error during spreadsheet debug - check debug panel", true);
+    });
+}
+
+// Add this button to the debug panel in your HTML
+// Find the debug panel div and add this button before the closing </div>
+document.addEventListener('DOMContentLoaded', function() {
+  const debugPanel = document.getElementById('debug-panel');
+  if (debugPanel) {
+    const debugSpreadsheetBtn = document.createElement('button');
+    debugSpreadsheetBtn.id = 'debug-spreadsheet';
+    debugSpreadsheetBtn.textContent = 'Debug Spreadsheet';
+    debugSpreadsheetBtn.style.backgroundColor = '#17a2b8';
+    debugSpreadsheetBtn.style.marginTop = '10px';
+    debugSpreadsheetBtn.style.fontSize = '12px';
+    debugSpreadsheetBtn.addEventListener('click', debugSpreadsheet);
+    
+    // Insert after the refresh-runners button
+    const refreshRunnersBtn = document.getElementById('refresh-runners');
+    if (refreshRunnersBtn && refreshRunnersBtn.parentNode) {
+      refreshRunnersBtn.parentNode.insertBefore(debugSpreadsheetBtn, refreshRunnersBtn.nextSibling);
+    } else {
+      debugPanel.appendChild(debugSpreadsheetBtn);
+    }
+  }
+});
+
+
+  
+
 // Add this function to clear upload tracking data
 function resetUploadTracking() {
   uploadedScans = {};
