@@ -1074,42 +1074,35 @@ function positionInstallPrompt() {
 
 
 
-// Add this function to your JavaScript
 function uploadScanDirectly(scan) {
   if (!isOnline) {
     logDebug("Cannot upload scan while offline");
     return Promise.reject(new Error("Offline"));
   }
-  
+
   logDebug(`Attempting direct upload for bib #${scan.bib}`);
-  
-  // Create a simple test row with the scan data
-const rowData = [
-  scan.timestamp,  // Column A: TIMESTAMP
-  scan.bib,        // Column B: BIB NUMBER
-  scan.name,       // Column C: RUNNER NAME
-  scan.event,      // Column D: EVENT (Add this line)
-  scan.checkpoint  // Column E: CHECKPOINT (was D before)
-];
-  
-  
-  // Create a simple form data object
+
+  const rowData = [
+    scan.timestamp,     // TIMESTAMP
+    scan.bib,           // BIB NUMBER
+    scan.name,          // RUNNER NAME
+    scan.checkpoint,    // CHECKPOINT
+    scan.event          // EVENT
+  ];
+
   const formData = new FormData();
   formData.append('action', 'appendRow');
   formData.append('sheetId', RESULTS_SHEET_ID);
+  formData.append('sheetName', scan.event === "ASCENT" ? "ASCENT RESULTS" : "50k CHECKPOINT SCANS");
   formData.append('data', JSON.stringify(rowData));
-  
-  // Log what we're sending
-  logDebug(`Sending direct upload: ${JSON.stringify(rowData)}`);
-  
-  // Use fetch API to upload the data
+
   return fetch(APPS_SCRIPT_URL, {
     method: 'POST',
     mode: 'no-cors',
     body: formData
   })
   .then(() => {
-    logDebug(`Direct upload for bib #${scan.bib} sent (no response due to no-cors)`);
+    logDebug(`Direct upload for bib #${scan.bib} sent`);
     return true;
   })
   .catch(error => {
@@ -1117,6 +1110,7 @@ const rowData = [
     return false;
   });
 }
+
 
 // Upload pending scans
 function uploadPendingScans(force = false) {
