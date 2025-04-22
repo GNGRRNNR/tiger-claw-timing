@@ -586,22 +586,22 @@ justify-content: center;
 gap: 10px;
 }
 
-.platform-button {
-background-color: #28a745;
-color: white;
-border: none;
-border-radius: 5px;
-padding: 10px 15px;
-font-size: 14px;
-cursor: pointer;
-display: flex;
-align-items: center;
-justify-content: center;
-min-width: 120px;
+.platform-button, .icon-button {
+  background-color: #0066cc !important; /* Blue color with !important to override */
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 100px;
 }
 
-.platform-button:hover {
-background-color: #218838;
+.platform-button:hover, .icon-button:hover {
+  background-color: #0052a3 !important; /* Darker blue on hover */
 }
 
 .platform-icon {
@@ -625,27 +625,22 @@ padding-left: 20px;
 margin-bottom: 8px;
 }
 
-/* Add this to your existing CSS */
+/* Make the install icons container appear at the top */
 .install-icons {
-display: flex;
-justify-content: center;
-gap: 10px;
-margin: 10px 0;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 0 0 10px 0;
+  padding: 5px;
+  background-color: #e6f2ff;
+  border-bottom: 1px solid #0066cc;
+  width: 100%;
 }
 
+/* Make the icon buttons smaller */
 .icon-button {
-background-color: #28a745;
-color: white;
-border: none;
-border-radius: 5px;
-padding: 8px 12px;
-font-size: 14px;
-cursor: pointer;
-display: flex;
-align-items: center;
-justify-content: center;
-box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-transition: all 0.2s ease;
+  padding: 4px 8px;
+  font-size: 12px;
 }
 
 .icon-button:hover {
@@ -748,10 +743,26 @@ You are currently offline. Scans will be saved and uploaded when connection is r
 </div>
 
 <!-- Scanner Screen -->
+<!-- In the scanner-screen div, move the install-icons div to the top -->
 <div id="scanner-screen" class="hidden">
-<div class="app-header">
-<h1>TIGER CLAW TIMING</h1>
-<div id="checkpoint-display" style="font-weight: bold; font-size: 18px; margin: 10px 0;"></div>
+  <div class="install-icons">
+    <button id="scanner-android-install" class="icon-button" title="Install on Android">
+      <span class="platform-icon">🤖</span> Install App
+    </button>
+    <button id="scanner-ios-install" class="icon-button" title="Install on iOS">
+      <span class="platform-icon">🍎</span> Install App
+    </button>
+  </div>
+  
+  <div class="app-header">
+    <h1>TIGER CLAW TIMING</h1>
+    <div id="checkpoint-display" style="font-weight: bold; font-size: 18px; margin: 10px 0;"></div>
+    
+    <!-- Rest of the header content -->
+  </div>
+  
+  <!-- Rest of the scanner screen content -->
+</div>
 
 <div class="install-icons">
 <button id="scanner-android-install" class="icon-button" title="Install on Android">
@@ -851,7 +862,21 @@ You are currently offline. Scans will be saved and uploaded when connection is r
 
 <script>
 // Main application code
+// Add this to your JavaScript to ensure all install buttons are blue
 document.addEventListener('DOMContentLoaded', function() {
+  // Make all platform buttons blue
+  const platformButtons = document.querySelectorAll('.platform-button, .icon-button');
+  platformButtons.forEach(button => {
+    button.style.backgroundColor = '#0066cc';
+  });
+  
+  // Ensure the persistent install button is blue
+  if (persistentInstallBtn) {
+    persistentInstallBtn.style.backgroundColor = '#0066cc';
+  }
+});
+  
+  
 // DOM Elements
 const loadingScreen = document.getElementById('loading-screen');
 const loadingError = document.getElementById('loading-error');
@@ -997,7 +1022,7 @@ function updateInstallPrompts() {
 
   
 
-// Function to position the install prompt at the top of the current screen
+// Update this function to ensure the install prompt is at the top
 function positionInstallPrompt() {
   const installPrompt = document.getElementById('install-prompt');
   if (!installPrompt) return;
@@ -1013,11 +1038,14 @@ function positionInstallPrompt() {
   }
   
   if (currentScreen) {
-    // Move the install prompt to be the first child of the current screen
-    if (installPrompt.parentNode !== currentScreen || 
-        currentScreen.firstChild !== installPrompt) {
-      currentScreen.insertBefore(installPrompt, currentScreen.firstChild);
-    }
+    // Make sure the install prompt is the first child of the current screen
+    currentScreen.insertBefore(installPrompt, currentScreen.firstChild);
+    
+    // Ensure it's styled as a banner
+    installPrompt.style.width = '100%';
+    installPrompt.style.margin = '0 0 15px 0';
+    installPrompt.style.backgroundColor = '#e6f2ff';
+    installPrompt.style.borderBottom = '2px solid #0066cc';
   }
 }
   
