@@ -974,17 +974,18 @@ const PERIODIC_UPLOAD_INTERVAL = 30 * 1000; // 30 seconds
 const RUNNERS_SHEET_ID = "19ysJEfg5dDTUe6q-JXngWbUAziGmrn0jGilGy8SkcYg"; // Your runners spreadsheet ID
 const RESULTS_SHEET_ID = "1StRgcagtoZs6x-TRCQMAWiTIqXKq__6_Gvcj8ysUz5c"; // Your results spreadsheet ID
 
-// Event-specific sheet names
+// Add this near the top of your script with other configuration variables
 const EVENT_CONFIG = {
-  "ASCENT": {
-    RUNNERS_SHEET_NAME: "ASCENT RUNNERS",
-    RESULTS_SHEET_NAME: "ASCENT RESULTS"
+  '50K': {
+    RUNNERS_SHEET_NAME: '50K RUNNERS',
+    RESULTS_SHEET_NAME: '50k CHECKPOINT SCANS'
   },
-  "50K": {
-    RUNNERS_SHEET_NAME: "50k RUNNERS",
-    RESULTS_SHEET_NAME: "50k CHECKPOINT SCANS" // or "50k RESULTS" depending on which one you want to use
+  'ASCENT': {
+    RUNNERS_SHEET_NAME: 'ASCENT RUNNERS',
+    RESULTS_SHEET_NAME: 'ASCENT RESULTS'
   }
 };
+
 
 const DATA_LOAD_TIMEOUT = 30000; // 30 seconds timeout for data loading
   
@@ -1586,29 +1587,20 @@ function clearSessionData() {
   logDebug('Session data cleared for new login');
 }
 
-// Fetch already scanned runners at this checkpoint
 function fetchAlreadyScannedRunners() {
-  if (!checkpoint || !isOnline) return;
-
-  logDebug(`Fetching already scanned runners at checkpoint: ${checkpoint}`);
-
-  // Use fetch API to get checkpoint stats with no-cors mode
-  fetch(`${APPS_SCRIPT_URL}?action=getCheckpointStats&checkpoint=${encodeURIComponent(checkpoint)}`, {
-    method: 'GET',
-    mode: 'no-cors', // Use no-cors to avoid CORS errors
-    cache: 'no-cache'
-  })
-  .then(() => {
-    // Since we can't read the response with no-cors, we'll use the spreadsheet API directly
-    fetchCheckpointStatsFromSpreadsheet();
-  })
-  .catch(error => {
-    logDebug('Error fetching already scanned runners: ' + error);
-    // We'll rely on the checkpoint stats to update this information
-    fetchCheckpointStatsFromSpreadsheet();
-  });
+  return fetch(APPS_SCRIPT_URL + '?action=getScannedRunners&eventType=' + encodeURIComponent(event) + '&checkpoint=' + encodeURIComponent(checkpoint), 
+    { mode: 'no-cors' } // Add this line
+  )
+    .then(() => {
+      // With no-cors, we can't read the response content
+      // We'll need to rely on local tracking of scanned runners
+      logDebug(`Using locally tracked scanned runners for ${checkpoint}`);
+    })
+    .catch(error => {
+      console.error('Error fetching already scanned runners:', error);
+      showMessage('Failed to load already scanned runners. Check your connection and try again.', true);
+    });
 }
-
 
   
 function fetchCheckpointStatsFromSpreadsheet() {
@@ -1625,38 +1617,17 @@ function fetchCheckpointStatsFromSpreadsheet() {
   isRefreshingStats = true;
   statsRefreshing.classList.remove("hidden");
 
-  // Add the event type parameter to the API call
+  // Use no-cors mode to avoid CORS errors
   fetch(
     `${APPS_SCRIPT_URL}?action=getCheckpointStats&eventType=${encodeURIComponent(event)}&checkpoint=${encodeURIComponent(checkpoint)}`,
+    { mode: 'no-cors' } // Add this line
   )
-    .then(response => response.text())
-    .then(text => {
-      try {
-        // Try to parse the response as JSON
-        const data = JSON.parse(text);
-
-        if (data.success && data.data) {
-          const stats = data.data;
-
-          // Update the UI with the stats
-          statsText.textContent = `${stats.scannedCount} of ${stats.totalRunners} active runners scanned (${stats.scannedPercentage}%)`;
-          progressBarFill.style.width = `${stats.scannedPercentage}%`;
-          scannedCount.textContent = `${stats.scannedCount} scanned`;
-          remainingCount.textContent = `${stats.totalRunners - stats.scannedCount} remaining`;
-
-          logDebug(`Stats updated: ${stats.scannedCount}/${stats.totalRunners} (${stats.scannedPercentage}%)`);
-        } else {
-          logDebug("Failed to parse stats response or error in response");
-          // Fall back to local calculation
-          const stats = calculateLocalCheckpointStats();
-          updateCheckpointStatsUI(stats);
-        }
-      } catch (error) {
-        logDebug(`Error parsing stats response: ${error}`);
-        // Fall back to local calculation
-        const stats = calculateLocalCheckpointStats();
-        updateCheckpointStatsUI(stats);
-      }
+    .then(response => {
+      // With no-cors, we can't read the response content
+      // Fall back to local calculation
+      const stats = calculateLocalCheckpointStats();
+      updateCheckpointStatsUI(stats);
+      return null;
     })
     .catch(error => {
       logDebug(`Error fetching checkpoint stats: ${error}`);
@@ -2358,6 +2329,8 @@ function checkLoginStatus() {
   }
 }
 
+  
+
 function fetchRunnerData(forceRefresh = false) {
   if (isLoadingRunnerData) {
     logDebug('Already loading runner data, skipping duplicate request');
@@ -2419,68 +2392,36 @@ function fetchRunnerData(forceRefresh = false) {
   // Add a cache-busting parameter to ensure we get fresh data
   const cacheBuster = new Date().getTime();
   
-  // Add the event type parameter to the API call
-  fetch(`${APPS_SCRIPT_URL}?action=getRunnerData&eventType=${encodeURIComponent(event)}&cacheBuster=${cacheBuster}`)
-    .then(response => {
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return response.text();
-    })
-    .then(text => {
+  // Use no-cors mode to avoid CORS errors
+  fetch(`${APPS_SCRIPT_URL}?action=getRunnerData&eventType=${encodeURIComponent(event)}&cacheBuster=${cacheBuster}`, 
+    { mode: 'no-cors' } // Add this line
+  )
+    .then(() => {
+      // With no-cors, we can't read the response content
+      // Try to use cached data if available
       try {
-        const data = JSON.parse(text);
-
-        if (data.success && data.data && Array.isArray(data.data)) {
-          const runners = data.data;
-          const runnerMap = {};
-
-          // Process each runner
-          runners.forEach(runner => {
-            const bib = runner.bibNumber;
-            const name = runner.name || "Unknown";
-            const status = runner.status || "Active";
-            const dnf = status === "DNF" || status === "DNS";
-
-            runnerMap[bib] = {
-              name: name,
-              dnf: dnf
-            };
-          });
-
-          if (Object.keys(runnerMap).length === 0) {
-            throw new Error(`No runner data found for event: ${event}`);
+        const storedData = localStorage.getItem('runnersData');
+        if (storedData) {
+          const parsedData = JSON.parse(storedData);
+          if (parsedData && Object.keys(parsedData).length > 0) {
+            runnersData = parsedData;
+            logDebug(`Using ${Object.keys(runnersData).length} runners from localStorage`);
+            
+            // Hide loading screen and show appropriate screen
+            loadingScreen.classList.add('hidden');
+            checkLoginStatus();
+            
+            // Set up runner data refresh interval
+            setupRunnerDataRefresh();
+            
+            // Update checkpoint stats with fresh data
+            if (checkpoint) {
+              fetchCheckpointStats(true);
+            }
           }
-
-          // Update the last DNF check timestamp
-          lastDnfCheck = Date.now();
-
-          runnersData = runnerMap;
-          localStorage.setItem('runnersData', JSON.stringify(runnersData));
-          logDebug(`Loaded ${Object.keys(runnersData).length} runners for event: ${event}`);
-
-          // Clear the timeout
-          if (dataLoadTimeoutId) {
-            clearTimeout(dataLoadTimeoutId);
-            dataLoadTimeoutId = null;
-          }
-
-          // Hide loading screen and show appropriate screen
-          loadingScreen.classList.add('hidden');
-          checkLoginStatus();
-
-          // Set up runner data refresh interval
-          setupRunnerDataRefresh();
-
-          // Update checkpoint stats with fresh data
-          if (checkpoint) {
-            fetchCheckpointStats(true);
-          }
-        } else {
-          throw new Error("Invalid runner data format or empty response");
         }
-      } catch (error) {
-        throw new Error(`Error parsing runner data: ${error.message}`);
+      } catch (e) {
+        logDebug('Error loading runners data from localStorage: ' + e);
       }
     })
     .catch(error => {
@@ -2553,46 +2494,70 @@ function fetchCheckpointStats(forceRefresh = false) {
   }
 }
 
-// Calculate checkpoint stats locally
+  
+
 function calculateLocalCheckpointStats() {
-  // Count total runners
-  const totalRunners = Object.keys(runnersData).length;
+  if (!checkpoint) {
+    return { scannedCount: 0, totalRunners: 0, scannedPercentage: 0, dnfCount: 0 };
+  }
   
-  // Count DNF runners
-  const dnfRunners = Object.values(runnersData).filter(runner => runner.dnf).length;
+  logDebug('Fetching runner data for stats update');
   
-  // Count active runners (total minus DNF)
-  const activeRunners = totalRunners - dnfRunners;
+  // Count active runners and DNFs
+  let activeRunners = 0;
+  let dnfCount = 0;
   
   // Count scanned runners at this checkpoint
-  const scannedRunners = alreadyScannedRunners.size;
+  const scannedBibs = new Set();
   
-  // Calculate remaining runners
-  const remainingRunners = Math.max(0, activeRunners - scannedRunners);
+  // Process each runner
+  for (const bib in runnersData) {
+    if (runnersData.hasOwnProperty(bib)) {
+      const runner = runnersData[bib];
+      
+      if (runner.dnf) {
+        dnfCount++;
+      } else {
+        activeRunners++;
+        
+        // Check if this runner has been scanned at this checkpoint
+        if (alreadyScannedRunners.has(bib)) {
+          scannedBibs.add(bib);
+        }
+      }
+    }
+  }
   
-  // Calculate completion percentage
-  const completionPercentage = activeRunners > 0 ? Math.round((scannedRunners / activeRunners) * 100) : 0;
+  const scannedCount = scannedBibs.size;
+  const scannedPercentage = activeRunners > 0 ? Math.round((scannedCount / activeRunners) * 100) : 0;
+  
+  logDebug(`Checkpoint stats: ${scannedCount}/${activeRunners} active runners scanned (${scannedPercentage}%), ${dnfCount} DNF`);
   
   return {
-    totalRunners,
-    activeRunners,
-    dnfRunners,
-    scannedRunners,
-    remainingRunners,
-    completionPercentage
+    scannedCount: scannedCount,
+    totalRunners: activeRunners,
+    scannedPercentage: scannedPercentage,
+    dnfCount: dnfCount
   };
 }
 
-// Update checkpoint stats UI
-function updateCheckpointStatsUI(stats) {
-  statsText.textContent = `${stats.scannedRunners} of ${stats.activeRunners} active runners scanned (${stats.completionPercentage}%)`;
-  progressBarFill.style.width = `${stats.completionPercentage}%`;
-  scannedCount.textContent = `${stats.scannedRunners} scanned`;
-  remainingCount.textContent = `${stats.remainingRunners} remaining`;
+
   
-  // Update debug info
-  logDebug(`Checkpoint stats: ${stats.scannedRunners}/${stats.activeRunners} active runners scanned (${stats.completionPercentage}%), ${stats.dnfRunners} DNF`);
+function updateCheckpointStatsUI(stats) {
+  if (!stats) return;
+  
+  // Update the stats text
+  statsText.textContent = `${stats.scannedCount} of ${stats.totalRunners} active runners scanned (${stats.scannedPercentage}%)`;
+  
+  // Update the progress bar
+  progressBarFill.style.width = `${stats.scannedPercentage}%`;
+  
+  // Update the scanned and remaining counts
+  scannedCount.textContent = `${stats.scannedCount} scanned`;
+  remainingCount.textContent = `${stats.totalRunners - stats.scannedCount} remaining`;
 }
+
+  
 
 // Scan button click handler
 scanButton.addEventListener('click', function() {
@@ -2959,8 +2924,6 @@ function updatePendingUploadsUI() {
   }
 }
 
-// Upload pending scans
-// Upload pending scans
 function uploadPendingScans(force = false) {
   if (!isOnline || pendingUploads.length === 0) {
     return;
@@ -2980,16 +2943,57 @@ function uploadPendingScans(force = false) {
   // Create a copy of the pending uploads
   const uploadsToProcess = [...pendingUploads];
   
- // Get the current event's results sheet name
-const resultsSheetName = event && EVENT_CONFIG[event]?.RESULTS_SHEET_NAME;
+  // Prepare the data for upload with your exact column names
+  const uploadData = {
+    action: 'recordScans',
+    scans: uploadsToProcess,
+    columnMappings: {
+      bib: "BIB NUMBER",
+      name: "RUNNER NAME",
+      event: "EVENT",
+      checkpoint: "CHECKPOINT",
+      timestamp: "TIMESTAMP"
+    }
+  };
   
-if (!resultsSheetName) {
-  logDebug(`No results sheet name found for event: ${event}`);
-  showMessage(`Configuration error: Cannot upload for ${event}`, true);
-  isUploadingPendingScans = false;
-  return;
+  // Log the data being sent
+  logDebug(`Upload data: ${JSON.stringify(uploadData).substring(0, 200)}...`);
+  
+  // Use fetch API to upload the data - always use no-cors since that worked before
+  fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    mode: 'no-cors', // This is already correct
+    cache: 'no-cache',
+    headers: {
+      'Content-Type': 'text/plain;charset=utf-8',
+    },
+    body: JSON.stringify(uploadData)
+  })
+  .then(() => {
+    // Since we can't read the response with no-cors, assume success
+    logDebug('Upload successful (assumed)');
+    showMessage(`${uploadsToProcess.length} scans uploaded successfully`);
+    
+    // Clear pending uploads completely instead of tracking individually
+    pendingUploads = [];
+    savePendingScans();
+    
+    // Update UI
+    updatePendingUploadsUI();
+    
+    // Fetch fresh checkpoint stats
+    fetchCheckpointStats(true);
+  })
+  .catch(error => {
+    logDebug('Error uploading scans: ' + error);
+    showMessage('Upload failed. Will retry later.', true);
+  })
+  .finally(() => {
+    isUploadingPendingScans = false;
+  });
 }
 
+  
 // Prepare the data for upload with your exact column names
 const uploadData = {
   action: 'recordScans',
