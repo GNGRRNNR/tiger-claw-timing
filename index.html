@@ -1022,6 +1022,10 @@ self.addEventListener("install", (event) => {
 
 const DATA_LOAD_TIMEOUT = 30000; // 30 seconds timeout for data loading
 
+
+const checkpointStatsContent = document.getElementById('checkpoint-stats');
+const statsRefreshing = document.getElementById('stats-refreshing');
+
   
 
 // Check for URL parameters (for QR code login)
@@ -1198,20 +1202,6 @@ function calculateLocalCheckpointStats() {
   }
 }
 
-// Add this function to update the checkpoint stats UI
-function updateCheckpointStatsUI(stats) {
-  if (!statsText || !progressBarFill || !scannedCount || !remainingCount) {
-    logDebug("Stats UI elements not found")
-    return
-  }
-
-  statsText.textContent = `${stats.scannedCount} of ${stats.totalRunners} active runners scanned (${stats.scannedPercentage}%)`
-  progressBarFill.style.width = `${stats.scannedPercentage}%`
-  scannedCount.textContent = `${stats.scannedCount} scanned`
-  remainingCount.textContent = `${stats.totalRunners - stats.scannedCount} remaining`
-
-  logDebug(`Stats updated: ${stats.scannedCount}/${stats.totalRunners} (${stats.scannedPercentage}%)`)
-}
 
 // Add this function to fetch checkpoint stats
 // Assuming fetchCheckpointStatsFromSpreadsheet is defined elsewhere and handles online data fetching
@@ -1660,7 +1650,7 @@ function handleLogin() {
 }
   
 
-/ Update your showScannerScreen function to properly handle fetchCheckpointStats
+// Update your showScannerScreen function to properly handle fetchCheckpointStats
 function showScannerScreen() {
   loginScreen.classList.add("hidden")
   loadingScreen.classList.add("hidden")
@@ -1775,7 +1765,6 @@ function fetchAlreadyScannedRunners() {
   
 // Replace your fetchCheckpointStatsFromSpreadsheet function with this one
 let isRefreshingStats = false // Declare isRefreshingStats
-const APPS_SCRIPT_URL = "" // Declare APPS_SCRIPT_URL
 const checkpointStatsContent = document.createElement("div") // Declare checkpointStatsContent
 
 function fetchCheckpointStatsFromSpreadsheet() {
@@ -1848,19 +1837,6 @@ function fetchCheckpointStatsFromSpreadsheet() {
     })
 }
 
-// Placeholder functions - replace with actual implementations
-function calculateLocalCheckpointStats() {
-  console.warn("calculateLocalCheckpointStats() is a placeholder. Implement the actual logic.")
-  return {}
-}
-
-function updateCheckpointStatsUI(stats) {
-  console.warn("updateCheckpointStatsUI() is a placeholder. Implement the actual logic.")
-}
-
-function logDebug(message) {
-  console.log(message)
-}
 
 
 
@@ -2560,7 +2536,6 @@ const loadingScreen = document.getElementById("loadingScreen") // Example, repla
 const loginScreen = document.getElementById("loginScreen") // Example, replace with actual element
 const scannerScreen = document.getElementById("scannerScreen") // Example, replace with actual element
 const loadingError = document.getElementById("loadingError") // Example, replace with actual element
-const APPS_SCRIPT_URL = "" // Replace with actual URL
 const DATA_LOAD_TIMEOUT = 5000 // Replace with actual timeout value
 const event = "default_event" // Replace with actual event
 const checkpoint = null // Replace with actual checkpoint
