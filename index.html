@@ -2994,59 +2994,6 @@ function uploadPendingScans(force = false) {
 }
 
   
-// Prepare the data for upload with your exact column names
-const uploadData = {
-  action: 'recordScans',
-  scans: uploadsToProcess,
-  sheetId: RESULTS_SHEET_ID,
-  sheetName: resultsSheetName, // Pass the correct sheet name
-  columnMappings: {
-    bib: "BIB NUMBER",
-    name: "RUNNER NAME",
-    event: "EVENT",
-    checkpoint: "CHECKPOINT",
-    timestamp: "TIMESTAMP"
-  }
-};
-  
-  
-  // Log the data being sent
-  logDebug(`Upload data: ${JSON.stringify(uploadData).substring(0, 200)}...`);
-  
-  // Use fetch API to upload the data - always use no-cors since that worked before
-  fetch(APPS_SCRIPT_URL, {
-    method: 'POST',
-    mode: 'no-cors', // Use no-cors as it worked before
-    cache: 'no-cache',
-    headers: {
-      'Content-Type': 'text/plain;charset=utf-8',
-    },
-    body: JSON.stringify(uploadData)
-  })
-  .then(() => {
-    // Since we can't read the response with no-cors, assume success
-    logDebug('Upload successful (assumed)');
-    showMessage(`${uploadsToProcess.length} scans uploaded successfully`);
-    
-    // Clear pending uploads completely instead of tracking individually
-    pendingUploads = [];
-    savePendingScans();
-    
-    // Update UI
-    updatePendingUploadsUI();
-    
-    // Fetch fresh checkpoint stats
-    fetchCheckpointStats(true);
-  })
-  .catch(error => {
-    logDebug('Error uploading scans: ' + error);
-    showMessage('Upload failed. Will retry later.', true);
-  })
-  .finally(() => {
-    isUploadingPendingScans = false;
-  });
-
-  
   
 
 // Show message
