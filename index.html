@@ -961,17 +961,6 @@ let persistentInstallBtn = null; // Store the persistent install button element
 let event = '';
 
 
-
-let isLoadingRunnerData = false
-let dataLoadAttempted = false
-let runnersData = {}
-let loadingScreen // This should be assigned the actual loading screen element
-let loginScreen // This should be assigned the actual login screen element
-let scannerScreen // This should be assigned the actual scanner screen element
-let loadingError // This should be assigned the actual loading error element
-let dataLoadTimeoutId
-let lastDnfCheck
-
 // Declare variables that were previously undeclared
 let DATA_LOAD_TIMEOUT
 let EVENT_CONFIG
@@ -2274,8 +2263,11 @@ function loadPendingScans() {
 
 // Save pending scans to localStorage
 function savePendingScans() {
-  // Implementation for savePendingScans
-  console.log("savePendingScans function called")
+  try {
+    localStorage.setItem('pendingUploads', JSON.stringify(pendingUploads));
+  } catch (error) {
+    logDebug('Error saving pending scans to localStorage: ' + error);
+  }
 }
 
 
@@ -2366,7 +2358,9 @@ function updateConnectionStatus() {
     statusText.style.color = '#dc3545';
   }
 }
+  
 
+// CHANGE THIS BLOCK (approximately line 1200-1250)
 function checkLoginStatus() {
   const savedEvent = localStorage.getItem('tigerClawEvent');
   const savedCheckpoint = localStorage.getItem('tigerClawCheckpoint');
@@ -2562,117 +2556,8 @@ function setupRunnerDataRefresh() {
 
 
   
-
-// Fix for the fetchCheckpointStats function
-function fetchCheckpointStats(force = false) {
-  if (!force && !isOnline) {
-    return
-  }
-
-  logDebug(`Fetching checkpoint stats for ${event} at ${checkpoint}`)
-
-  return fetch(
-    APPS_SCRIPT_URL +
-      "?action=getStats&eventType=" +
-      encodeURIComponent(event) +
-      "&checkpoint=" +
-      encodeURIComponent(checkpoint),
-  )
-    .then((response) => {
-      if (!response.ok) {
-        throw new Error("Network response was not ok")
-      }
-      return response.json()
-    })
-    .then((data) => {
-      if (data && data.stats) {
-        // Format the stats into a readable string
-        let statsString = `<strong>Event:</strong> ${event}<br>`
-        for (const key in data.stats) {
-          if (data.stats.hasOwnProperty(key)) {
-            statsString += `<strong>${key}:</strong> ${data.stats[key]}<br>`
-          }
-        }
-        checkpointStatsContent.innerHTML = statsString
-        logDebug(`Checkpoint stats loaded successfully for ${event}`)
-      } else {
-        throw new Error("Invalid data format received for checkpoint stats")
-      }
-    })
-    .catch((error) => {
-      console.error("Error fetching checkpoint stats:", error)
-      showMessage("Failed to load checkpoint stats. Check your connection and try again.", true)
-    })
-}
-
   
 
-function calculateLocalCheckpointStats() {
-  // Declare variables that were previously undeclared
-  let checkpoint
-  let event
-  let runnersData
-  let alreadyScannedRunners
-
-  // Mock logDebug function if it's not available
-  function logDebug(message) {
-    if (typeof console !== "undefined" && typeof console.debug === "function") {
-      console.debug(message)
-    } else if (typeof console !== "undefined" && typeof console.log === "function") {
-      console.log(message)
-    }
-  }
-
-  if (!checkpoint || !event) {
-    return { scannedCount: 0, totalRunners: 0, scannedPercentage: 0, dnfCount: 0 }
-  }
-
-  logDebug(`Calculating local stats for ${event} at ${checkpoint}`)
-
-  // Count active runners and DNFs for this specific event
-  let activeRunners = 0
-  let dnfCount = 0
-
-  // Count scanned runners at this checkpoint
-  const scannedBibs = new Set()
-
-  // Process each runner
-  for (const bib in runnersData) {
-    if (runnersData.hasOwnProperty(bib)) {
-      const runner = runnersData[bib]
-
-      // Make sure we're only counting runners for the current event
-      if (runner.event !== event && runner.event !== undefined) {
-        continue
-      }
-
-      if (runner.dnf) {
-        dnfCount++
-      } else {
-        activeRunners++
-
-        // Check if this runner has been scanned at this checkpoint
-        if (alreadyScannedRunners.has(bib)) {
-          scannedBibs.add(bib)
-        }
-      }
-    }
-  }
-
-  const scannedCount = scannedBibs.size
-  const scannedPercentage = activeRunners > 0 ? Math.round((scannedCount / activeRunners) * 100) : 0
-
-  logDebug(
-    `${event} checkpoint stats: ${scannedCount}/${activeRunners} active runners scanned (${scannedPercentage}%), ${dnfCount} DNF`,
-  )
-
-  return {
-    scannedCount: scannedCount,
-    totalRunners: activeRunners,
-    scannedPercentage: scannedPercentage,
-    dnfCount: dnfCount,
-  }
-}
   
 
 
@@ -3250,8 +3135,8 @@ locationSelect.value = '';
     loginScreen.classList.remove('hidden');
     
     // Clear form fields
-    checkpointSelect.value = '';
-    passwordInput.value = '';
+locationSelect.value = '';
+passwordInput.value = '';
     
     // Clear any error messages
     loginError.classList.add('hidden');
