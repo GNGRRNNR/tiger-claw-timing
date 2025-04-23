@@ -961,7 +961,7 @@ let event = '';
   
 // Constants
 const CORRECT_PASSWORD = "threeloops";
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzLzt-7aNjfxmH_XtZ8qKsGJiq_jx79Ahse4c_uB93IzSVErIkbVJoEckrCAY686E0Q/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwO_8raBc9Y9iz6leH9UOK4fkLpBbWIrEmdrFSH-WXHtkHOtnCjpKariRYf88aVZuA/exec";
 const RUNNER_DATA_REFRESH_INTERVAL = 2 * 60 * 1000; // 2 minutes
 const CHECKPOINT_STATS_REFRESH_INTERVAL = 30 * 1000; // 30 seconds
 const DNF_CHECK_INTERVAL = 60 * 1000; // 1 minute
@@ -1225,108 +1225,145 @@ function fetchCheckpointStats(force = false) {
 
 
 
-// Fix for the uploadPendingScans function
 function uploadPendingScans(force = false) {
   if (!isOnline || pendingUploads.length === 0) {
-    return
+    return;
   }
-
+  
   // Allow forced uploads to bypass the isUploadingPendingScans check
   if (!force && isUploadingPendingScans) {
-    return
+    return;
   }
-
+  
   // Set uploading flag
-  isUploadingPendingScans = true
-
-  logDebug(`Uploading ${pendingUploads.length} pending scans`)
-  showMessage(`Uploading ${pendingUploads.length} scans...`)
-
-  // Create a copy of the pending uploads
-  const uploadsToProcess = [...pendingUploads]
-
+  isUploadingPendingScans = true;
+  
+  logDebug(`Uploading ${pendingUploads.length} pending scans`);
+  showMessage(`Uploading ${pendingUploads.length} scans...`);
+  
   // Group scans by event type
-  const scansByEvent = {}
-  uploadsToProcess.forEach((scan) => {
-    if (!scansByEvent[scan.event]) {
-      scansByEvent[scan.event] = []
-    }
-    scansByEvent[scan.event].push(scan)
-  })
-
-  // Process each event's scans separately
-  const uploadPromises = Object.keys(scansByEvent).map((eventType) => {
-    const eventScans = scansByEvent[eventType]
-    const eventConfig = EVENT_CONFIG[eventType]
-
-    if (!eventConfig) {
-      logDebug(`Invalid event type: ${eventType}`)
-      return Promise.resolve()
-    }
-
-    // Prepare the data for upload with your exact column names
-    const uploadData = {
+  const ascentScans = pendingUploads.filter(scan => scan.event === "ASCENT");
+  const fiftyKScans = pendingUploads.filter(scan => scan.event === "50K");
+  
+  logDebug(`Found ${ascentScans.length} ASCENT scans and ${fiftyKScans.length} 50K scans`);
+  
+  // Create separate upload promises for each event type
+  const uploadPromises = [];
+  
+  // Upload ASCENT scans
+  if (ascentScans.length > 0) {
+    // Format ASCENT scans for the ASCENT RESULTS sheet structure
+    const formattedAscentScans = ascentScans.map(scan => {
+      // Create a formatted finish time (HH:MM:SS) for display
+      const scanTime = new Date(scan.timestamp);
+      const finishTime = scanTime.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+      
+      return {
+        ...scan,
+        status: "FINISHED", // Default status for finishers
+        finishTime: finishTime // Add formatted finish time
+      };
+    });
+    
+    const ascentUploadData = {
       action: "recordScans",
-      eventType: eventType,
-      scans: eventScans,
+      eventType: "ASCENT",
+      scans: formattedAscentScans,
+      sheetName: "ASCENT RESULTS",
       columnMappings: {
+        timestamp: "TIMESTAMP",
         bib: "BIB NUMBER",
         name: "RUNNER NAME",
-        event: "EVENT",
-        checkpoint: "CHECKPOINT",
+        status: "STATUS",
+        finishTime: "FINISH TIME"
+      }
+    };
+    
+    uploadPromises.push(
+      fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        cache: 'no-cache',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
+        body: JSON.stringify(ascentUploadData)
+      }).then(() => {
+        logDebug('ASCENT upload successful (assumed)');
+        return ascentScans.length;
+      }).catch(error => {
+        logDebug('Error uploading ASCENT scans: ' + error);
+        return 0;
+      })
+    );
+  }
+  
+  // Upload 50K scans
+  if (fiftyKScans.length > 0) {
+    const fiftyKUploadData = {
+      action: "recordScans",
+      eventType: "50K",
+      scans: fiftyKScans,
+      sheetName: "50k CHECKPOINT SCANS",
+      columnMappings: {
         timestamp: "TIMESTAMP",
-        finishTime: "FINISH TIME", // Add finish time mapping
-      },
-    }
-
-    // Log the data being sent
-    logDebug(`Upload data for ${eventType}: ${JSON.stringify(uploadData).substring(0, 200)}...`)
-
-    // Use fetch API to upload the data
-    return fetch(APPS_SCRIPT_URL, {
-      method: "POST",
-      mode: "no-cors",
-      cache: "no-cache",
-      headers: {
-        "Content-Type": "text/plain;charset=utf-8",
-      },
-      body: JSON.stringify(uploadData),
-    })
-      .then(() => {
-        logDebug(`Upload for ${eventType} successful (assumed)`)
-        return eventScans.length
+        bib: "BIB NUMBER",
+        name: "RUNNER NAME",
+        checkpoint: "CHECKPOINT"
+      }
+    };
+    
+    uploadPromises.push(
+      fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        cache: 'no-cache',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
+        body: JSON.stringify(fiftyKUploadData)
+      }).then(() => {
+        logDebug('50K upload successful (assumed)');
+        return fiftyKScans.length;
+      }).catch(error => {
+        logDebug('Error uploading 50K scans: ' + error);
+        return 0;
       })
-      .catch((error) => {
-        logDebug(`Error uploading ${eventType} scans: ${error}`)
-        throw error
-      })
-  })
-
-  // Wait for all uploads to complete
+    );
+  }
+  
+  // Process all upload promises
   Promise.all(uploadPromises)
-    .then((results) => {
-      const totalUploaded = results.reduce((sum, count) => sum + (count || 0), 0)
-      logDebug(`All uploads completed: ${totalUploaded} scans uploaded`)
-      showMessage(`${totalUploaded} scans uploaded successfully`)
-
+    .then(results => {
+      const totalUploaded = results.reduce((sum, count) => sum + count, 0);
+      logDebug(`Successfully uploaded ${totalUploaded} scans`);
+      showMessage(`${totalUploaded} scans uploaded successfully`);
+      
       // Clear pending uploads
-      pendingUploads = []
-      savePendingScans()
-
+      pendingUploads = [];
+      savePendingScans();
+      
       // Update UI
-      updatePendingUploadsUI()
-
+      updatePendingUploadsUI();
+      
       // Fetch fresh checkpoint stats
-      fetchCheckpointStats(true)
+      fetchCheckpointStats(true);
     })
-    .catch((error) => {
-      logDebug("Error in upload process: " + error)
-      showMessage("Some uploads failed. Will retry later.", true)
+    .catch(error => {
+      logDebug('Error in upload process: ' + error);
+      showMessage('Upload failed. Will retry later.', true);
     })
     .finally(() => {
-      isUploadingPendingScans = false
-    })
+      isUploadingPendingScans = false;
+    });
 }
+
+  
   
 
 function setupPersistentInstallButton(btnElement) {
@@ -2817,186 +2854,116 @@ manualSubmitButton.addEventListener('click', function() {
   bibInput.value = '';
 });
 
+
+  
 function processScan(bibNumber) {
-  // Declare variables that were previously undeclared
-  // These would ideally be imported or defined elsewhere in a larger application context
-  // For this example, we'll initialize them as empty objects/strings
-  if (typeof runnersData === "undefined") {
-    runnersData = {}
-  }
-  if (typeof showMessage === "undefined") {
-    showMessage = (message, isError) => {
-      console.log(message)
-    } // Placeholder
-  }
-  if (typeof checkpoint === "undefined") {
-    checkpoint = ""
-  }
-  if (typeof processedScans === "undefined") {
-    processedScans = {}
-  }
-  if (typeof scanTimestamps === "undefined") {
-    scanTimestamps = {}
-  }
-  if (typeof recentScans === "undefined") {
-    recentScans = []
-  }
-  if (typeof pendingUploads === "undefined") {
-    pendingUploads = []
-  }
-  if (typeof alreadyScannedRunners === "undefined") {
-    alreadyScannedRunners = new Set()
-  }
-  if (typeof saveProcessedScans === "undefined") {
-    saveProcessedScans = () => {}
-  }
-  if (typeof saveScanTimestamps === "undefined") {
-    saveScanTimestamps = () => {}
-  }
-  if (typeof localStorage === "undefined") {
-    localStorage = {
-      setItem: () => {},
-      getItem: () => {},
-    }
-  }
-  if (typeof updateRecentScansUI === "undefined") {
-    updateRecentScansUI = () => {}
-  }
-  if (typeof flashOverlay === "undefined") {
-    flashOverlay = { style: { display: "none" } }
-  }
-  if (typeof savePendingScans === "undefined") {
-    savePendingScans = () => {}
-  }
-  if (typeof updatePendingUploadsUI === "undefined") {
-    updatePendingUploadsUI = () => {}
-  }
-  if (typeof isOnline === "undefined") {
-    isOnline = false
-  }
-  if (typeof uploadPendingScans === "undefined") {
-    uploadPendingScans = () => {}
-  }
-  if (typeof fetchCheckpointStats === "undefined") {
-    fetchCheckpointStats = () => {}
-  }
-  if (typeof logDebug === "undefined") {
-    logDebug = (message) => {
-      console.log(message)
-    }
-  }
-  if (typeof event === "undefined") {
-    event = "default"
-  }
-
-  // Check if this is a valid bib number for the current event
+  // Check if this is a valid bib number
   if (!runnersData[bibNumber]) {
-    showMessage(`Bib #${bibNumber} not found in ${event} runner data`, true)
-    return
+    showMessage(`Bib #${bibNumber} not found in runner data`, true);
+    return;
   }
-
+  
   // Check if the runner is marked as DNF
   if (runnersData[bibNumber].dnf) {
-    showMessage(`Bib #${bibNumber} is marked as DNF`, true)
-    return
+    showMessage(`Bib #${bibNumber} is marked as DNF`, true);
+    return;
   }
-
+  
   // Create scan key
-  const scanKey = `${bibNumber}-${checkpoint}`
-
+  const scanKey = `${bibNumber}-${checkpoint}`;
+  
   // Check if we've already processed this scan
-  let isRescan = false
+  let isRescan = false;
   if (processedScans[scanKey]) {
-    isRescan = true
-    const lastScanTime = new Date(scanTimestamps[scanKey]).toLocaleTimeString()
-    logDebug(`Rescan of Bib #${bibNumber} (previous scan at ${lastScanTime})`)
-
+    isRescan = true;
+    const lastScanTime = new Date(scanTimestamps[scanKey]).toLocaleTimeString();
+    logDebug(`Rescan of Bib #${bibNumber} (previous scan at ${lastScanTime})`);
+    
     // Remove previous scan from recent scans
-    recentScans = recentScans.filter((scan) => !(scan.bib === bibNumber && scan.checkpoint === checkpoint))
-
+    recentScans = recentScans.filter(scan => !(scan.bib === bibNumber && scan.checkpoint === checkpoint));
+    
     // Find and remove previous scan from pending uploads
-    const previousScanIndex = pendingUploads.findIndex(
-      (scan) => scan.bib === bibNumber && scan.checkpoint === checkpoint,
-    )
+    const previousScanIndex = pendingUploads.findIndex(scan => scan.bib === bibNumber && scan.checkpoint === checkpoint);
     if (previousScanIndex !== -1) {
-      pendingUploads.splice(previousScanIndex, 1)
-      savePendingScans()
+      pendingUploads.splice(previousScanIndex, 1);
+      savePendingScans();
     }
   }
-
+  
   // Mark as processed and update timestamp
-  processedScans[scanKey] = true
-  scanTimestamps[scanKey] = new Date().toISOString()
-  saveProcessedScans()
-  saveScanTimestamps()
-
+  processedScans[scanKey] = true;
+  scanTimestamps[scanKey] = new Date().toISOString();
+  saveProcessedScans();
+  saveScanTimestamps();
+  
   // Add to already scanned runners set
-  alreadyScannedRunners.add(bibNumber)
-
+  alreadyScannedRunners.add(bibNumber);
+  
   // Create scan record
-  const timestamp = new Date().toISOString()
-
+  const timestamp = new Date().toISOString();
+  
   // Format a human-readable finish time (HH:MM:SS) for display
-  const now = new Date()
-  const finishTime = now.toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  })
-
+  const now = new Date();
+  const finishTime = now.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+  
   const scan = {
     bib: bibNumber,
     name: runnersData[bibNumber].name,
     event: event,
     checkpoint: checkpoint,
     timestamp: timestamp,
-    finishTime: finishTime, // Add formatted finish time
+    finishTime: finishTime, // Add formatted finish time for ASCENT
+    status: event === "ASCENT" ? "FINISHED" : undefined, // Add status for ASCENT
     uploaded: false,
-    isRescan: isRescan,
-  }
-
+    isRescan: isRescan
+  };
+  
   // Add to recent scans
-  recentScans.unshift(scan)
+  recentScans.unshift(scan);
   if (recentScans.length > 50) {
-    recentScans.pop()
+    recentScans.pop();
   }
-
+  
   // Save recent scans to localStorage
   try {
-    localStorage.setItem("recentScans", JSON.stringify(recentScans))
+    localStorage.setItem('recentScans', JSON.stringify(recentScans));
   } catch (error) {
-    logDebug("Error saving recent scans to localStorage: " + error)
+    logDebug('Error saving recent scans to localStorage: ' + error);
   }
-
+  
   // Update UI
-  updateRecentScansUI()
-
+  updateRecentScansUI();
+  
   // Show success message
   if (isRescan) {
-    showMessage(`Updated scan for Bib #${bibNumber}: ${runnersData[bibNumber].name}`)
+    showMessage(`Updated scan for Bib #${bibNumber}: ${runnersData[bibNumber].name}`);
   } else {
-    showMessage(`Scanned Bib #${bibNumber}: ${runnersData[bibNumber].name}`)
+    showMessage(`Scanned Bib #${bibNumber}: ${runnersData[bibNumber].name}`);
   }
-
+  
   // Flash the overlay
-  flashOverlay.style.display = "block"
+  flashOverlay.style.display = 'block';
   setTimeout(() => {
-    flashOverlay.style.display = "none"
-  }, 300)
-
+    flashOverlay.style.display = 'none';
+  }, 300);
+  
   // Add to pending uploads
-  pendingUploads.push(scan)
-  savePendingScans()
-  updatePendingUploadsUI()
-
+  pendingUploads.push(scan);
+  savePendingScans();
+  updatePendingUploadsUI();
+  
   // Try to upload immediately if online
   if (isOnline) {
-    uploadPendingScans(true) // Force upload
+    uploadPendingScans(true); // Force upload
   }
-
+  
   // Update checkpoint stats
-  fetchCheckpointStats(true) // Force refresh stats
+  fetchCheckpointStats();
 }
 
 
