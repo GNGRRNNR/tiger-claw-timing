@@ -1766,14 +1766,18 @@ function fetchCheckpointStatsFromSpreadsheet() {
     // If offline, calculate stats locally
     const stats = calculateLocalCheckpointStats();
     updateCheckpointStatsUI(stats);
-    statsRefreshing.classList.add("hidden");
+    if (statsRefreshing) {
+      statsRefreshing.classList.add("hidden");
+    }
     isRefreshingStats = false;
     return;
   }
 
   logDebug(`Fetching checkpoint stats from spreadsheet for: ${checkpoint} (Event: ${event})`);
   isRefreshingStats = true;
-  statsRefreshing.classList.remove("hidden");
+  if (statsRefreshing) {
+    statsRefreshing.classList.remove("hidden");
+  }
 
   // Use the API endpoint to get stats directly
   fetch(
@@ -1798,7 +1802,9 @@ function fetchCheckpointStatsFromSpreadsheet() {
               statsString += `<strong>${key}:</strong> ${data.stats[key]}<br>`;
             }
           }
-          checkpointStatsContent.innerHTML = statsString;
+          if (checkpointStatsContent) {
+            checkpointStatsContent.innerHTML = statsString;
+          }
           logDebug("Checkpoint stats loaded successfully");
         } else {
           logDebug("Failed to parse stats response or error in response");
@@ -1821,7 +1827,9 @@ function fetchCheckpointStatsFromSpreadsheet() {
     })
     .finally(() => {
       // Hide the refreshing indicator
-      statsRefreshing.classList.add("hidden");
+      if (statsRefreshing) {
+        statsRefreshing.classList.add("hidden");
+      }
       isRefreshingStats = false;
     });
 }
