@@ -961,7 +961,7 @@ let event = '';
   
 // Constants
 const CORRECT_PASSWORD = "threeloops";
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwO_8raBc9Y9iz6leH9UOK4fkLpBbWIrEmdrFSH-WXHtkHOtnCjpKariRYf88aVZuA/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwkozzQzrKU2wWnqgMpegNyFAB9JrLOsuQUGYJ8LYXeYrncqVepEBZBqndFsEv-Ct7z/exec";
 const RUNNER_DATA_REFRESH_INTERVAL = 2 * 60 * 1000; // 2 minutes
 const CHECKPOINT_STATS_REFRESH_INTERVAL = 30 * 1000; // 30 seconds
 const DNF_CHECK_INTERVAL = 60 * 1000; // 1 minute
@@ -2464,145 +2464,149 @@ function checkLoginStatus() {
 
 
 
-// Update your fetchRunnerData function to properly handle the ASCENT event
+// Update the fetchRunnerData function
 function fetchRunnerData(forceRefresh = false) {
   if (isLoadingRunnerData) {
-    logDebug("Already loading runner data, skipping duplicate request")
-    return
+    logDebug("Already loading runner data, skipping duplicate request");
+    return;
   }
-
+  
   // Set loading flag
-  isLoadingRunnerData = true
-  dataLoadAttempted = true
-
+  isLoadingRunnerData = true;
+  dataLoadAttempted = true;
+  
   // Show loading screen if we don't have any data yet
   if (Object.keys(runnersData).length === 0) {
-    loadingScreen.classList.remove("hidden")
-    loginScreen.classList.add("hidden")
-    scannerScreen.classList.add("hidden")
+    loadingScreen.classList.remove("hidden");
+    loginScreen.classList.add("hidden");
+    scannerScreen.classList.add("hidden");
   }
-
+  
   // Hide any previous error
-  loadingError.classList.add("hidden")
-
-  logDebug(`Fetching runner data for ${event}`)
-
+  loadingError.classList.add("hidden");
+  
+  // Log the current event to debug
+  logDebug(`Fetching runner data for event: "${event}"`);
+  
   // Set a timeout to show an error if the data doesn't load
   if (dataLoadTimeoutId) {
-    clearTimeout(dataLoadTimeoutId)
+    clearTimeout(dataLoadTimeoutId);
   }
-
+  
   dataLoadTimeoutId = setTimeout(() => {
     if (isLoadingRunnerData) {
-      logDebug("Data loading timed out")
-      isLoadingRunnerData = false
-
+      logDebug("Data loading timed out");
+      isLoadingRunnerData = false;
+      
       // Show error if we don't have any data
       if (Object.keys(runnersData).length === 0) {
-        loadingError.classList.remove("hidden")
+        loadingError.classList.remove("hidden");
       } else {
         // We have some data, so continue with what we have
-        loadingScreen.classList.add("hidden")
-        checkLoginStatus()
+        loadingScreen.classList.add("hidden");
+        checkLoginStatus();
       }
     }
-  }, DATA_LOAD_TIMEOUT)
-
+  }, DATA_LOAD_TIMEOUT);
+  
   // Add a cache-busting parameter to ensure we get fresh data
-  const cacheBuster = new Date().getTime()
-
+  const cacheBuster = new Date().getTime();
+  
   // Use the API to get runner data for the specific event
   fetch(`${APPS_SCRIPT_URL}?action=getRunnerData&eventType=${encodeURIComponent(event)}&cacheBuster=${cacheBuster}`)
-    .then((response) => {
+    .then(response => {
       if (!response.ok) {
-        throw new Error("Network response was not ok")
+        throw new Error("Network response was not ok");
       }
-      return response.json()
+      return response.json();
     })
-    .then((data) => {
+    .then(data => {
+      logDebug(`Received runner data response: ${JSON.stringify(data).substring(0, 200)}...`);
+      
       if (data && data.success && data.data && Array.isArray(data.data)) {
-        const runners = data.data
-        const runnerMap = {}
-
+        const runners = data.data;
+        const runnerMap = {};
+        
         // Process each runner
-        runners.forEach((runner) => {
-          const bib = runner.bibNumber
-          const name = runner.name || "Unknown"
-          const status = runner.status || "Active"
-          const dnf = status === "DNF" || status === "DNS"
-
+        runners.forEach(runner => {
+          const bib = runner.bibNumber;
+          const name = runner.name || "Unknown";
+          const status = runner.status || "Active";
+          const dnf = status === "DNF" || status === "DNS";
+          
           runnerMap[bib] = {
             name: name,
             dnf: dnf,
-          }
-        })
-
+            event: event // Store the event with each runner
+          };
+        });
+        
         if (Object.keys(runnerMap).length === 0) {
-          throw new Error(`No runner data found for event: ${event}`)
+          throw new Error(`No runner data found for event: ${event}`);
         }
-
+        
         // Update the last DNF check timestamp
-        lastDnfCheck = Date.now()
-
-        runnersData = runnerMap
-        localStorage.setItem(`runnersData_${event}`, JSON.stringify(runnersData))
-        logDebug(`Loaded ${Object.keys(runnersData).length} runners for event: ${event}`)
-
+        lastDnfCheck = Date.now();
+        
+        runnersData = runnerMap;
+        localStorage.setItem(`runnersData_${event}`, JSON.stringify(runnersData));
+        logDebug(`Loaded ${Object.keys(runnersData).length} runners for event: ${event}`);
+        
         // Clear the timeout
         if (dataLoadTimeoutId) {
-          clearTimeout(dataLoadTimeoutId)
-          dataLoadTimeoutId = null
+          clearTimeout(dataLoadTimeoutId);
+          dataLoadTimeoutId = null;
         }
-
+        
         // Hide loading screen and show appropriate screen
-        loadingScreen.classList.add("hidden")
-        checkLoginStatus()
-
+        loadingScreen.classList.add("hidden");
+        checkLoginStatus();
+        
         // Set up runner data refresh interval
-        setupRunnerDataRefresh()
-
+        setupRunnerDataRefresh();
+        
         // Update checkpoint stats with fresh data
         if (checkpoint) {
-          fetchCheckpointStats(true)
+          fetchCheckpointStats(true);
         }
       } else {
-        throw new Error("Invalid runner data format or empty response")
+        throw new Error("Invalid runner data format or empty response");
       }
     })
-    .catch((error) => {
-      logDebug("Error fetching runner data: " + error)
-
+    .catch(error => {
+      logDebug("Error fetching runner data: " + error);
+      
       // If we have cached data, use that
       try {
-        const storedData = localStorage.getItem(`runnersData_${event}`)
+        const storedData = localStorage.getItem(`runnersData_${event}`);
         if (storedData) {
-          const parsedData = JSON.parse(storedData)
+          const parsedData = JSON.parse(storedData);
           if (parsedData && Object.keys(parsedData).length > 0) {
-            runnersData = parsedData
-            logDebug(`Using ${Object.keys(runnersData).length} runners from localStorage after fetch error`)
-
+            runnersData = parsedData;
+            logDebug(`Using ${Object.keys(runnersData).length} runners from localStorage after fetch error`);
+            
             // Hide loading screen and show appropriate screen
-            loadingScreen.classList.add("hidden")
-            checkLoginStatus()
-            return
+            loadingScreen.classList.add("hidden");
+            checkLoginStatus();
+            return;
           }
         }
       } catch (e) {
-        logDebug("Error loading runners data from localStorage: " + e)
+        logDebug("Error loading runners data from localStorage: " + e);
       }
-
+      
       // Show error if we don't have any data
       if (Object.keys(runnersData).length === 0) {
-        loadingError.classList.remove("hidden")
+        loadingError.classList.remove("hidden");
       } else {
         // We have some data, so continue with what we have
-        loadingScreen.classList.add("hidden")
-        checkLoginStatus()
+        loadingScreen.classList.add("hidden");
+        checkLoginStatus();
       }
     })
     .finally(() => {
-      isLoadingRunnerData = false
-    })
+      isLoadingRunnerData = false;
+    });
 }
 
   
@@ -2857,9 +2861,12 @@ manualSubmitButton.addEventListener('click', function() {
 
   
 function processScan(bibNumber) {
+  // Log the current event and checkpoint for debugging
+  logDebug(`Processing scan for bib #${bibNumber} at ${checkpoint} for event ${event}`);
+  
   // Check if this is a valid bib number
   if (!runnersData[bibNumber]) {
-    showMessage(`Bib #${bibNumber} not found in runner data`, true);
+    showMessage(`Bib #${bibNumber} not found in ${event} runner data`, true);
     return;
   }
   
@@ -2914,14 +2921,17 @@ function processScan(bibNumber) {
   const scan = {
     bib: bibNumber,
     name: runnersData[bibNumber].name,
-    event: event,
+    event: event, // Use the currently selected event, not based on bib number
     checkpoint: checkpoint,
     timestamp: timestamp,
-    finishTime: finishTime, // Add formatted finish time for ASCENT
+    finishTime: finishTime, // Add formatted finish time
     status: event === "ASCENT" ? "FINISHED" : undefined, // Add status for ASCENT
     uploaded: false,
     isRescan: isRescan
   };
+  
+  // Log the scan object for debugging
+  logDebug(`Created scan object: ${JSON.stringify(scan)}`);
   
   // Add to recent scans
   recentScans.unshift(scan);
@@ -2965,7 +2975,6 @@ function processScan(bibNumber) {
   // Update checkpoint stats
   fetchCheckpointStats();
 }
-
 
   
 
@@ -3028,59 +3037,126 @@ function uploadPendingScans(force = false) {
   logDebug(`Uploading ${pendingUploads.length} pending scans`);
   showMessage(`Uploading ${pendingUploads.length} scans...`);
   
-  // Create a copy of the pending uploads
-  const uploadsToProcess = [...pendingUploads];
+  // Create a deep copy of the pending uploads to avoid reference issues
+  const uploadsToProcess = JSON.parse(JSON.stringify(pendingUploads));
   
-  // Prepare the data for upload with your exact column names
-  const uploadData = {
-    action: 'recordScans',
-    scans: uploadsToProcess,
-    columnMappings: {
-      bib: "BIB NUMBER",
-      name: "RUNNER NAME",
-      event: "EVENT",
-      checkpoint: "CHECKPOINT",
-      timestamp: "TIMESTAMP"
-    }
-  };
+  // Group scans by event type
+  const ascentScans = uploadsToProcess.filter(scan => scan.event === "ASCENT");
+  const fiftyKScans = uploadsToProcess.filter(scan => scan.event === "50K");
   
-  // Log the data being sent
-  logDebug(`Upload data: ${JSON.stringify(uploadData).substring(0, 200)}...`);
+  logDebug(`Found ${ascentScans.length} ASCENT scans and ${fiftyKScans.length} 50K scans`);
   
-  // Use fetch API to upload the data - always use no-cors since that worked before
-  fetch(APPS_SCRIPT_URL, {
-    method: 'POST',
-    mode: 'no-cors', // This is already correct
-    cache: 'no-cache',
-    headers: {
-      'Content-Type': 'text/plain;charset=utf-8',
-    },
-    body: JSON.stringify(uploadData)
-  })
-  .then(() => {
-    // Since we can't read the response with no-cors, assume success
-    logDebug('Upload successful (assumed)');
-    showMessage(`${uploadsToProcess.length} scans uploaded successfully`);
+  // Create separate upload promises for each event type
+  const uploadPromises = [];
+  const successfulUploads = [];
+  
+  // Upload ASCENT scans
+  if (ascentScans.length > 0) {
+    const ascentUploadData = {
+      action: "recordScans",
+      eventType: "ASCENT",
+      scans: ascentScans,
+      sheetName: "ASCENT RESULTS",
+      columnMappings: {
+        timestamp: "TIMESTAMP",
+        bib: "BIB NUMBER",
+        name: "RUNNER NAME",
+        status: "STATUS",
+        finishTime: "FINISH TIME"
+      }
+    };
     
-    // Clear pending uploads completely instead of tracking individually
-    pendingUploads = [];
-    savePendingScans();
+    uploadPromises.push(
+      fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        cache: 'no-cache',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
+        body: JSON.stringify(ascentUploadData)
+      }).then(() => {
+        logDebug('ASCENT upload successful (assumed)');
+        // Mark these scans as successfully uploaded
+        ascentScans.forEach(scan => {
+          successfulUploads.push(`${scan.bib}-${scan.checkpoint}`);
+        });
+        return ascentScans.length;
+      }).catch(error => {
+        logDebug('Error uploading ASCENT scans: ' + error);
+        return 0;
+      })
+    );
+  }
+  
+  // Upload 50K scans
+  if (fiftyKScans.length > 0) {
+    const fiftyKUploadData = {
+      action: "recordScans",
+      eventType: "50K",
+      scans: fiftyKScans,
+      sheetName: "50k CHECKPOINT SCANS",
+      columnMappings: {
+        timestamp: "TIMESTAMP",
+        bib: "BIB NUMBER",
+        name: "RUNNER NAME",
+        checkpoint: "CHECKPOINT"
+      }
+    };
     
-    // Update UI
-    updatePendingUploadsUI();
-    
-    // Fetch fresh checkpoint stats
-    fetchCheckpointStats(true);
-  })
-  .catch(error => {
-    logDebug('Error uploading scans: ' + error);
-    showMessage('Upload failed. Will retry later.', true);
-  })
-  .finally(() => {
-    isUploadingPendingScans = false;
-  });
+    uploadPromises.push(
+      fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        cache: 'no-cache',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
+        body: JSON.stringify(fiftyKUploadData)
+      }).then(() => {
+        logDebug('50K upload successful (assumed)');
+        // Mark these scans as successfully uploaded
+        fiftyKScans.forEach(scan => {
+          successfulUploads.push(`${scan.bib}-${scan.checkpoint}`);
+        });
+        return fiftyKScans.length;
+      }).catch(error => {
+        logDebug('Error uploading 50K scans: ' + error);
+        return 0;
+      })
+    );
+  }
+  
+  // Process all upload promises
+  Promise.all(uploadPromises)
+    .then(results => {
+      const totalUploaded = results.reduce((sum, count) => sum + count, 0);
+      logDebug(`Successfully uploaded ${totalUploaded} scans`);
+      showMessage(`${totalUploaded} scans uploaded successfully`);
+      
+      // Only remove the successfully uploaded scans from pendingUploads
+      if (successfulUploads.length > 0) {
+        pendingUploads = pendingUploads.filter(scan => {
+          const scanKey = `${scan.bib}-${scan.checkpoint}`;
+          return !successfulUploads.includes(scanKey);
+        });
+        savePendingScans();
+      }
+      
+      // Update UI
+      updatePendingUploadsUI();
+      
+      // Fetch fresh checkpoint stats
+      fetchCheckpointStats(true);
+    })
+    .catch(error => {
+      logDebug('Error in upload process: ' + error);
+      showMessage('Upload failed. Will retry later.', true);
+    })
+    .finally(() => {
+      isUploadingPendingScans = false;
+    });
 }
-
   
   
 
