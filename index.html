@@ -964,7 +964,7 @@ let event = '';
   
 // Constants
 const CORRECT_PASSWORD = "threeloops";
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzmrwCXV1rnxZdAXzMcUYRwldD9tUQxy8D3Kv1dOEsxMihz_g7w1PePklxhbE02osiA/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxewAR5EVyszUa6074Uic9uhTBg3baj-VtTedaRxFtql79_E_JbXIzWRaa0EdGso7ff/exec";
 const RUNNER_DATA_REFRESH_INTERVAL = 2 * 60 * 1000; // 2 minutes
 const CHECKPOINT_STATS_REFRESH_INTERVAL = 30 * 1000; // 30 seconds
 const DNF_CHECK_INTERVAL = 60 * 1000; // 1 minute
@@ -1080,35 +1080,38 @@ function uploadScanDirectly(scan) {
     return Promise.reject(new Error("Offline"));
   }
 
-  logDebug(`Attempting direct upload for bib #${scan.bib}`);
+  logDebug(`Attempting direct upload for bib #${scan.bib} (Event: ${scan.event})`);
+
+  // Get the appropriate sheet name based on event type
+  const sheetName = scan.event === "ASCENT" ? "ASCENT RESULTS" : "50k CHECKPOINT SCANS";
 
   const rowData = [
-    scan.timestamp,     // TIMESTAMP
-    scan.bib,           // BIB NUMBER
-    scan.name,          // RUNNER NAME
-    scan.checkpoint,    // CHECKPOINT
-    scan.event          // EVENT
+    scan.timestamp, // TIMESTAMP
+    scan.bib, // BIB NUMBER
+    scan.name, // RUNNER NAME
+    scan.checkpoint, // CHECKPOINT
+    scan.event, // EVENT
   ];
 
   const formData = new FormData();
-  formData.append('action', 'appendRow');
-  formData.append('sheetId', RESULTS_SHEET_ID);
-  formData.append('sheetName', scan.event === "ASCENT" ? "ASCENT RESULTS" : "50k CHECKPOINT SCANS");
-  formData.append('data', JSON.stringify(rowData));
+  formData.append("action", "appendRow");
+  formData.append("sheetId", RESULTS_SHEET_ID);
+  formData.append("sheetName", sheetName);
+  formData.append("data", JSON.stringify(rowData));
 
   return fetch(APPS_SCRIPT_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    body: formData
+    method: "POST",
+    mode: "no-cors",
+    body: formData,
   })
-  .then(() => {
-    logDebug(`Direct upload for bib #${scan.bib} sent`);
-    return true;
-  })
-  .catch(error => {
-    logDebug(`Direct upload error: ${error.message}`);
-    return false;
-  });
+    .then(() => {
+      logDebug(`Direct upload for bib #${scan.bib} sent to ${sheetName}`);
+      return true;
+    })
+    .catch((error) => {
+      logDebug(`Direct upload error: ${error.message}`);
+      return false;
+    });
 }
 
 
@@ -1609,36 +1612,100 @@ function fetchAlreadyScannedRunners() {
 
   
 function fetchCheckpointStatsFromSpreadsheet() {
-  const eventType = event; // Use the current event in memory
-  const checkpointName = checkpoint;
+  if (!checkpoint || !isOnline) {
+    // If offline, calculate stats locally
+    const stats = calculateLocalCheckpointStats();
+    updateCheckpointStatsUI(stats);
+    statsRefreshing.classList.add("hidden");
+    isRefreshingStats = false;
+    return;
+  }
 
-  logDebug(`Fetching stats for ${eventType} @ ${checkpointName}`);
+  logDebug(`Fetching checkpoint stats from spreadsheet for: ${checkpoint} (Event: ${event})`);
+  isRefreshingStats = true;
+  statsRefreshing.classList.remove("hidden");
 
-  fetch(`${APPS_SCRIPT_URL}?action=getCheckpointStats&eventType=${encodeURIComponent(eventType)}&checkpoint=${encodeURIComponent(checkpointName)}`)
-    .then(response => response.json())
-    .then(data => {
-      if (data.success && data.data) {
-        const stats = data.data;
+  // Add the event type parameter to the API call
+  fetch(
+    `${APPS_SCRIPT_URL}?action=getCheckpointStats&eventType=${encodeURIComponent(event)}&checkpoint=${encodeURIComponent(checkpoint)}`,
+  )
+    .then(response => response.text())
+    .then(text => {
+      try {
+        // Try to parse the response as JSON
+        const data = JSON.parse(text);
 
-        // Update progress UI
-        statsText.textContent = `${stats.scannedCount} of ${stats.totalRunners} active runners scanned (${stats.scannedPercentage}%)`;
-        progressBarFill.style.width = `${stats.scannedPercentage}%`;
-        scannedCount.textContent = `${stats.scannedCount} scanned`;
-        remainingCount.textContent = `${stats.totalRunners - stats.scannedCount} remaining`;
+        if (data.success && data.data) {
+          const stats = data.data;
 
-        logDebug(`Stats updated: ${stats.scannedCount}/${stats.totalRunners} (${stats.scannedPercentage}%)`);
-      } else {
-        logDebug("Failed to load stats (backend returned error): " + data.error);
+          // Update the UI with the stats
+          statsText.textContent = `${stats.scannedCount} of ${stats.totalRunners} active runners scanned (${stats.scannedPercentage}%)`;
+          progressBarFill.style.width = `${stats.scannedPercentage}%`;
+          scannedCount.textContent = `${stats.scannedCount} scanned`;
+          remainingCount.textContent = `${stats.totalRunners - stats.scannedCount} remaining`;
+
+          logDebug(`Stats updated: ${stats.scannedCount}/${stats.totalRunners} (${stats.scannedPercentage}%)`);
+        } else {
+          logDebug("Failed to parse stats response or error in response");
+          // Fall back to local calculation
+          const stats = calculateLocalCheckpointStats();
+          updateCheckpointStatsUI(stats);
+        }
+      } catch (error) {
+        logDebug(`Error parsing stats response: ${error}`);
+        // Fall back to local calculation
+        const stats = calculateLocalCheckpointStats();
+        updateCheckpointStatsUI(stats);
       }
     })
-    .catch(err => {
-      logDebug("Error fetching stats: " + err);
+    .catch(error => {
+      logDebug(`Error fetching checkpoint stats: ${error}`);
+      // Fall back to local calculation
+      const stats = calculateLocalCheckpointStats();
+      updateCheckpointStatsUI(stats);
     })
     .finally(() => {
+      // Hide the refreshing indicator
+      statsRefreshing.classList.add("hidden");
       isRefreshingStats = false;
-      statsRefreshing.classList.add('hidden');
     });
 }
+
+
+
+// Add this function to fetch the list of already scanned runners
+function fetchScannedRunnersList() {
+  if (!checkpoint || !isOnline) return
+
+  logDebug(`Fetching scanned runners list for ${event} at ${checkpoint}`)
+
+  fetch(
+    `${APPS_SCRIPT_URL}?action=getScannedRunners&eventType=${encodeURIComponent(event)}&checkpoint=${encodeURIComponent(checkpoint)}`,
+  )
+    .then((response) => response.text())
+    .then((text) => {
+      try {
+        const data = JSON.parse(text)
+        if (data.success && data.data) {
+          // Clear existing set
+          alreadyScannedRunners = new Set()
+
+          // Add each scanned bib to the set
+          data.data.forEach((scan) => {
+            alreadyScannedRunners.add(scan.bib)
+          })
+
+          logDebug(`Loaded ${alreadyScannedRunners.size} already scanned runners`)
+        }
+      } catch (error) {
+        logDebug(`Error parsing scanned runners response: ${error}`)
+      }
+    })
+    .catch((error) => {
+      logDebug(`Error fetching scanned runners: ${error}`)
+    })
+}
+
 
 
 
@@ -2291,7 +2358,6 @@ function checkLoginStatus() {
   }
 }
 
-// Fetch runner data from the spreadsheet
 function fetchRunnerData(forceRefresh = false) {
   if (isLoadingRunnerData) {
     logDebug('Already loading runner data, skipping duplicate request');
@@ -2307,7 +2373,6 @@ function fetchRunnerData(forceRefresh = false) {
     return;
   }
 
-  
   // Check if we already have data and it's not a forced refresh
   if (!forceRefresh && Object.keys(runnersData).length > 0) {
     logDebug('Using cached runner data');
@@ -2328,7 +2393,7 @@ function fetchRunnerData(forceRefresh = false) {
   // Hide any previous error
   loadingError.classList.add('hidden');
   
-  logDebug('Fetching runner data from spreadsheet');
+  logDebug(`Fetching runner data from spreadsheet for event: ${event}, sheet: ${sheetName}`);
   
   // Set a timeout to show an error if the data doesn't load
   if (dataLoadTimeoutId) {
@@ -2354,9 +2419,8 @@ function fetchRunnerData(forceRefresh = false) {
   // Add a cache-busting parameter to ensure we get fresh data
   const cacheBuster = new Date().getTime();
   
-  const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${RUNNERS_SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}&cacheBuster=${cacheBuster}`;
-  
-  fetch(spreadsheetUrl)
+  // Add the event type parameter to the API call
+  fetch(`${APPS_SCRIPT_URL}?action=getRunnerData&eventType=${encodeURIComponent(event)}&cacheBuster=${cacheBuster}`)
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -2365,84 +2429,58 @@ function fetchRunnerData(forceRefresh = false) {
     })
     .then(text => {
       try {
-        // The response is not pure JSON, it's wrapped in a callback
-        // We need to extract the JSON part
-        const jsonStart = text.indexOf('{');
-        const jsonEnd = text.lastIndexOf('}') + 1;
-        if (jsonStart === -1 || jsonEnd === 0) {
-          throw new Error('Invalid response format - could not find JSON data');
-        }
-        const jsonString = text.substring(jsonStart, jsonEnd);
-        return JSON.parse(jsonString);
-      } catch (e) {
-        throw new Error(`Error parsing spreadsheet response: ${e.message}`);
-      }
-    })
-    .then(data => {
-      if (data && data.table && data.table.rows) {
-        const runnerMap = {};
-        const rows = data.table.rows;
-        const headers = data.table.cols.map(col => col.label);
-        
-        // Find column indices
-        const bibIndex = headers.findIndex(h => h && h.toLowerCase().includes('bib'));
-        const nameIndex = headers.findIndex(h => h && h.toLowerCase().includes('name'));
-        const statusIndex = headers.findIndex(h => h === 'DNF' || (h && h.toLowerCase().includes('status')));
-        
-        if (bibIndex === -1 || nameIndex === -1) {
-          throw new Error('Could not find required columns in spreadsheet');
-        }
-        
-        for (let i = 0; i < rows.length; i++) {
-          const row = rows[i].c;
-          if (row && row[bibIndex] && row[bibIndex].v) {
-            const bib = row[bibIndex].v.toString();
-            const name = row[nameIndex] && row[nameIndex].v ? row[nameIndex].v.toString() : 'Unknown';
-            let dnf = false;
-            
-            // Check for DNF in status column
-            if (statusIndex !== -1 && row[statusIndex] && row[statusIndex].v) {
-              const status = row[statusIndex].v.toString().toUpperCase();
-              dnf = (status === 'DNF' || status === 'DNS' || status === 'TRUE');
-            }
-            
+        const data = JSON.parse(text);
+
+        if (data.success && data.data && Array.isArray(data.data)) {
+          const runners = data.data;
+          const runnerMap = {};
+
+          // Process each runner
+          runners.forEach(runner => {
+            const bib = runner.bibNumber;
+            const name = runner.name || "Unknown";
+            const status = runner.status || "Active";
+            const dnf = status === "DNF" || status === "DNS";
+
             runnerMap[bib] = {
               name: name,
               dnf: dnf
             };
+          });
+
+          if (Object.keys(runnerMap).length === 0) {
+            throw new Error(`No runner data found for event: ${event}`);
           }
+
+          // Update the last DNF check timestamp
+          lastDnfCheck = Date.now();
+
+          runnersData = runnerMap;
+          localStorage.setItem('runnersData', JSON.stringify(runnersData));
+          logDebug(`Loaded ${Object.keys(runnersData).length} runners for event: ${event}`);
+
+          // Clear the timeout
+          if (dataLoadTimeoutId) {
+            clearTimeout(dataLoadTimeoutId);
+            dataLoadTimeoutId = null;
+          }
+
+          // Hide loading screen and show appropriate screen
+          loadingScreen.classList.add('hidden');
+          checkLoginStatus();
+
+          // Set up runner data refresh interval
+          setupRunnerDataRefresh();
+
+          // Update checkpoint stats with fresh data
+          if (checkpoint) {
+            fetchCheckpointStats(true);
+          }
+        } else {
+          throw new Error("Invalid runner data format or empty response");
         }
-        
-        if (Object.keys(runnerMap).length === 0) {
-          throw new Error('No runner data found in spreadsheet');
-        }
-        
-        // Update the last DNF check timestamp
-        lastDnfCheck = Date.now();
-        
-        runnersData = runnerMap;
-        localStorage.setItem('runnersData', JSON.stringify(runnersData));
-        logDebug(`Loaded ${Object.keys(runnersData).length} runners from spreadsheet`);
-        
-        // Clear the timeout
-        if (dataLoadTimeoutId) {
-          clearTimeout(dataLoadTimeoutId);
-          dataLoadTimeoutId = null;
-        }
-        
-        // Hide loading screen and show appropriate screen
-        loadingScreen.classList.add('hidden');
-        checkLoginStatus();
-        
-        // Set up runner data refresh interval
-        setupRunnerDataRefresh();
-        
-        // Update checkpoint stats with fresh data
-        if (checkpoint) {
-          fetchCheckpointStats(true);
-        }
-      } else {
-        throw new Error('Invalid spreadsheet data format');
+      } catch (error) {
+        throw new Error(`Error parsing runner data: ${error.message}`);
       }
     })
     .catch(error => {
@@ -2480,6 +2518,8 @@ function fetchRunnerData(forceRefresh = false) {
       isLoadingRunnerData = false;
     });
 }
+
+  
 
 // Set up periodic refresh of runner data
 function setupRunnerDataRefresh() {
@@ -2771,11 +2811,10 @@ manualSubmitButton.addEventListener('click', function() {
   bibInput.value = '';
 });
 
-// Process a scan (either from QR code or manual entry)
 function processScan(bibNumber) {
   // Check if this is a valid bib number
   if (!runnersData[bibNumber]) {
-    showMessage(`Bib #${bibNumber} not found in runner data`, true);
+    showMessage(`Bib #${bibNumber} not found in ${event} runner data`, true);
     return;
   }
   
@@ -2784,7 +2823,6 @@ function processScan(bibNumber) {
     showMessage(`Bib #${bibNumber} is marked as DNF`, true);
     return;
   }
-
   
   // Create scan key
   const scanKey = `${bibNumber}-${checkpoint}`;
@@ -2816,17 +2854,17 @@ function processScan(bibNumber) {
   // Add to already scanned runners set
   alreadyScannedRunners.add(bibNumber);
   
-// Create scan record
-const timestamp = new Date().toISOString();
-const scan = {
-  bib: bibNumber,
-  name: runnersData[bibNumber].name,
-  event: event,  // Add this line
-  checkpoint: checkpoint,
-  timestamp: timestamp,
-  uploaded: false,
-  isRescan: isRescan
-};
+  // Create scan record
+  const timestamp = new Date().toISOString();
+  const scan = {
+    bib: bibNumber,
+    name: runnersData[bibNumber].name,
+    event: event, // Make sure to include the event type
+    checkpoint: checkpoint,
+    timestamp: timestamp,
+    uploaded: false,
+    isRescan: isRescan
+  };
   
   // Add to recent scans
   recentScans.unshift(scan);
