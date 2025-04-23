@@ -721,13 +721,10 @@ font-size: 16px;
       </div>
 
       <!-- Hidden username field for accessibility -->
-      <div class="form-group" style="display:none;">
-        <label for="username-input">Username</label>
-        <input type="text" id="username-input" name="username" autocomplete="username">
-      </div>
-
-      <button type="submit" id="login-button">Login</button>
-    </form>
+<div class="form-group" style="display:none;">
+  <label for="username-input">Username</label>
+  <input type="text" id="username-input" name="username" autocomplete="username">
+</div>
 
     <!-- Download Section (add this to the login screen) -->
     <div class="download-section">
@@ -1024,7 +1021,7 @@ const DATA_LOAD_TIMEOUT = 30000; // 30 seconds timeout for data loading
 
 
 const checkpointStatsContent = document.getElementById('checkpoint-stats');
-const statsRefreshing = document.getElementById('stats-refreshing');
+statsRefreshing = document.getElementById('stats-refreshing');
 
   
 
