@@ -1768,73 +1768,68 @@ let isRefreshingStats = false // Declare isRefreshingStats
 const checkpointStatsContent = document.createElement("div") // Declare checkpointStatsContent
 
 function fetchCheckpointStatsFromSpreadsheet() {
-  // Declare variables
-  let checkpoint
-  let isOnline
-  let statsRefreshing
-
   if (!checkpoint || !isOnline) {
     // If offline, calculate stats locally
-    const stats = calculateLocalCheckpointStats()
-    updateCheckpointStatsUI(stats)
-    statsRefreshing.classList.add("hidden")
-    isRefreshingStats = false
-    return
+    const stats = calculateLocalCheckpointStats();
+    updateCheckpointStatsUI(stats);
+    statsRefreshing.classList.add("hidden");
+    isRefreshingStats = false;
+    return;
   }
 
-  logDebug(`Fetching checkpoint stats from spreadsheet for: ${checkpoint} (Event: ${event})`)
-  isRefreshingStats = true
-  statsRefreshing.classList.remove("hidden")
+  logDebug(`Fetching checkpoint stats from spreadsheet for: ${checkpoint} (Event: ${event})`);
+  isRefreshingStats = true;
+  statsRefreshing.classList.remove("hidden");
 
   // Use the API endpoint to get stats directly
   fetch(
-    `${APPS_SCRIPT_URL}?action=getCheckpointStats&eventType=${encodeURIComponent(event)}&checkpoint=${encodeURIComponent(checkpoint)}`,
+    `${APPS_SCRIPT_URL}?action=getCheckpointStats&eventType=${encodeURIComponent(event)}&checkpoint=${encodeURIComponent(checkpoint)}`
   )
     .then((response) => {
       if (!response.ok) {
-        throw new Error("Network response was not ok")
+        throw new Error("Network response was not ok");
       }
-      return response.text()
+      return response.text();
     })
     .then((text) => {
       try {
         // Try to parse the response as JSON
-        const data = JSON.parse(text)
+        const data = JSON.parse(text);
 
         if (data.success && data.stats) {
           // Format the stats into a readable string
-          let statsString = ""
+          let statsString = "";
           for (const key in data.stats) {
             if (data.stats.hasOwnProperty(key)) {
-              statsString += `<strong>${key}:</strong> ${data.stats[key]}<br>`
+              statsString += `<strong>${key}:</strong> ${data.stats[key]}<br>`;
             }
           }
-          checkpointStatsContent.innerHTML = statsString
-          logDebug("Checkpoint stats loaded successfully")
+          checkpointStatsContent.innerHTML = statsString;
+          logDebug("Checkpoint stats loaded successfully");
         } else {
-          logDebug("Failed to parse stats response or error in response")
+          logDebug("Failed to parse stats response or error in response");
           // Fall back to local calculation
-          const stats = calculateLocalCheckpointStats()
-          updateCheckpointStatsUI(stats)
+          const stats = calculateLocalCheckpointStats();
+          updateCheckpointStatsUI(stats);
         }
       } catch (error) {
-        logDebug(`Error parsing stats response: ${error}`)
+        logDebug(`Error parsing stats response: ${error}`);
         // Fall back to local calculation
-        const stats = calculateLocalCheckpointStats()
-        updateCheckpointStatsUI(stats)
+        const stats = calculateLocalCheckpointStats();
+        updateCheckpointStatsUI(stats);
       }
     })
     .catch((error) => {
-      logDebug(`Error fetching checkpoint stats: ${error}`)
+      logDebug(`Error fetching checkpoint stats: ${error}`);
       // Fall back to local calculation
-      const stats = calculateLocalCheckpointStats()
-      updateCheckpointStatsUI(stats)
+      const stats = calculateLocalCheckpointStats();
+      updateCheckpointStatsUI(stats);
     })
     .finally(() => {
       // Hide the refreshing indicator
-      statsRefreshing.classList.add("hidden")
-      isRefreshingStats = false
-    })
+      statsRefreshing.classList.add("hidden");
+      isRefreshingStats = false;
+    });
 }
 
 
