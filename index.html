@@ -1003,6 +1003,23 @@ const EVENT_CONFIG = {
 }
 
 
+const CACHE_NAME = "my-site-cache-v1"
+const urlsToCache = ["/", "/index.html", "/style.css", "/script.js"]
+
+// Update your service worker installation event to handle errors better
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      console.log("Opened cache")
+      // Use individual cache.add calls instead of cache.addAll to handle failures better
+      return Promise.allSettled(
+        urlsToCache.map((url) => cache.add(url).catch((err) => console.log(`Failed to cache ${url}: ${err}`))),
+      )
+    }),
+  )
+})
+
+
 const DATA_LOAD_TIMEOUT = 30000; // 30 seconds timeout for data loading
 
   
@@ -1130,6 +1147,99 @@ function uploadScanDirectly(scan) {
       return false;
     });
 }
+
+
+
+// Add this function to your code
+function calculateLocalCheckpointStats() {
+  if (!checkpoint || !event) {
+    return { scannedCount: 0, totalRunners: 0, scannedPercentage: 0, dnfCount: 0 }
+  }
+
+  logDebug(`Calculating local stats for ${event} at ${checkpoint}`)
+
+  // Count active runners and DNFs for this specific event
+  let activeRunners = 0
+  let dnfCount = 0
+
+  // Count scanned runners at this checkpoint
+  const scannedBibs = new Set()
+
+  // Process each runner
+  for (const bib in runnersData) {
+    if (runnersData.hasOwnProperty(bib)) {
+      const runner = runnersData[bib]
+
+      if (runner.dnf) {
+        dnfCount++
+      } else {
+        activeRunners++
+
+        // Check if this runner has been scanned at this checkpoint
+        if (alreadyScannedRunners.has(bib)) {
+          scannedBibs.add(bib)
+        }
+      }
+    }
+  }
+
+  const scannedCount = scannedBibs.size
+  const scannedPercentage = activeRunners > 0 ? Math.round((scannedCount / activeRunners) * 100) : 0
+
+  logDebug(
+    `Local checkpoint stats: ${scannedCount}/${activeRunners} active runners scanned (${scannedPercentage}%), ${dnfCount} DNF`,
+  )
+
+  return {
+    scannedCount: scannedCount,
+    totalRunners: activeRunners,
+    scannedPercentage: scannedPercentage,
+    dnfCount: dnfCount,
+  }
+}
+
+// Add this function to update the checkpoint stats UI
+function updateCheckpointStatsUI(stats) {
+  if (!statsText || !progressBarFill || !scannedCount || !remainingCount) {
+    logDebug("Stats UI elements not found")
+    return
+  }
+
+  statsText.textContent = `${stats.scannedCount} of ${stats.totalRunners} active runners scanned (${stats.scannedPercentage}%)`
+  progressBarFill.style.width = `${stats.scannedPercentage}%`
+  scannedCount.textContent = `${stats.scannedCount} scanned`
+  remainingCount.textContent = `${stats.totalRunners - stats.scannedCount} remaining`
+
+  logDebug(`Stats updated: ${stats.scannedCount}/${stats.totalRunners} (${stats.scannedPercentage}%)`)
+}
+
+// Add this function to fetch checkpoint stats
+// Assuming fetchCheckpointStatsFromSpreadsheet is defined elsewhere and handles online data fetching
+let fetchCheckpointStatsFromSpreadsheet // Declare the variable
+
+function fetchCheckpointStats(force = false) {
+  if (!force && (!isOnline || !checkpoint || !event)) {
+    return
+  }
+
+  logDebug(`Fetching checkpoint stats for ${event} at ${checkpoint}`)
+
+  // If we're offline, calculate stats locally
+  if (!isOnline) {
+    const stats = calculateLocalCheckpointStats()
+    updateCheckpointStatsUI(stats)
+    return
+  }
+
+  // Otherwise, fetch from the spreadsheet
+  if (typeof fetchCheckpointStatsFromSpreadsheet === "function") {
+    fetchCheckpointStatsFromSpreadsheet()
+  } else {
+    logDebug("fetchCheckpointStatsFromSpreadsheet function is not defined.")
+  }
+}
+
+
 
 
 // Fix for the uploadPendingScans function
@@ -1550,27 +1660,40 @@ function handleLogin() {
 }
   
 
+/ Update your showScannerScreen function to properly handle fetchCheckpointStats
 function showScannerScreen() {
-  loginScreen.classList.add('hidden');
-  loadingScreen.classList.add('hidden');
-  scannerScreen.classList.remove('hidden');
-  checkpointDisplay.textContent = checkpoint;
-  eventDisplay.textContent = event;
-  updateConnectionStatus();
-  fetchCheckpointStats();
-  setupCheckpointStatsRefresh();
-  
+  loginScreen.classList.add("hidden")
+  loadingScreen.classList.add("hidden")
+  scannerScreen.classList.remove("hidden")
+  eventDisplay.textContent = event
+  checkpointDisplay.textContent = checkpoint
+  updateConnectionStatus()
+
+  // Make sure fetchCheckpointStats is defined before calling it
+  if (typeof fetchCheckpointStats === "function") {
+    fetchCheckpointStats()
+    setupCheckpointStatsRefresh()
+  } else {
+    logDebug("fetchCheckpointStats function is not defined")
+    // Fallback to display some basic info
+    if (checkpointStatsContent) {
+      checkpointStatsContent.innerHTML = `<strong>Event:</strong> ${event}<br><strong>Checkpoint:</strong> ${checkpoint}`
+    }
+  }
 
   // Update install prompts when showing scanner screen
-  updateInstallPrompts();
-  positionInstallPrompt();
-  
+  updateInstallPrompts()
+  positionInstallPrompt()
+
   // Make sure the persistent install button is in the correct container
-  if (persistentInstallBtn && persistentInstallBtn.parentNode !== document.querySelector('#scanner-screen .app-header')) {
-    const appHeader = document.querySelector('#scanner-screen .app-header');
+  if (
+    persistentInstallBtn &&
+    persistentInstallBtn.parentNode !== document.querySelector("#scanner-screen .app-header")
+  ) {
+    const appHeader = document.querySelector("#scanner-screen .app-header")
     if (appHeader && persistentInstallBtn.parentNode) {
-      persistentInstallBtn.parentNode.removeChild(persistentInstallBtn);
-      appHeader.appendChild(persistentInstallBtn);
+      persistentInstallBtn.parentNode.removeChild(persistentInstallBtn)
+      appHeader.appendChild(persistentInstallBtn)
     }
   }
 }
@@ -1650,44 +1773,95 @@ function fetchAlreadyScannedRunners() {
 }
 
   
+// Replace your fetchCheckpointStatsFromSpreadsheet function with this one
+let isRefreshingStats = false // Declare isRefreshingStats
+const APPS_SCRIPT_URL = "" // Declare APPS_SCRIPT_URL
+const checkpointStatsContent = document.createElement("div") // Declare checkpointStatsContent
+
 function fetchCheckpointStatsFromSpreadsheet() {
+  // Declare variables
+  let checkpoint
+  let isOnline
+  let statsRefreshing
+
   if (!checkpoint || !isOnline) {
     // If offline, calculate stats locally
-    const stats = calculateLocalCheckpointStats();
-    updateCheckpointStatsUI(stats);
-    statsRefreshing.classList.add("hidden");
-    isRefreshingStats = false;
-    return;
+    const stats = calculateLocalCheckpointStats()
+    updateCheckpointStatsUI(stats)
+    statsRefreshing.classList.add("hidden")
+    isRefreshingStats = false
+    return
   }
 
-  logDebug(`Fetching checkpoint stats from spreadsheet for: ${checkpoint} (Event: ${event})`);
-  isRefreshingStats = true;
-  statsRefreshing.classList.remove("hidden");
+  logDebug(`Fetching checkpoint stats from spreadsheet for: ${checkpoint} (Event: ${event})`)
+  isRefreshingStats = true
+  statsRefreshing.classList.remove("hidden")
 
-  // Use no-cors mode to avoid CORS errors
+  // Use the API endpoint to get stats directly
   fetch(
     `${APPS_SCRIPT_URL}?action=getCheckpointStats&eventType=${encodeURIComponent(event)}&checkpoint=${encodeURIComponent(checkpoint)}`,
-    { mode: 'no-cors' } // Add this line
   )
-    .then(response => {
-      // With no-cors, we can't read the response content
-      // Fall back to local calculation
-      const stats = calculateLocalCheckpointStats();
-      updateCheckpointStatsUI(stats);
-      return null;
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error("Network response was not ok")
+      }
+      return response.text()
     })
-    .catch(error => {
-      logDebug(`Error fetching checkpoint stats: ${error}`);
+    .then((text) => {
+      try {
+        // Try to parse the response as JSON
+        const data = JSON.parse(text)
+
+        if (data.success && data.stats) {
+          // Format the stats into a readable string
+          let statsString = ""
+          for (const key in data.stats) {
+            if (data.stats.hasOwnProperty(key)) {
+              statsString += `<strong>${key}:</strong> ${data.stats[key]}<br>`
+            }
+          }
+          checkpointStatsContent.innerHTML = statsString
+          logDebug("Checkpoint stats loaded successfully")
+        } else {
+          logDebug("Failed to parse stats response or error in response")
+          // Fall back to local calculation
+          const stats = calculateLocalCheckpointStats()
+          updateCheckpointStatsUI(stats)
+        }
+      } catch (error) {
+        logDebug(`Error parsing stats response: ${error}`)
+        // Fall back to local calculation
+        const stats = calculateLocalCheckpointStats()
+        updateCheckpointStatsUI(stats)
+      }
+    })
+    .catch((error) => {
+      logDebug(`Error fetching checkpoint stats: ${error}`)
       // Fall back to local calculation
-      const stats = calculateLocalCheckpointStats();
-      updateCheckpointStatsUI(stats);
+      const stats = calculateLocalCheckpointStats()
+      updateCheckpointStatsUI(stats)
     })
     .finally(() => {
       // Hide the refreshing indicator
-      statsRefreshing.classList.add("hidden");
-      isRefreshingStats = false;
-    });
+      statsRefreshing.classList.add("hidden")
+      isRefreshingStats = false
+    })
 }
+
+// Placeholder functions - replace with actual implementations
+function calculateLocalCheckpointStats() {
+  console.warn("calculateLocalCheckpointStats() is a placeholder. Implement the actual logic.")
+  return {}
+}
+
+function updateCheckpointStatsUI(stats) {
+  console.warn("updateCheckpointStatsUI() is a placeholder. Implement the actual logic.")
+}
+
+function logDebug(message) {
+  console.log(message)
+}
+
 
 
 
@@ -2381,6 +2555,29 @@ function checkLoginStatus() {
 
   
 
+// Assuming these are defined elsewhere, but declaring them here to avoid errors
+const loadingScreen = document.getElementById("loadingScreen") // Example, replace with actual element
+const loginScreen = document.getElementById("loginScreen") // Example, replace with actual element
+const scannerScreen = document.getElementById("scannerScreen") // Example, replace with actual element
+const loadingError = document.getElementById("loadingError") // Example, replace with actual element
+const APPS_SCRIPT_URL = "" // Replace with actual URL
+const DATA_LOAD_TIMEOUT = 5000 // Replace with actual timeout value
+const event = "default_event" // Replace with actual event
+const checkpoint = null // Replace with actual checkpoint
+const logDebug = console.log // Replace with actual logging function
+
+// Declare functions that are used but not defined in this snippet
+const checkLoginStatus = () => {
+  logDebug("checkLoginStatus called (placeholder)")
+}
+const setupRunnerDataRefresh = () => {
+  logDebug("setupRunnerDataRefresh called (placeholder)")
+}
+const fetchCheckpointStats = (force) => {
+  logDebug("fetchCheckpointStats called (placeholder)")
+}
+
+// Update your fetchRunnerData function to properly handle the ASCENT event
 function fetchRunnerData(forceRefresh = false) {
   if (isLoadingRunnerData) {
     logDebug("Already loading runner data, skipping duplicate request")
@@ -2424,18 +2621,6 @@ function fetchRunnerData(forceRefresh = false) {
     }
   }, DATA_LOAD_TIMEOUT)
 
-  // Get the correct sheet name for the current event
-  const eventConfig = EVENT_CONFIG[event]
-  if (!eventConfig) {
-    logDebug(`Invalid event: ${event}`)
-    showMessage(`Configuration error: Invalid event ${event}`, true)
-    isLoadingRunnerData = false
-    return
-  }
-
-  const sheetId = eventConfig.RUNNERS_SHEET_ID
-  const sheetName = eventConfig.RUNNERS_SHEET_NAME
-
   // Add a cache-busting parameter to ensure we get fresh data
   const cacheBuster = new Date().getTime()
 
@@ -2462,7 +2647,6 @@ function fetchRunnerData(forceRefresh = false) {
           runnerMap[bib] = {
             name: name,
             dnf: dnf,
-            event: event, // Store the event with each runner
           }
         })
 
