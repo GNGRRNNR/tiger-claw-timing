@@ -1005,40 +1005,6 @@ const EVENT_CONFIG = {
 
 const DATA_LOAD_TIMEOUT = 30000; // 30 seconds timeout for data loading
 
-
-
-// Declare missing variables
-const isOnline = navigator.onLine // Or initialize based on initial state
-let pendingUploads = []
-let isUploadingPendingScans = false
-const APPS_SCRIPT_URL = "" // Declare APPS_SCRIPT_URL
-const checkpoint = "" // Declare checkpoint
-const checkpointStatsContent = document.createElement("div") // Declare checkpointStatsContent
-let alreadyScannedRunners = new Set() // Declare alreadyScannedRunners
-let isLoadingRunnerData = false // Declare isLoadingRunnerData
-let dataLoadAttempted = false // Declare dataLoadAttempted
-let runnersData = {} // Declare runnersData
-const loadingScreen = document.createElement("div") // Declare loadingScreen
-const loadingError = document.createElement("div") // Declare loadingError
-let dataLoadTimeoutId = null
-let lastDnfCheck = 0
-const event = ""
-
-// Mock functions for logDebug and showMessage if they are not available
-function logDebug(message) {
-  console.debug(message)
-}
-
-function showMessage(message, isError = false) {
-  if (isError) {
-    console.error(message)
-  } else {
-    console.log(message)
-  }
-}
-
-
-  
   
 
 // Check for URL parameters (for QR code login)
@@ -2989,7 +2955,7 @@ function updateRecentScansUI() {
   });
 }
 
-/function updatePendingUploadsUI() {
+function updatePendingUploadsUI() {
   // Implementation for updatePendingUploadsUI
   console.log("updatePendingUploadsUI function called")
 }
