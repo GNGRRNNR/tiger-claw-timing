@@ -1681,6 +1681,16 @@ function handleLogin() {
   const selectedEvent = eventSelect.value;
   const selectedCheckpoint = checkpointSelect.value;
   const password = passwordInput.value;
+  const selectedLocation = locationSelect.value;
+  
+  if (!selectedLocation) {
+    loginError.textContent = 'Please select a location';
+    loginError.classList.remove('hidden');
+    return;
+  }
+  
+  // Split the combined value
+  const [selectedEvent, selectedCheckpoint] = selectedLocation.split('|');
 
   if (!selectedEvent) {
     loginError.textContent = 'Please select an event';
@@ -1730,6 +1740,38 @@ function handleLogin() {
       startPeriodicUploadAttempts();
     });
 }
+
+
+
+// Add this function
+function startPeriodicUploadAttempts() {
+  if (periodicUploadInterval) {
+    clearInterval(periodicUploadInterval);
+  }
+  periodicUploadInterval = setInterval(() => {
+    if (isOnline && pendingUploads.length > 0) {
+      uploadPendingScans();
+    }
+  }, PERIODIC_UPLOAD_INTERVAL);
+  logDebug("Started periodic upload attempts");
+}
+
+// Add this function
+function fetchRunnerDataForStats() {
+  return new Promise((resolve, reject) => {
+    if (Object.keys(runnersData).length > 0) {
+      resolve(runnersData);
+      return;
+    }
+    
+    fetchRunnerData(true)
+      .then(() => resolve(runnersData))
+      .catch(reject);
+  });
+}
+
+
+
 
 // Add this new function for prioritized runner data loading
 function loadRunnersDataWithPriority() {
@@ -3311,8 +3353,17 @@ function updateRecentScansUI() {
 }
 
 function updatePendingUploadsUI() {
-  // Implementation for updatePendingUploadsUI
-  console.log("updatePendingUploadsUI function called")
+  pendingUploadsContainer.innerHTML = '';
+  
+  if (pendingUploads.length === 0) {
+    pendingUploadsContainer.classList.add('hidden');
+    return;
+  }
+  
+  pendingUploadsContainer.classList.remove('hidden');
+  pendingUploadsContainer.innerHTML = `
+    <p>${pendingUploads.length} scan${pendingUploads.length === 1 ? '' : 's'} pending upload</p>
+  `;
 }
 
 
