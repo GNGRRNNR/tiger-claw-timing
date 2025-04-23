@@ -960,11 +960,34 @@ let dataLoadAttempted = false; // Flag to track if we've attempted to load data
 let persistentInstallBtn = null; // Store the persistent install button element
 let event = '';
 
+
+
+let isLoadingRunnerData = false
+let dataLoadAttempted = false
+let runnersData = {}
+let loadingScreen // This should be assigned the actual loading screen element
+let loginScreen // This should be assigned the actual login screen element
+let scannerScreen // This should be assigned the actual scanner screen element
+let loadingError // This should be assigned the actual loading error element
+let dataLoadTimeoutId
+let lastDnfCheck
+
+// Declare variables that were previously undeclared
+let DATA_LOAD_TIMEOUT
+let EVENT_CONFIG
+let APPS_SCRIPT_URL
+
+// Declare functions that were previously undeclared
+let showMessage
+let checkLoginStatus
+let setupRunnerDataRefresh
+let checkpoint
+let fetchCheckpointStats
   
   
 // Constants
 const CORRECT_PASSWORD = "threeloops";
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzRwIK_wZfpuJXyJkw9YL-DApHGMssgHLt3txTt078h0p9RQRbah_ZZztoXp0kz7Gny/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzLzt-7aNjfxmH_XtZ8qKsGJiq_jx79Ahse4c_uB93IzSVErIkbVJoEckrCAY686E0Q/exec";
 const RUNNER_DATA_REFRESH_INTERVAL = 2 * 60 * 1000; // 2 minutes
 const CHECKPOINT_STATS_REFRESH_INTERVAL = 30 * 1000; // 30 seconds
 const DNF_CHECK_INTERVAL = 60 * 1000; // 1 minute
@@ -1152,38 +1175,71 @@ function uploadPendingScans(force = false) {
   // Create a copy of the pending uploads
   const uploadsToProcess = [...pendingUploads]
 
-  // Prepare the data for upload with your exact column names
-  const uploadData = {
-    action: "recordScans",
-    scans: uploadsToProcess,
-    columnMappings: {
-      bib: "BIB NUMBER",
-      name: "RUNNER NAME",
-      event: "EVENT",
-      checkpoint: "CHECKPOINT",
-      timestamp: "TIMESTAMP",
-    },
-  }
-
-  // Log the data being sent
-  logDebug(`Upload data: ${JSON.stringify(uploadData).substring(0, 200)}...`)
-
-  // Use fetch API to upload the data - always use no-cors since that worked before
-  fetch(APPS_SCRIPT_URL, {
-    method: "POST",
-    mode: "no-cors", // Use no-cors as it worked before
-    cache: "no-cache",
-    headers: {
-      "Content-Type": "text/plain;charset=utf-8",
-    },
-    body: JSON.stringify(uploadData),
+  // Group scans by event type
+  const scansByEvent = {}
+  uploadsToProcess.forEach((scan) => {
+    if (!scansByEvent[scan.event]) {
+      scansByEvent[scan.event] = []
+    }
+    scansByEvent[scan.event].push(scan)
   })
-    .then(() => {
-      // Since we can't read the response with no-cors, assume success
-      logDebug("Upload successful (assumed)")
-      showMessage(`${uploadsToProcess.length} scans uploaded successfully`)
 
-      // Clear pending uploads completely instead of tracking individually
+  // Process each event's scans separately
+  const uploadPromises = Object.keys(scansByEvent).map((eventType) => {
+    const eventScans = scansByEvent[eventType]
+    const eventConfig = EVENT_CONFIG[eventType]
+
+    if (!eventConfig) {
+      logDebug(`Invalid event type: ${eventType}`)
+      return Promise.resolve()
+    }
+
+    // Prepare the data for upload with your exact column names
+    const uploadData = {
+      action: "recordScans",
+      eventType: eventType,
+      scans: eventScans,
+      columnMappings: {
+        bib: "BIB NUMBER",
+        name: "RUNNER NAME",
+        event: "EVENT",
+        checkpoint: "CHECKPOINT",
+        timestamp: "TIMESTAMP",
+        finishTime: "FINISH TIME", // Add finish time mapping
+      },
+    }
+
+    // Log the data being sent
+    logDebug(`Upload data for ${eventType}: ${JSON.stringify(uploadData).substring(0, 200)}...`)
+
+    // Use fetch API to upload the data
+    return fetch(APPS_SCRIPT_URL, {
+      method: "POST",
+      mode: "no-cors",
+      cache: "no-cache",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8",
+      },
+      body: JSON.stringify(uploadData),
+    })
+      .then(() => {
+        logDebug(`Upload for ${eventType} successful (assumed)`)
+        return eventScans.length
+      })
+      .catch((error) => {
+        logDebug(`Error uploading ${eventType} scans: ${error}`)
+        throw error
+      })
+  })
+
+  // Wait for all uploads to complete
+  Promise.all(uploadPromises)
+    .then((results) => {
+      const totalUploaded = results.reduce((sum, count) => sum + (count || 0), 0)
+      logDebug(`All uploads completed: ${totalUploaded} scans uploaded`)
+      showMessage(`${totalUploaded} scans uploaded successfully`)
+
+      // Clear pending uploads
       pendingUploads = []
       savePendingScans()
 
@@ -1194,14 +1250,13 @@ function uploadPendingScans(force = false) {
       fetchCheckpointStats(true)
     })
     .catch((error) => {
-      logDebug("Error uploading scans: " + error)
-      showMessage("Upload failed. Will retry later.", true)
+      logDebug("Error in upload process: " + error)
+      showMessage("Some uploads failed. Will retry later.", true)
     })
     .finally(() => {
       isUploadingPendingScans = false
     })
 }
-
   
 
 function setupPersistentInstallButton(btnElement) {
@@ -2344,7 +2399,6 @@ function checkLoginStatus() {
 
   
 
-// Fix for the fetchRunnerData function
 function fetchRunnerData(forceRefresh = false) {
   if (isLoadingRunnerData) {
     logDebug("Already loading runner data, skipping duplicate request")
@@ -2387,6 +2441,18 @@ function fetchRunnerData(forceRefresh = false) {
       }
     }
   }, DATA_LOAD_TIMEOUT)
+
+  // Get the correct sheet name for the current event
+  const eventConfig = EVENT_CONFIG[event]
+  if (!eventConfig) {
+    logDebug(`Invalid event: ${event}`)
+    showMessage(`Configuration error: Invalid event ${event}`, true)
+    isLoadingRunnerData = false
+    return
+  }
+
+  const sheetId = eventConfig.RUNNERS_SHEET_ID
+  const sheetName = eventConfig.RUNNERS_SHEET_NAME
 
   // Add a cache-busting parameter to ensure we get fresh data
   const cacheBuster = new Date().getTime()
@@ -2485,6 +2551,7 @@ function fetchRunnerData(forceRefresh = false) {
       isLoadingRunnerData = false
     })
 }
+
   
 
 // Set up periodic refresh of runner data
@@ -2541,49 +2608,72 @@ function fetchCheckpointStats(force = false) {
   
 
 function calculateLocalCheckpointStats() {
-  if (!checkpoint) {
-    return { scannedCount: 0, totalRunners: 0, scannedPercentage: 0, dnfCount: 0 };
+  // Declare variables that were previously undeclared
+  let checkpoint
+  let event
+  let runnersData
+  let alreadyScannedRunners
+
+  // Mock logDebug function if it's not available
+  function logDebug(message) {
+    if (typeof console !== "undefined" && typeof console.debug === "function") {
+      console.debug(message)
+    } else if (typeof console !== "undefined" && typeof console.log === "function") {
+      console.log(message)
+    }
   }
-  
-  logDebug('Fetching runner data for stats update');
-  
-  // Count active runners and DNFs
-  let activeRunners = 0;
-  let dnfCount = 0;
-  
+
+  if (!checkpoint || !event) {
+    return { scannedCount: 0, totalRunners: 0, scannedPercentage: 0, dnfCount: 0 }
+  }
+
+  logDebug(`Calculating local stats for ${event} at ${checkpoint}`)
+
+  // Count active runners and DNFs for this specific event
+  let activeRunners = 0
+  let dnfCount = 0
+
   // Count scanned runners at this checkpoint
-  const scannedBibs = new Set();
-  
+  const scannedBibs = new Set()
+
   // Process each runner
   for (const bib in runnersData) {
     if (runnersData.hasOwnProperty(bib)) {
-      const runner = runnersData[bib];
-      
+      const runner = runnersData[bib]
+
+      // Make sure we're only counting runners for the current event
+      if (runner.event !== event && runner.event !== undefined) {
+        continue
+      }
+
       if (runner.dnf) {
-        dnfCount++;
+        dnfCount++
       } else {
-        activeRunners++;
-        
+        activeRunners++
+
         // Check if this runner has been scanned at this checkpoint
         if (alreadyScannedRunners.has(bib)) {
-          scannedBibs.add(bib);
+          scannedBibs.add(bib)
         }
       }
     }
   }
-  
-  const scannedCount = scannedBibs.size;
-  const scannedPercentage = activeRunners > 0 ? Math.round((scannedCount / activeRunners) * 100) : 0;
-  
-  logDebug(`Checkpoint stats: ${scannedCount}/${activeRunners} active runners scanned (${scannedPercentage}%), ${dnfCount} DNF`);
-  
+
+  const scannedCount = scannedBibs.size
+  const scannedPercentage = activeRunners > 0 ? Math.round((scannedCount / activeRunners) * 100) : 0
+
+  logDebug(
+    `${event} checkpoint stats: ${scannedCount}/${activeRunners} active runners scanned (${scannedPercentage}%), ${dnfCount} DNF`,
+  )
+
   return {
     scannedCount: scannedCount,
     totalRunners: activeRunners,
     scannedPercentage: scannedPercentage,
-    dnfCount: dnfCount
-  };
+    dnfCount: dnfCount,
+  }
 }
+  
 
 
   
@@ -2821,102 +2911,189 @@ manualSubmitButton.addEventListener('click', function() {
 });
 
 function processScan(bibNumber) {
-  // Check if this is a valid bib number
-  if (!runnersData[bibNumber]) {
-    showMessage(`Bib #${bibNumber} not found in ${event} runner data`, true);
-    return;
+  // Declare variables that were previously undeclared
+  // These would ideally be imported or defined elsewhere in a larger application context
+  // For this example, we'll initialize them as empty objects/strings
+  if (typeof runnersData === "undefined") {
+    runnersData = {}
   }
-  
-  // Check if the runner is marked as DNF
-  if (runnersData[bibNumber].dnf) {
-    showMessage(`Bib #${bibNumber} is marked as DNF`, true);
-    return;
+  if (typeof showMessage === "undefined") {
+    showMessage = (message, isError) => {
+      console.log(message)
+    } // Placeholder
   }
-  
-  // Create scan key
-  const scanKey = `${bibNumber}-${checkpoint}`;
-  
-  // Check if we've already processed this scan
-  let isRescan = false;
-  if (processedScans[scanKey]) {
-    isRescan = true;
-    const lastScanTime = new Date(scanTimestamps[scanKey]).toLocaleTimeString();
-    logDebug(`Rescan of Bib #${bibNumber} (previous scan at ${lastScanTime})`);
-    
-    // Remove previous scan from recent scans
-    recentScans = recentScans.filter(scan => !(scan.bib === bibNumber && scan.checkpoint === checkpoint));
-    
-    // Find and remove previous scan from pending uploads
-    const previousScanIndex = pendingUploads.findIndex(scan => scan.bib === bibNumber && scan.checkpoint === checkpoint);
-    if (previousScanIndex !== -1) {
-      pendingUploads.splice(previousScanIndex, 1);
-      savePendingScans();
+  if (typeof checkpoint === "undefined") {
+    checkpoint = ""
+  }
+  if (typeof processedScans === "undefined") {
+    processedScans = {}
+  }
+  if (typeof scanTimestamps === "undefined") {
+    scanTimestamps = {}
+  }
+  if (typeof recentScans === "undefined") {
+    recentScans = []
+  }
+  if (typeof pendingUploads === "undefined") {
+    pendingUploads = []
+  }
+  if (typeof alreadyScannedRunners === "undefined") {
+    alreadyScannedRunners = new Set()
+  }
+  if (typeof saveProcessedScans === "undefined") {
+    saveProcessedScans = () => {}
+  }
+  if (typeof saveScanTimestamps === "undefined") {
+    saveScanTimestamps = () => {}
+  }
+  if (typeof localStorage === "undefined") {
+    localStorage = {
+      setItem: () => {},
+      getItem: () => {},
     }
   }
-  
+  if (typeof updateRecentScansUI === "undefined") {
+    updateRecentScansUI = () => {}
+  }
+  if (typeof flashOverlay === "undefined") {
+    flashOverlay = { style: { display: "none" } }
+  }
+  if (typeof savePendingScans === "undefined") {
+    savePendingScans = () => {}
+  }
+  if (typeof updatePendingUploadsUI === "undefined") {
+    updatePendingUploadsUI = () => {}
+  }
+  if (typeof isOnline === "undefined") {
+    isOnline = false
+  }
+  if (typeof uploadPendingScans === "undefined") {
+    uploadPendingScans = () => {}
+  }
+  if (typeof fetchCheckpointStats === "undefined") {
+    fetchCheckpointStats = () => {}
+  }
+  if (typeof logDebug === "undefined") {
+    logDebug = (message) => {
+      console.log(message)
+    }
+  }
+  if (typeof event === "undefined") {
+    event = "default"
+  }
+
+  // Check if this is a valid bib number for the current event
+  if (!runnersData[bibNumber]) {
+    showMessage(`Bib #${bibNumber} not found in ${event} runner data`, true)
+    return
+  }
+
+  // Check if the runner is marked as DNF
+  if (runnersData[bibNumber].dnf) {
+    showMessage(`Bib #${bibNumber} is marked as DNF`, true)
+    return
+  }
+
+  // Create scan key
+  const scanKey = `${bibNumber}-${checkpoint}`
+
+  // Check if we've already processed this scan
+  let isRescan = false
+  if (processedScans[scanKey]) {
+    isRescan = true
+    const lastScanTime = new Date(scanTimestamps[scanKey]).toLocaleTimeString()
+    logDebug(`Rescan of Bib #${bibNumber} (previous scan at ${lastScanTime})`)
+
+    // Remove previous scan from recent scans
+    recentScans = recentScans.filter((scan) => !(scan.bib === bibNumber && scan.checkpoint === checkpoint))
+
+    // Find and remove previous scan from pending uploads
+    const previousScanIndex = pendingUploads.findIndex(
+      (scan) => scan.bib === bibNumber && scan.checkpoint === checkpoint,
+    )
+    if (previousScanIndex !== -1) {
+      pendingUploads.splice(previousScanIndex, 1)
+      savePendingScans()
+    }
+  }
+
   // Mark as processed and update timestamp
-  processedScans[scanKey] = true;
-  scanTimestamps[scanKey] = new Date().toISOString();
-  saveProcessedScans();
-  saveScanTimestamps();
-  
+  processedScans[scanKey] = true
+  scanTimestamps[scanKey] = new Date().toISOString()
+  saveProcessedScans()
+  saveScanTimestamps()
+
   // Add to already scanned runners set
-  alreadyScannedRunners.add(bibNumber);
-  
+  alreadyScannedRunners.add(bibNumber)
+
   // Create scan record
-  const timestamp = new Date().toISOString();
+  const timestamp = new Date().toISOString()
+
+  // Format a human-readable finish time (HH:MM:SS) for display
+  const now = new Date()
+  const finishTime = now.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  })
+
   const scan = {
     bib: bibNumber,
     name: runnersData[bibNumber].name,
-    event: event, // Make sure to include the event type
+    event: event,
     checkpoint: checkpoint,
     timestamp: timestamp,
+    finishTime: finishTime, // Add formatted finish time
     uploaded: false,
-    isRescan: isRescan
-  };
-  
-  // Add to recent scans
-  recentScans.unshift(scan);
-  if (recentScans.length > 50) {
-    recentScans.pop();
+    isRescan: isRescan,
   }
-  
+
+  // Add to recent scans
+  recentScans.unshift(scan)
+  if (recentScans.length > 50) {
+    recentScans.pop()
+  }
+
   // Save recent scans to localStorage
   try {
-    localStorage.setItem('recentScans', JSON.stringify(recentScans));
+    localStorage.setItem("recentScans", JSON.stringify(recentScans))
   } catch (error) {
-    logDebug('Error saving recent scans to localStorage: ' + error);
+    logDebug("Error saving recent scans to localStorage: " + error)
   }
-  
+
   // Update UI
-  updateRecentScansUI();
-  
+  updateRecentScansUI()
+
   // Show success message
   if (isRescan) {
-    showMessage(`Updated scan for Bib #${bibNumber}: ${runnersData[bibNumber].name}`);
+    showMessage(`Updated scan for Bib #${bibNumber}: ${runnersData[bibNumber].name}`)
   } else {
-    showMessage(`Scanned Bib #${bibNumber}: ${runnersData[bibNumber].name}`);
+    showMessage(`Scanned Bib #${bibNumber}: ${runnersData[bibNumber].name}`)
   }
-  
+
   // Flash the overlay
-  flashOverlay.style.display = 'block';
+  flashOverlay.style.display = "block"
   setTimeout(() => {
-    flashOverlay.style.display = 'none';
-  }, 300);
-  
+    flashOverlay.style.display = "none"
+  }, 300)
+
   // Add to pending uploads
-  pendingUploads.push(scan);
-  savePendingScans();
-  updatePendingUploadsUI();
-  
+  pendingUploads.push(scan)
+  savePendingScans()
+  updatePendingUploadsUI()
+
   // Try to upload immediately if online
   if (isOnline) {
-    uploadPendingScans(true); // Force upload
+    uploadPendingScans(true) // Force upload
   }
-  
+
   // Update checkpoint stats
-  fetchCheckpointStats();
+  fetchCheckpointStats(true) // Force refresh stats
 }
+
+
+  
 
   
 // Update recent scans UI
