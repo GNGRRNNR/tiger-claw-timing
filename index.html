@@ -1200,9 +1200,6 @@ function calculateLocalCheckpointStats() {
 }
 
 
-// Add this function to fetch checkpoint stats
-// Assuming fetchCheckpointStatsFromSpreadsheet is defined elsewhere and handles online data fetching
-let fetchCheckpointStatsFromSpreadsheet // Declare the variable
 
 function fetchCheckpointStats(force = false) {
   if (!force && (!isOnline || !checkpoint || !event)) {
@@ -1954,106 +1951,7 @@ const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${RESULTS_SHEET_I
 
 
   
-// Fetch runner data specifically for stats updates
-function fetchRunnerDataForStats() {
-  return new Promise((resolve, reject) => {
-    if (!isOnline) {
-      resolve(); // Use existing data if offline
-      return;
-    }
-    
-    logDebug('Fetching runner data for stats update');
-    
-    // Add a cache-busting parameter to ensure we get fresh data
-    const cacheBuster = new Date().getTime();
-    
-    // Fetch directly from the spreadsheet using the Google Visualization API
-    const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${RUNNERS_SHEET_ID}/gviz/tq?tqx=out:json&cacheBuster=${cacheBuster}`;
-    
-    fetch(spreadsheetUrl)
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.text();
-      })
-      .then(text => {
-        try {
-          // The response is not pure JSON, it's wrapped in a callback
-          // We need to extract the JSON part
-          const jsonStart = text.indexOf('{');
-          const jsonEnd = text.lastIndexOf('}') + 1;
-          if (jsonStart === -1 || jsonEnd === 0) {
-            throw new Error('Invalid response format - could not find JSON data');
-          }
-          const jsonString = text.substring(jsonStart, jsonEnd);
-          return JSON.parse(jsonString);
-        } catch (e) {
-          throw new Error(`Error parsing spreadsheet response: ${e.message}`);
-        }
-      })
-      .then(data => {
-        if (data && data.table && data.table.rows) {
-          const runnerMap = {};
-          const rows = data.table.rows;
-          const headers = data.table.cols.map(col => col.label);
-          
-          logDebug(`Found runner list columns: ${headers.join(', ')}`);
-          
-          // Find column indices using your exact column names
-          const bibIndex = headers.findIndex(h => h === "BIB NUMBER");
-          const nameIndex = headers.findIndex(h => h === "RUNNER NAME");
-          const statusIndex = headers.findIndex(h => h === "STATUS");
-          
-          logDebug(`Runner list column indices: bib=${bibIndex}, name=${nameIndex}, status=${statusIndex}`);
-          
-          if (bibIndex === -1 || nameIndex === -1) {
-            throw new Error('Could not find required columns in runner list spreadsheet');
-          }
-          
-          for (let i = 0; i < rows.length; i++) {
-            const row = rows[i].c;
-            if (row && row[bibIndex] && row[bibIndex].v) {
-              const bib = row[bibIndex].v.toString();
-              const name = row[nameIndex] && row[nameIndex].v ? row[nameIndex].v.toString() : 'Unknown';
-              let dnf = false;
-              
-              // Check for DNF in status column
-              if (statusIndex !== -1 && row[statusIndex] && row[statusIndex].v) {
-                const status = row[statusIndex].v.toString().toUpperCase();
-                dnf = (status === 'DNF' || status === 'DNS' || status === 'TRUE');
-              }
-              
-              runnerMap[bib] = {
-                name: name,
-                dnf: dnf
-              };
-            }
-          }
-          
-          if (Object.keys(runnerMap).length === 0) {
-            throw new Error('No runner data found in spreadsheet');
-          }
-          
-          // Update the last DNF check timestamp
-          lastDnfCheck = Date.now();
-          
-          runnersData = runnerMap;
-          localStorage.setItem('runnersData', JSON.stringify(runnersData));
-          logDebug(`Updated ${Object.keys(runnersData).length} runners for stats calculation`);
-          
-          resolve();
-        } else {
-          throw new Error('Invalid spreadsheet data format');
-        }
-      })
-      .catch(error => {
-        logDebug('Error fetching runner data for stats: ' + error);
-        // Continue with existing data
-        resolve();
-      });
-  });
-}
+
 
   
 
