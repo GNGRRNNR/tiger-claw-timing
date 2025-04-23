@@ -1643,7 +1643,7 @@ function fetchCheckpointStatsFromSpreadsheet() {
 
 
 
-  
+const resultsSheetName = eventType === "ASCENT" ? "ASCENT RESULTS" : "50k CHECKPOINT SCANS";  
 const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${RESULTS_SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(resultsSheetName)}&cacheBuster=${cacheBuster}`;
 
   
