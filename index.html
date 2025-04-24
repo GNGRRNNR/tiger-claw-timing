@@ -1053,6 +1053,21 @@ function checkUrlParameters() {
   }
 }
 
+  
+
+function showScannerScreen() {
+  loginScreen.classList.add('hidden');
+  scannerScreen.classList.remove('hidden');
+
+  // Update display values
+  eventDisplay.textContent = event;
+  checkpointDisplay.textContent = checkpoint;
+
+  // Immediately fetch stats
+  fetchCheckpointStats(true);
+}
+
+
 // Register service worker for offline support
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
