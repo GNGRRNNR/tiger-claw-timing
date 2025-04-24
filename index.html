@@ -1575,58 +1575,7 @@ function handleLogin() {
 
 
 
-  
-// Split the combined value
-const [selectedEvent, selectedCheckpoint] = selectedLocation.split('|');
 
-  if (!selectedEvent) {
-    loginError.textContent = 'Please select an event';
-    loginError.classList.remove('hidden');
-    return;
-  }
-
-  if (!selectedCheckpoint) {
-    loginError.textContent = 'Please select a checkpoint';
-    loginError.classList.remove('hidden');
-    return;
-  }
-
-  if (password !== CORRECT_PASSWORD) {
-    loginError.textContent = 'Incorrect password';
-    loginError.classList.remove('hidden');
-    return;
-  }
-
-  // Clear old session data
-  clearSessionData();
-
-  // Save event and checkpoint
-  event = selectedEvent;
-  checkpoint = selectedCheckpoint;
-  localStorage.setItem('tigerClawEvent', event);
-  localStorage.setItem('tigerClawCheckpoint', checkpoint);
-
-  // Show scanner screen immediately
-  showScannerScreen();
-
-  // Load runner data with high priority
-  loadRunnersDataWithPriority()
-    .then(() => {
-      // After runner data is loaded, fetch checkpoint stats
-      fetchCheckpointStats(true);
-      // Then fetch already scanned runners
-      fetchAlreadyScannedRunners();
-      // Start periodic upload attempts
-      startPeriodicUploadAttempts();
-    })
-    .catch(error => {
-      logDebug(`Error in login sequence: ${error}`);
-      // Still proceed with what we have
-      fetchCheckpointStats(true);
-      fetchAlreadyScannedRunners();
-      startPeriodicUploadAttempts();
-    });
-}
 
 
 
@@ -1760,18 +1709,19 @@ function loadRunnersDataWithPriority() {
 // Update your showScannerScreen function to properly handle fetchCheckpointStats
 // Update the handleLogin function to load stats immediately
 function handleLogin() {
-  const selectedEvent = eventSelect.value;
-  const selectedCheckpoint = checkpointSelect.value;
+  const selectedLocation = locationSelect.value;
   const password = passwordInput.value;
 
-  if (!selectedEvent) {
-    loginError.textContent = 'Please select an event';
+  if (!selectedLocation) {
+    loginError.textContent = 'Please select a location';
     loginError.classList.remove('hidden');
     return;
   }
 
-  if (!selectedCheckpoint) {
-    loginError.textContent = 'Please select a checkpoint';
+  const [selectedEvent, selectedCheckpoint] = selectedLocation.split('|');
+
+  if (!selectedEvent) {
+    loginError.textContent = 'Please select an event';
     loginError.classList.remove('hidden');
     return;
   }
