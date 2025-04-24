@@ -3250,6 +3250,17 @@ function uploadPendingScans(force = false) {
         status: "STATUS"
       }
     };
+
+    timestamp: new Date(scan.timestamp).toLocaleString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true,
+      month: 'numeric',
+      day: 'numeric',
+      year: 'numeric'
+    })
+
     
     logDebug(`ASCENT upload data: ${JSON.stringify(ascentUploadData)}`);
     
@@ -3293,6 +3304,17 @@ function uploadPendingScans(force = false) {
         event: "EVENT"
       }
     };
+
+    timestamp: new Date(scan.timestamp).toLocaleString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true,
+      month: 'numeric',
+      day: 'numeric',
+      year: 'numeric'
+    })
+
     
     logDebug(`50K upload data: ${JSON.stringify(fiftyKUploadData)}`);
     
