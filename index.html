@@ -1678,19 +1678,17 @@ loginForm.addEventListener('submit', function(event) {
 
 // Update the handleLogin function to load stats immediately
 function handleLogin() {
-  const selectedEvent = eventSelect.value;
-  const selectedCheckpoint = checkpointSelect.value;
-  const password = passwordInput.value;
   const selectedLocation = locationSelect.value;
-  
-  if (!selectedLocation) {
-    loginError.textContent = 'Please select a location';
-    loginError.classList.remove('hidden');
-    return;
-  }
-  
-  // Split the combined value
-  const [selectedEvent, selectedCheckpoint] = selectedLocation.split('|');
+  const password = passwordInput.value;
+
+if (!selectedLocation) {
+  loginError.textContent = 'Please select a location';
+  loginError.classList.remove('hidden');
+  return;
+}
+
+// Split the combined value
+const [selectedEvent, selectedCheckpoint] = selectedLocation.split('|');
 
   if (!selectedEvent) {
     loginError.textContent = 'Please select an event';
