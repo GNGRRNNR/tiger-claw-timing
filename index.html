@@ -3125,9 +3125,11 @@ function processScan(bibNumber) {
     uploaded: false,
     isRescan: isRescan
   };
-  
-  // Log the scan object for debugging
+
   logDebug(`Created scan object: ${JSON.stringify(scan)}`);
+
+  
+
   
   // Add to recent scans
   recentScans.unshift(scan);
@@ -3227,6 +3229,8 @@ function updatePendingUploadsUI() {
 
 
 function uploadPendingScans(force = false) {
+  logDebug(`uploadPendingScans() called. checkpoint=${checkpoint}, event=${event}`);
+
   if (!isOnline || pendingUploads.length === 0) {
     return;
   }
@@ -3367,6 +3371,10 @@ function uploadPendingScans(force = false) {
         pendingUploads = remainingUploads;
         savePendingScans();
       }
+
+      logDebug(`Uploading to ASCENT RESULTS sheet`);
+      logDebug(`Uploading to 50k CHECKPOINT SCANS sheet`);
+
       
       // Update UI
       updatePendingUploadsUI();
