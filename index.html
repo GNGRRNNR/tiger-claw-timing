@@ -1259,97 +1259,6 @@ function fetchCheckpointStats(force = false) {
 }
 
 
-
-
-function uploadPendingScans(force = false) {
-  if (!isOnline || pendingUploads.length === 0) return;
-  if (!force && isUploadingPendingScans) return;
-
-  isUploadingPendingScans = true;
-  logDebug(`Uploading ${pendingUploads.length} pending scans`);
-  showMessage(`Uploading ${pendingUploads.length} scans...`);
-
-  const uploadsToProcess = JSON.parse(JSON.stringify(pendingUploads));
-  const ascentScans = uploadsToProcess.filter(scan => scan.event === "ASCENT");
-  const fiftyKScans = uploadsToProcess.filter(scan => scan.event === "50K");
-
-  const uploadPromises = [];
-
-  // ASCENT Scans
-  if (ascentScans.length > 0) {
-    const ascentUploadData = {
-      action: "recordScans",
-      eventType: "ASCENT",
-      sheetName: "ASCENT RESULTS",
-      scans: ascentScans,
-      columnMappings: {
-        timestamp: "TIMESTAMP",
-        bib: "BIB NUMBER",
-        name: "RUNNER NAME",
-        status: "STATUS",
-        finishTime: "FINISH TIME"
-      }
-    };
-
-    uploadPromises.push(
-      fetch(APPS_SCRIPT_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        cache: 'no-cache',
-        headers: {
-          'Content-Type': 'text/plain;charset=utf-8',
-        },
-        body: JSON.stringify(ascentUploadData)
-      }).then(() => ascentScans.length)
-    );
-  }
-
-  // 50K Scans
-  if (fiftyKScans.length > 0) {
-    const fiftyKUploadData = {
-      action: "recordScans",
-      eventType: "50K",
-      sheetName: "50k CHECKPOINT SCANS",
-      scans: fiftyKScans,
-      columnMappings: {
-        timestamp: "TIMESTAMP",
-        bib: "BIB NUMBER",
-        name: "RUNNER NAME",
-        checkpoint: "CHECKPOINT"
-      }
-    };
-
-    uploadPromises.push(
-      fetch(APPS_SCRIPT_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        cache: 'no-cache',
-        headers: {
-          'Content-Type': 'text/plain;charset=utf-8',
-        },
-        body: JSON.stringify(fiftyKUploadData)
-      }).then(() => fiftyKScans.length)
-    );
-  }
-
-  Promise.all(uploadPromises)
-    .then(() => {
-      showMessage("Scans uploaded successfully");
-      pendingUploads = [];
-      savePendingScans();
-      updatePendingUploadsUI();
-      fetchCheckpointStats(true);
-    })
-    .catch(error => {
-      logDebug('Upload failed: ' + error);
-      showMessage('Upload failed, will retry later.', true);
-    })
-    .finally(() => {
-      isUploadingPendingScans = false;
-    });
-}
-
-
   
   
 
@@ -1627,17 +1536,46 @@ loginForm.addEventListener('submit', function(event) {
   handleLogin();
 });
 
-// Update the handleLogin function to load stats immediately
+
+  
+
 function handleLogin() {
   const selectedLocation = locationSelect.value;
   const password = passwordInput.value;
 
-if (!selectedLocation) {
-  loginError.textContent = 'Please select a location';
-  loginError.classList.remove('hidden');
-  return;
+  if (!selectedLocation) {
+    loginError.textContent = 'Please select a location';
+    loginError.classList.remove('hidden');
+    return;
+  }
+
+  const [selectedEvent, selectedCheckpoint] = selectedLocation.split('|');
+  if (password !== CORRECT_PASSWORD) {
+    loginError.textContent = 'Incorrect password';
+    loginError.classList.remove('hidden');
+    return;
+  }
+
+  // Save event/checkpoint
+  event = selectedEvent;
+  checkpoint = selectedCheckpoint;
+  localStorage.setItem('tigerClawEvent', event);
+  localStorage.setItem('tigerClawCheckpoint', checkpoint);
+
+  // Clear session and show UI
+  clearSessionData();
+  showScannerScreen();
+
+  loadRunnersDataWithPriority().then(() => {
+    fetchCheckpointStats(true);           // ✅ NOW waits for runner data to be loaded
+    fetchAlreadyScannedRunners();         // ✅ Load scanned runners
+    startPeriodicUploadAttempts();        // ✅ Begin periodic uploads
+  });
 }
 
+
+
+  
 // Split the combined value
 const [selectedEvent, selectedCheckpoint] = selectedLocation.split('|');
 
