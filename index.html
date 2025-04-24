@@ -2379,22 +2379,28 @@ function init() {
 
   // Check if we already have runner data in localStorage
   try {
-    const storedData = localStorage.getItem('runnersData');
-    if (storedData) {
-      const parsedData = JSON.parse(storedData);
-      if (parsedData && Object.keys(parsedData).length > 0) {
-        // We have data, use it immediately
-        runnersData = parsedData;
-        logDebug(`Loaded ${Object.keys(runnersData).length} runners from localStorage at init`);
-        
-        // Check for pending uploads that need to be processed
-        if (pendingUploads.length > 0) {
-          logDebug(`Found ${pendingUploads.length} pending uploads at startup`);
-          updatePendingUploadsUI();
-        }
-        
-        loadingScreen.classList.add('hidden');
-        checkLoginStatus();
+    const savedEvent = localStorage.getItem('tigerClawEvent');
+    const savedCheckpoint = localStorage.getItem('tigerClawCheckpoint');
+
+    if (savedEvent && savedCheckpoint) {
+      event = savedEvent;
+      checkpoint = savedCheckpoint;
+
+      // Show scanner screen immediately (if coming back from reload)
+      showScannerScreen();
+
+      // Load runner data and stats after screen is set
+      loadRunnersDataWithPriority()
+        .then(() => {
+          fetchCheckpointStats(true);
+          fetchAlreadyScannedRunners();
+          startPeriodicUploadAttempts();
+        });
+    } else {
+      loginScreen.classList.remove('hidden');
+      loadingScreen.classList.add('hidden');
+    }
+
         
         // Still fetch fresh data in the background
         setTimeout(() => {
