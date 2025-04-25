@@ -2345,6 +2345,7 @@ function clearAllData() {
 }
 
 // Revised init() function to fix mobile loading and stats delay
+// Revised init() function with safe fallback on runner load failure
 function init() {
   const androidInstallBtn = document.getElementById("android-install-btn");
   const iosInstallBtn = document.getElementById("ios-install-btn");
@@ -2406,13 +2407,21 @@ function init() {
         fetchCheckpointStats(true);
         fetchAlreadyScannedRunners();
         startPeriodicUploadAttempts();
+      })
+      .catch(error => {
+        logDebug('Failed to load runners after init: ' + error);
+        localStorage.removeItem('tigerClawEvent');
+        localStorage.removeItem('tigerClawCheckpoint');
+        scannerScreen.classList.add('hidden');
+        loginScreen.classList.remove('hidden');
+        loadingScreen.classList.add('hidden');
+        showMessage("Connection error. Please log in again.", true);
       });
   } else {
     loginScreen.classList.remove('hidden');
     loadingScreen.classList.add('hidden');
   }
 
-  // Try to recover runner data in background after a delay
   setTimeout(() => {
     if (!runnersData || Object.keys(runnersData).length === 0) {
       fetchRunnerData(true);
@@ -3266,7 +3275,7 @@ function uploadPendingScans(force = false) {
         body: JSON.stringify(ascentUploadData)
       }).then(() => {
         ascentScans.forEach(scan => {
-          successfulUploads.push(`${scan.bib}-${scan.checkpoint}`);
+successfulUploads.push(`${scan.bib}-${(scan.checkpoint || '').toUpperCase()}`);
         });
         return ascentScans.length;
       }).catch(error => {
@@ -3303,7 +3312,7 @@ function uploadPendingScans(force = false) {
         body: JSON.stringify(fiftyKUploadData)
       }).then(() => {
         fiftyKScans.forEach(scan => {
-          successfulUploads.push(`${scan.bib}-${scan.checkpoint}`);
+successfulUploads.push(`${scan.bib}-${(scan.checkpoint || '').toUpperCase()}`);
         });
         return fiftyKScans.length;
       }).catch(error => {
@@ -3320,7 +3329,7 @@ function uploadPendingScans(force = false) {
 
       if (successfulUploads.length > 0) {
         pendingUploads = pendingUploads.filter(scan => {
-          const scanKey = `${scan.bib}-${scan.checkpoint}`;
+          const scanKey = `${scan.bib}-${(scan.checkpoint || '').toUpperCase()}`;
           return !successfulUploads.includes(scanKey);
         });
         savePendingScans();
