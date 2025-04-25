@@ -2428,12 +2428,19 @@ function init() {
     }
   }, 1000);
 
-  if (isOnline && pendingUploads.length > 0) {
-    logDebug(`Found ${pendingUploads.length} pending uploads at startup - attempting to upload`);
-    setTimeout(() => {
-      uploadPendingScans(true);
-    }, 3000);
+    if (isOnline && pendingUploads.length > 0) {
+    const tryUploadWhenReady = () => {
+      if (event && checkpoint) {
+        logDebug(`Uploading ${pendingUploads.length} pending uploads after init`);
+        uploadPendingScans(true);
+      } else {
+        logDebug('Waiting for event/checkpoint before uploading pending scans...');
+        setTimeout(tryUploadWhenReady, 500); // Retry in 0.5s
+      }
+    };
+    tryUploadWhenReady();
   }
+
 }
 
 
@@ -3217,6 +3224,9 @@ function updatePendingUploadsUI() {
 
 // Rewritten uploadPendingScans() with full logging, key normalization, and error capture
 function uploadPendingScans(force = false) {
+  // Always check actual connection before continuing
+  isOnline = navigator.onLine;
+
   logDebug(`uploadPendingScans() called. checkpoint=${checkpoint}, event=${event}`);
   logDebug(`Uploading scans. Online? ${isOnline}. Pending uploads: ${pendingUploads.length}`);
   logDebug(`navigator.onLine is actually: ${navigator.onLine}`);
