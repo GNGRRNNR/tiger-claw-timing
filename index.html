@@ -1057,14 +1057,15 @@ function checkUrlParameters() {
 
 function showScannerScreen() {
   loginScreen.classList.add('hidden');
+  loadingScreen.classList.add('hidden'); // 🔥 hide loading label
+
   scannerScreen.classList.remove('hidden');
 
-  // Update display values
+  // Update checkpoint/event display
   eventDisplay.textContent = event;
   checkpointDisplay.textContent = checkpoint;
 
-  // Immediately fetch stats
-  fetchCheckpointStats(true);
+  updateOfflineBanner();
 }
 
 
@@ -3207,42 +3208,41 @@ function updatePendingUploadsUI() {
 
 function uploadPendingScans(force = false) {
   logDebug(`uploadPendingScans() called. checkpoint=${checkpoint}, event=${event}`);
+  logDebug(`Uploading scans. Online? ${isOnline}. Pending uploads: ${pendingUploads.length}`);
+  if (pendingUploads.length > 0) {
+    logDebug(`First pending scan: ${JSON.stringify(pendingUploads[0])}`);
+  }
 
-  if (!isOnline || pendingUploads.length === 0) {
-    return;
-  }
-  
-  // Allow forced uploads to bypass the isUploadingPendingScans check
-  if (!force && isUploadingPendingScans) {
-    return;
-  }
-  
-  // Set uploading flag
+  if (!isOnline || pendingUploads.length === 0) return;
+  if (!force && isUploadingPendingScans) return;
+
   isUploadingPendingScans = true;
-  
-  logDebug(`Uploading ${pendingUploads.length} pending scans`);
   showMessage(`Uploading ${pendingUploads.length} scans...`);
-  
-  // Create a deep copy of the pending uploads to avoid reference issues
+
   const uploadsToProcess = JSON.parse(JSON.stringify(pendingUploads));
-  
-  // Log all scans for debugging
-  logDebug(`All scans to upload: ${JSON.stringify(uploadsToProcess)}`);
-  
-  // Group scans by event type
   const ascentScans = uploadsToProcess.filter(scan => scan.event === "ASCENT");
   const fiftyKScans = uploadsToProcess.filter(scan => scan.event === "50K");
-  
-  logDebug(`Grouped scans: ${ascentScans.length} ASCENT scans and ${fiftyKScans.length} 50K scans`);
-  
-  // Create separate upload promises for each event type
   const uploadPromises = [];
   const successfulUploads = [];
-  
+
+  // Format timestamps for readability
+  const formatTimestamp = (ts) => new Date(ts).toLocaleString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+    month: 'numeric',
+    day: 'numeric',
+    year: 'numeric'
+  });
+
+  ascentScans.forEach(scan => scan.timestamp = formatTimestamp(scan.timestamp));
+  fiftyKScans.forEach(scan => scan.timestamp = formatTimestamp(scan.timestamp));
+
   // Upload ASCENT scans
   if (ascentScans.length > 0) {
-    logDebug(`Preparing to upload ${ascentScans.length} ASCENT scans to ASCENT RESULTS sheet`);
-    
+    logDebug(`Uploading to ASCENT RESULTS sheet`);
+
     const ascentUploadData = {
       action: "recordScans",
       eventType: "ASCENT",
@@ -3257,31 +3257,14 @@ function uploadPendingScans(force = false) {
       }
     };
 
-    timestamp: new Date(scan.timestamp).toLocaleString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true,
-      month: 'numeric',
-      day: 'numeric',
-      year: 'numeric'
-    })
-
-    
-    logDebug(`ASCENT upload data: ${JSON.stringify(ascentUploadData)}`);
-    
     uploadPromises.push(
       fetch(APPS_SCRIPT_URL, {
         method: 'POST',
         mode: 'no-cors',
         cache: 'no-cache',
-        headers: {
-          'Content-Type': 'text/plain;charset=utf-8',
-        },
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify(ascentUploadData)
       }).then(() => {
-        logDebug('ASCENT upload successful (assumed)');
-        // Mark these scans as successfully uploaded
         ascentScans.forEach(scan => {
           successfulUploads.push(`${scan.bib}-${scan.checkpoint}`);
         });
@@ -3292,11 +3275,11 @@ function uploadPendingScans(force = false) {
       })
     );
   }
-  
+
   // Upload 50K scans
   if (fiftyKScans.length > 0) {
-    logDebug(`Preparing to upload ${fiftyKScans.length} 50K scans to 50k CHECKPOINT SCANS sheet`);
-    
+    logDebug(`Uploading to 50k CHECKPOINT SCANS sheet`);
+
     const fiftyKUploadData = {
       action: "recordScans",
       eventType: "50K",
@@ -3311,31 +3294,14 @@ function uploadPendingScans(force = false) {
       }
     };
 
-    timestamp: new Date(scan.timestamp).toLocaleString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true,
-      month: 'numeric',
-      day: 'numeric',
-      year: 'numeric'
-    })
-
-    
-    logDebug(`50K upload data: ${JSON.stringify(fiftyKUploadData)}`);
-    
     uploadPromises.push(
       fetch(APPS_SCRIPT_URL, {
         method: 'POST',
         mode: 'no-cors',
         cache: 'no-cache',
-        headers: {
-          'Content-Type': 'text/plain;charset=utf-8',
-        },
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify(fiftyKUploadData)
       }).then(() => {
-        logDebug('50K upload successful (assumed)');
-        // Mark these scans as successfully uploaded
         fiftyKScans.forEach(scan => {
           successfulUploads.push(`${scan.bib}-${scan.checkpoint}`);
         });
@@ -3346,39 +3312,21 @@ function uploadPendingScans(force = false) {
       })
     );
   }
-  
-  // Process all upload promises
+
   Promise.all(uploadPromises)
     .then(results => {
       const totalUploaded = results.reduce((sum, count) => sum + count, 0);
-      logDebug(`Successfully uploaded ${totalUploaded} scans`);
       showMessage(`${totalUploaded} scans uploaded successfully`);
-      
-      // Only remove the successfully uploaded scans from pendingUploads
+
       if (successfulUploads.length > 0) {
-        logDebug(`Removing ${successfulUploads.length} successfully uploaded scans from pending list`);
-        
-        // Create a new array without the successfully uploaded scans
-        const remainingUploads = pendingUploads.filter(scan => {
+        pendingUploads = pendingUploads.filter(scan => {
           const scanKey = `${scan.bib}-${scan.checkpoint}`;
           return !successfulUploads.includes(scanKey);
         });
-        
-        logDebug(`Pending uploads before: ${pendingUploads.length}, after: ${remainingUploads.length}`);
-        
-        // Update the pendingUploads array
-        pendingUploads = remainingUploads;
         savePendingScans();
       }
 
-      logDebug(`Uploading to ASCENT RESULTS sheet`);
-      logDebug(`Uploading to 50k CHECKPOINT SCANS sheet`);
-
-      
-      // Update UI
       updatePendingUploadsUI();
-      
-      // Fetch fresh checkpoint stats
       fetchCheckpointStats(true);
     })
     .catch(error => {
@@ -3389,6 +3337,7 @@ function uploadPendingScans(force = false) {
       isUploadingPendingScans = false;
     });
 }
+
   
   
 
