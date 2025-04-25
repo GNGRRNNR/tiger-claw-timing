@@ -964,7 +964,7 @@ let pendingUploadsMonitorActive = false;
   
 // Constants
 const CORRECT_PASSWORD = "threeloops";
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxWHPsMCqTPh6dU7eNDEVoAKvulL7gizqXhE7vnb15MdF5cB3RLn2tmKCywtEEBbx65/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzFbZrZeeGH6D_XyXlgBMZ9JoXNaMheucKIW5di1E1osr_ZXQUr6-47alw8XQ3QYV_a/exec";
 const RUNNER_DATA_REFRESH_INTERVAL = 2 * 60 * 1000; // 2 minutes
 const CHECKPOINT_STATS_REFRESH_INTERVAL = 30 * 1000; // 30 seconds
 const DNF_CHECK_INTERVAL = 60 * 1000; // 1 minute
@@ -1066,6 +1066,26 @@ function showScannerScreen() {
   // Immediately fetch stats
   fetchCheckpointStats(true);
 }
+
+
+function testBackendConnection() {
+  fetch(`${APPS_SCRIPT_URL}?action=ping`)
+    .then(res => res.json())
+    .then(data => {
+      if (data.message === "Connection successful") {
+        isOnline = true;
+        updateOfflineBanner();
+      } else {
+        isOnline = false;
+        updateOfflineBanner();
+      }
+    })
+    .catch(() => {
+      isOnline = false;
+      updateOfflineBanner();
+    });
+}
+
 
 
 // Register service worker for offline support
@@ -1588,6 +1608,24 @@ function handleLogin() {
 
 
 
+function testBackendConnection() {
+  fetch(`${APPS_SCRIPT_URL}?action=ping`)
+    .then(res => res.json())
+    .then(data => {
+      if (data.message === "Connection successful") {
+        isOnline = true;
+        updateOfflineBanner(); // also update UI
+      } else {
+        isOnline = false;
+        updateOfflineBanner();
+      }
+    })
+    .catch(() => {
+      isOnline = false;
+      updateOfflineBanner();
+    });
+}
+
 
 
 
@@ -1604,6 +1642,9 @@ function startPeriodicUploadAttempts() {
   }, PERIODIC_UPLOAD_INTERVAL);
   logDebug("Started periodic upload attempts");
 }
+
+testBackendConnection();
+setInterval(testBackendConnection, 30000);
 
 // Add this function
 function fetchRunnerDataForStats() {
@@ -1972,7 +2013,10 @@ function fetchCheckpointStatsFromSpreadsheet() {
   isRefreshingStats = true;
   if (statsRefreshing) statsRefreshing.classList.remove("hidden");
 
-  fetch(`${APPS_SCRIPT_URL}?action=getCheckpointStats&eventType=${encodeURIComponent(event)}&checkpoint=${encodeURIComponent(checkpoint)}`)
+    const eventType = localStorage.getItem('tigerClawEvent');
+    const selectedCheckpoint = localStorage.getItem('tigerClawCheckpoint');
+
+    fetch(`${APPS_SCRIPT_URL}?action=getCheckpointStats&eventType=${encodeURIComponent(eventType)}&checkpoint=${encodeURIComponent(selectedCheckpoint)}`)
     .then((response) => {
       if (!response.ok) throw new Error("Network response was not ok");
       return response.json();
@@ -2396,14 +2440,19 @@ function startMonitoring() {
 
 
 
-// Update offline banner
 function updateOfflineBanner() {
-  if (!isOnline) {
-    offlineBanner.classList.remove('hidden');
+  const connectionIndicator = document.getElementById("connection-status");
+  if (navigator.onLine) {
+    connectionIndicator.textContent = "Connected";
+    connectionIndicator.classList.remove("text-red-600");
+    connectionIndicator.classList.add("text-green-600");
   } else {
-    offlineBanner.classList.add('hidden');
+    connectionIndicator.textContent = "No Connection";
+    connectionIndicator.classList.remove("text-green-600");
+    connectionIndicator.classList.add("text-red-600");
   }
 }
+
 
 // Load uploaded scans from localStorage
 function loadUploadedScans() {
