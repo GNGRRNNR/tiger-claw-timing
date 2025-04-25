@@ -1029,29 +1029,32 @@ const checkpointStatsContent = document.getElementById('checkpoint-stats');
 
 // Check for URL parameters (for QR code login)
 function checkUrlParameters() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const checkpointParam = urlParams.get('checkpoint');
-  const passwordParam = urlParams.get('password');
+  const params = new URLSearchParams(window.location.search);
+  const urlEvent = params.get("event");
+  const urlCheckpoint = params.get("checkpoint");
 
-  if (checkpointParam && passwordParam) {
-    logDebug(`Found URL parameters: checkpoint=${checkpointParam}`);
-    
-    // Auto-fill the login form
-    const checkpointOption = Array.from(checkpointSelect.options).find(
-      option => option.value === checkpointParam
-    );
-    
-    if (checkpointOption) {
-      checkpointSelect.value = checkpointParam;
-      passwordInput.value = passwordParam;
-      
-      // Auto login after a short delay
-      setTimeout(() => {
-        handleLogin();
-      }, 500);
-    }
+  if (urlEvent && urlCheckpoint) {
+    event = urlEvent.toUpperCase();
+    checkpoint = urlCheckpoint.toUpperCase();
+    localStorage.setItem("tigerClawEvent", event);
+    localStorage.setItem("tigerClawCheckpoint", checkpoint);
+
+    showScannerScreen();
+
+    loadRunnersDataWithPriority()
+      .then(() => {
+        fetchCheckpointStats(true);
+        fetchAlreadyScannedRunners();
+        startPeriodicUploadAttempts();
+        uploadPendingScans(true);
+      })
+      .catch(error => {
+        logDebug('Failed to load runners via QR: ' + error);
+        showMessage("Could not load data. Please reconnect.", true);
+      });
   }
 }
+
 
   
 
