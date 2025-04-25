@@ -756,7 +756,7 @@ font-size: 16px;
   </div>
 
   <!-- Scanner Screen -->
-  <div id="scanner-screen" class="hidden">
+  <div id="scanner-screen">
   <div class="install-icons">
     <button id="scanner-android-install" class="icon-button" title="Install on Android">
       <span class="platform-icon">🤖</span> Install App
@@ -861,6 +861,14 @@ font-size: 16px;
 <!-- Include the HTML5 QR Code Scanner library directly in the HTML -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
+<script>
+  const event = "ASCENT";
+  const checkpoint = "FINISHLINE";
+  localStorage.setItem("tigerClawEvent", event);
+  localStorage.setItem("tigerClawCheckpoint", checkpoint);
+</script>
+
+  
 <script>
 // Main application code
 // Add this to your JavaScript to ensure all install buttons are blue
