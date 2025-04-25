@@ -964,7 +964,7 @@ let pendingUploadsMonitorActive = false;
   
 // Constants
 const CORRECT_PASSWORD = "threeloops";
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzFbZrZeeGH6D_XyXlgBMZ9JoXNaMheucKIW5di1E1osr_ZXQUr6-47alw8XQ3QYV_a/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzdf00vs6w0vob21YNenSARShuVVNYvhB_2bWodoxqYxaXdBu1EqAqTaViD4i70GZi4/exec";
 const RUNNER_DATA_REFRESH_INTERVAL = 2 * 60 * 1000; // 2 minutes
 const CHECKPOINT_STATS_REFRESH_INTERVAL = 30 * 1000; // 30 seconds
 const DNF_CHECK_INTERVAL = 60 * 1000; // 1 minute
@@ -3219,6 +3219,8 @@ function updatePendingUploadsUI() {
 function uploadPendingScans(force = false) {
   logDebug(`uploadPendingScans() called. checkpoint=${checkpoint}, event=${event}`);
   logDebug(`Uploading scans. Online? ${isOnline}. Pending uploads: ${pendingUploads.length}`);
+  logDebug(`navigator.onLine is actually: ${navigator.onLine}`);
+
   if (pendingUploads.length > 0) {
     logDebug(`First pending scan: ${JSON.stringify(pendingUploads[0])}`);
   }
