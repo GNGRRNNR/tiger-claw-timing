@@ -964,7 +964,7 @@ let pendingUploadsMonitorActive = false;
   
 // Constants
 const CORRECT_PASSWORD = "threeloops";
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw0myP_7idi4yuiToxjILjuheiiy_QvBQu1htF4HSJ68A5T3w1e-R2ceXwfSTzHFw/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxWHPsMCqTPh6dU7eNDEVoAKvulL7gizqXhE7vnb15MdF5cB3RLn2tmKCywtEEBbx65/exec";
 const RUNNER_DATA_REFRESH_INTERVAL = 2 * 60 * 1000; // 2 minutes
 const CHECKPOINT_STATS_REFRESH_INTERVAL = 30 * 1000; // 30 seconds
 const DNF_CHECK_INTERVAL = 60 * 1000; // 1 minute
@@ -1571,21 +1571,19 @@ function handleLogin() {
     return;
   }
 
-  // Save event/checkpoint
   event = selectedEvent;
   checkpoint = selectedCheckpoint;
   localStorage.setItem('tigerClawEvent', event);
   localStorage.setItem('tigerClawCheckpoint', checkpoint);
 
-  // Clear session and show UI
-  clearSessionData();
   showScannerScreen();
 
-  loadRunnersDataWithPriority().then(() => {
-    fetchCheckpointStats(true);           // ✅ NOW waits for runner data to be loaded
-    fetchAlreadyScannedRunners();         // ✅ Load scanned runners
-    startPeriodicUploadAttempts();        // ✅ Begin periodic uploads
-  });
+  loadRunnersDataWithPriority()
+    .then(() => {
+      fetchCheckpointStats(true);          // ✅ Wait for runners before fetching stats
+      fetchAlreadyScannedRunners();        // ✅ Then load scanned bibs
+      startPeriodicUploadAttempts();       // ✅ Then begin auto-uploads
+    });
 }
 
 
@@ -2301,31 +2299,23 @@ function clearAllData() {
   }
 }
 
-// Initialize the application
+// Revised init() function to fix mobile loading and stats delay
 function init() {
-  // DOM elements for installation
   const androidInstallBtn = document.getElementById("android-install-btn");
   const iosInstallBtn = document.getElementById("ios-install-btn");
   const iosInstructions = document.getElementById("ios-install-instructions");
   persistentInstallBtn = document.createElement("button");
 
-  // Set up persistent install button
   setupPersistentInstallButton(persistentInstallBtn);
-
-  // Set up installation instructions - pass the elements as parameters
   showAppropriateInstallInstructions(androidInstallBtn, iosInstallBtn, iosInstructions);
-
-  // Update install prompts
   updateInstallPrompts();
 
-  // Set up scanner screen install buttons
   const scannerAndroidInstall = document.getElementById('scanner-android-install');
   const scannerIosInstall = document.getElementById('scanner-ios-install');
   const scannerIosInstructions = document.getElementById('scanner-ios-instructions');
 
   if (scannerAndroidInstall) {
     scannerAndroidInstall.addEventListener('click', triggerInstall);
-    // Hide Android button on iOS
     if (isIOS()) {
       scannerAndroidInstall.classList.add('hidden');
     }
@@ -2335,89 +2325,55 @@ function init() {
     scannerIosInstall.addEventListener('click', () => {
       scannerIosInstructions.classList.toggle('hidden');
     });
-    // Hide iOS button on Android
     if (!isIOS()) {
       scannerIosInstall.classList.add('hidden');
     }
   }
 
-  // Hide both buttons if app is already installed
-  if (window.matchMedia('(display-mode: standalone)').matches || 
-      window.navigator.standalone === true) {
+  if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
     if (scannerAndroidInstall) scannerAndroidInstall.classList.add('hidden');
     if (scannerIosInstall) scannerIosInstall.classList.add('hidden');
   }
 
-  // Register service worker
   registerServiceWorker();
-
-  // Check for URL parameters (for QR code login)
   checkUrlParameters();
-
-  // Load data from localStorage
   loadPendingScans();
   loadProcessedScans();
   loadScanTimestamps();
   loadUploadedScans();
 
-  // Set initial online status
   isOnline = navigator.onLine;
   updateOfflineBanner();
 
-  // Set up online/offline event listeners
   window.addEventListener('online', handleOnlineStatusChange);
   window.addEventListener('offline', handleOnlineStatusChange);
 
-  // Check if the app is already installed
-  if (window.matchMedia('(display-mode: standalone)').matches || 
-      window.navigator.standalone === true) {
-    logDebug("App is already installed, hiding install prompts");
-    // App is already installed, hide all install prompts
-    if (installPrompt) installPrompt.classList.add("hidden");
-    if (persistentInstallBtn) persistentInstallBtn.classList.add("hidden");
+  const savedEvent = localStorage.getItem('tigerClawEvent');
+  const savedCheckpoint = localStorage.getItem('tigerClawCheckpoint');
+
+  if (savedEvent && savedCheckpoint) {
+    event = savedEvent;
+    checkpoint = savedCheckpoint;
+    showScannerScreen();
+
+    loadRunnersDataWithPriority()
+      .then(() => {
+        fetchCheckpointStats(true);
+        fetchAlreadyScannedRunners();
+        startPeriodicUploadAttempts();
+      });
+  } else {
+    loginScreen.classList.remove('hidden');
+    loadingScreen.classList.add('hidden');
   }
 
-  // Check if we already have runner data in localStorage
-  try {
-    const savedEvent = localStorage.getItem('tigerClawEvent');
-    const savedCheckpoint = localStorage.getItem('tigerClawCheckpoint');
-
-    if (savedEvent && savedCheckpoint) {
-      event = savedEvent;
-      checkpoint = savedCheckpoint;
-
-      // Show scanner screen immediately (if coming back from reload)
-      showScannerScreen();
-
-      // Load runner data and stats after screen is set
-      loadRunnersDataWithPriority()
-        .then(() => {
-          fetchCheckpointStats(true);
-          fetchAlreadyScannedRunners();
-          startPeriodicUploadAttempts();
-        });
-    } else {
-      loginScreen.classList.remove('hidden');
-      loadingScreen.classList.add('hidden');
+  // Try to recover runner data in background after a delay
+  setTimeout(() => {
+    if (!runnersData || Object.keys(runnersData).length === 0) {
+      fetchRunnerData(true);
     }
+  }, 1000);
 
-        
-        // Still fetch fresh data in the background
-        setTimeout(() => {
-          fetchRunnerData(true);
-        }, 1000);
-        
-        return;
-      }
-    }
-  } catch (error) {
-    logDebug('Error loading runners data from localStorage at init: ' + error);
-  }
-
-  // If we don't have data, fetch it
-  fetchRunnerData(true);
-
-  // Check if we have pending uploads and we're online
   if (isOnline && pendingUploads.length > 0) {
     logDebug(`Found ${pendingUploads.length} pending uploads at startup - attempting to upload`);
     setTimeout(() => {
@@ -2425,6 +2381,7 @@ function init() {
     }, 3000);
   }
 }
+
 
 
 
