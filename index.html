@@ -2348,6 +2348,7 @@ function clearAllData() {
 }
 
 // Revised init() function to fix mobile loading and stats delay
+// ✅ Phase 1 & 2: Updated init() + install banner for checkpoint-specific install
 function init() {
   const androidInstallBtn = document.getElementById("android-install-btn");
   const iosInstallBtn = document.getElementById("ios-install-btn");
@@ -2364,14 +2365,18 @@ function init() {
 
   if (scannerAndroidInstall) {
     scannerAndroidInstall.addEventListener('click', triggerInstall);
-    if (isIOS()) scannerAndroidInstall.classList.add('hidden');
+    if (isIOS()) {
+      scannerAndroidInstall.classList.add('hidden');
+    }
   }
 
   if (scannerIosInstall) {
     scannerIosInstall.addEventListener('click', () => {
       scannerIosInstructions.classList.toggle('hidden');
     });
-    if (!isIOS()) scannerIosInstall.classList.add('hidden');
+    if (!isIOS()) {
+      scannerIosInstall.classList.add('hidden');
+    }
   }
 
   if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
@@ -2392,12 +2397,25 @@ function init() {
   window.addEventListener('online', handleOnlineStatusChange);
   window.addEventListener('offline', handleOnlineStatusChange);
 
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlEvent = urlParams.get('event');
+  const urlCheckpoint = urlParams.get('checkpoint');
+
   const savedEvent = localStorage.getItem('tigerClawEvent');
   const savedCheckpoint = localStorage.getItem('tigerClawCheckpoint');
 
-  if (savedEvent && savedCheckpoint) {
+  // URL takes precedence if it's a fresh launch (for QR install)
+  if (urlEvent && urlCheckpoint) {
+    event = urlEvent;
+    checkpoint = urlCheckpoint;
+    localStorage.setItem('tigerClawEvent', event);
+    localStorage.setItem('tigerClawCheckpoint', checkpoint);
+  } else if (savedEvent && savedCheckpoint) {
     event = savedEvent;
     checkpoint = savedCheckpoint;
+  }
+
+  if (event && checkpoint) {
     showScannerScreen();
 
     loadRunnersDataWithPriority()
@@ -2405,11 +2423,6 @@ function init() {
         fetchCheckpointStats(true);
         fetchAlreadyScannedRunners();
         startPeriodicUploadAttempts();
-
-        if (pendingUploads.length > 0) {
-          logDebug(`Uploading ${pendingUploads.length} pending uploads after init`);
-          uploadPendingScans(true);
-        }
       })
       .catch(error => {
         logDebug('Failed to load runners after init: ' + error);
@@ -2420,18 +2433,29 @@ function init() {
         loadingScreen.classList.add('hidden');
         showMessage("Connection error. Please log in again.", true);
       });
-
   } else {
     loginScreen.classList.remove('hidden');
     loadingScreen.classList.add('hidden');
   }
 
-  // Fallback: try fetching again if runners didn't load after 1 second
   setTimeout(() => {
     if (!runnersData || Object.keys(runnersData).length === 0) {
       fetchRunnerData(true);
     }
   }, 1000);
+
+  if (isOnline && pendingUploads.length > 0) {
+    const tryUploadWhenReady = () => {
+      if (event && checkpoint) {
+        logDebug(`Uploading ${pendingUploads.length} pending uploads after init`);
+        uploadPendingScans(true);
+      } else {
+        logDebug('Waiting for event/checkpoint before uploading pending scans...');
+        setTimeout(tryUploadWhenReady, 500);
+      }
+    };
+    tryUploadWhenReady();
+  }
 }
 
 
