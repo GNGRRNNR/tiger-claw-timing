@@ -2347,8 +2347,7 @@ function clearAllData() {
   }
 }
 
-// Revised init() function to fix mobile loading and stats delay
-// ✅ Phase 1 & 2: Updated init() + install banner for checkpoint-specific install
+// FULL init() FUNCTION WITH FIXED INSTALL + AUTO CHECKPOINT LOAD
 function init() {
   const androidInstallBtn = document.getElementById("android-install-btn");
   const iosInstallBtn = document.getElementById("ios-install-btn");
@@ -2384,6 +2383,7 @@ function init() {
     if (scannerIosInstall) scannerIosInstall.classList.add('hidden');
   }
 
+  setupInstallPromptHandlers();
   registerServiceWorker();
   checkUrlParameters();
   loadPendingScans();
@@ -2397,25 +2397,12 @@ function init() {
   window.addEventListener('online', handleOnlineStatusChange);
   window.addEventListener('offline', handleOnlineStatusChange);
 
-  const urlParams = new URLSearchParams(window.location.search);
-  const urlEvent = urlParams.get('event');
-  const urlCheckpoint = urlParams.get('checkpoint');
-
   const savedEvent = localStorage.getItem('tigerClawEvent');
   const savedCheckpoint = localStorage.getItem('tigerClawCheckpoint');
 
-  // URL takes precedence if it's a fresh launch (for QR install)
-  if (urlEvent && urlCheckpoint) {
-    event = urlEvent;
-    checkpoint = urlCheckpoint;
-    localStorage.setItem('tigerClawEvent', event);
-    localStorage.setItem('tigerClawCheckpoint', checkpoint);
-  } else if (savedEvent && savedCheckpoint) {
+  if (savedEvent && savedCheckpoint) {
     event = savedEvent;
     checkpoint = savedCheckpoint;
-  }
-
-  if (event && checkpoint) {
     showScannerScreen();
 
     loadRunnersDataWithPriority()
@@ -2457,6 +2444,38 @@ function init() {
     tryUploadWhenReady();
   }
 }
+
+function setupInstallPromptHandlers() {
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+
+    const installBanner = document.getElementById('install-banner');
+    if (installBanner) installBanner.classList.remove('hidden');
+
+    const installButton = document.getElementById('install-btn');
+    if (installButton) {
+      installButton.classList.remove('hidden');
+      installButton.addEventListener('click', async () => {
+        if (!deferredPrompt) return;
+
+        if (event && checkpoint) {
+          localStorage.setItem('tigerClawEvent', event);
+          localStorage.setItem('tigerClawCheckpoint', checkpoint);
+        }
+
+        deferredPrompt.prompt();
+        const choice = await deferredPrompt.userChoice;
+        if (choice.outcome === 'accepted') {
+          logDebug('PWA install accepted');
+          if (installBanner) installBanner.classList.add('hidden');
+        }
+        deferredPrompt = null;
+      });
+    }
+  });
+}
+
 
 
 
