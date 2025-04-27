@@ -2,11 +2,11 @@
 
 const CACHE_NAME = 'ascent-finishline-cache-v1';
 const urlsToCache = [
-  './',
-  './index.html',
-  './manifest.json',
-  './icons/icon-192x192.png',
-  './icons/icon-512x512.png'
+  '/tiger-claw-timing/ascent-finishline/',
+  '/tiger-claw-timing/ascent-finishline/index.html',
+  '/tiger-claw-timing/ascent-finishline/manifest.json',
+  '/tiger-claw-timing/icons/icon-192x192.png',
+  '/tiger-claw-timing/icons/icon-512x512.png'
 ];
 
 // Install Service Worker
