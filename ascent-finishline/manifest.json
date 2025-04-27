@@ -1,11 +1,11 @@
 {
-  "name": "Tiger Claw Timing - Ascent Finishline",
-  "short_name": "Ascent Finishline",
+  "name": "Tiger Claw Ascent Finishline",
+  "short_name": "Ascent Finish",
+  "description": "QR Scanning for Ascent Finishline Checkpoint",
   "start_url": "/tiger-claw-timing/ascent-finishline/index.html",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#1e3a8a",
-  "orientation": "portrait",
+  "theme_color": "#0077cc",
   "icons": [
     {
       "src": "/tiger-claw-timing/icons/icon-192x192.png",
