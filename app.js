@@ -1,5 +1,6 @@
 // --- Configuration ---
 // IMPORTANT: Replace with your deployed Google Apps Script Web App URL
+// ****** UPDATED SCRIPT URL ******
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzYS0RC4S9oGb4ZGsyEukO9-RclUYEjC4OOg0XSgkBa-tdtqvU8Mm5IC2Y2mqN243Kd/exec';
 const SCAN_THROTTLE_MS = 1500; // Min time between successful scans (1.5 seconds)
 const SYNC_INTERVAL_MS = 30000; // Check for unsynced scans every 30 seconds
@@ -32,6 +33,7 @@ let scannedBibs = new Set(); // Track unique bibs scanned *at this checkpoint* i
 let recentScans = []; // Array of { bib: '101', time: 'HH:MM:SS', name: 'Jane Doe' }
 let syncIntervalId = null;
 let deferredInstallPrompt = null; // For PWA installation
+let toneJsStarted = false; // Track if Tone.js context has been started
 
 // --- Initialization ---
 window.addEventListener('load', async () => {
@@ -47,12 +49,14 @@ window.addEventListener('load', async () => {
     currentCheckpoint = urlParams.get('checkpoint');
     currentRace = urlParams.get('race');
 
+    // *** Crucial Check ***
     if (!currentCheckpoint || !currentRace) {
-        showStatus('Error: Missing checkpoint or race in URL.', 'error', true);
+        showStatus('Error: Missing checkpoint or race in URL. Please use the specific URL provided for this station.', 'error', true);
         checkpointDisplayElement.textContent = 'Config Error!';
         scanButton.disabled = true;
         scanButton.textContent = 'Configuration Error';
-        return;
+        console.error("URL must include ?checkpoint=CHECKPOINT_NAME&race=RACE_NAME");
+        return; // Stop initialization if parameters are missing
     }
     checkpointDisplayElement.textContent = `${currentCheckpoint} (${currentRace})`;
 
@@ -66,10 +70,10 @@ window.addEventListener('load', async () => {
     }
 
     // 3. Fetch Runner Data (Retry logic might be needed for flaky connections)
-    await fetchRunnerData();
+    await fetchRunnerData(); // This now only runs if checkpoint/race are present
 
     // 4. Initialize Scanner
-    initializeScanner();
+    initializeScanner(); // This now only runs if checkpoint/race are present
 
     // 5. Load recent scans from this session (not persistent across reloads for simplicity here)
     updateRecentScansUI();
@@ -78,9 +82,12 @@ window.addEventListener('load', async () => {
     syncIntervalId = setInterval(syncOfflineScans, SYNC_INTERVAL_MS);
     syncOfflineScans(); // Attempt initial sync
 
-    showStatus('Ready. Enter Manual Bib or Start Scan.', 'info');
-    scanButton.disabled = false; // Re-enable button after setup
-    scanButton.textContent = 'Start QR Code Scan'; // Set correct text
+    // Only enable scan button if init was successful
+    if (currentCheckpoint && currentRace) {
+        showStatus('Ready. Enter Manual Bib or Start Scan.', 'info');
+        scanButton.disabled = false; // Enable button after successful setup
+        scanButton.textContent = 'Start QR Code Scan';
+    }
 });
 
 // --- PWA & Service Worker ---
@@ -134,8 +141,17 @@ function handleOnlineStatus() {
         connectionStatusElement.textContent = 'Online';
         connectionStatusElement.className = 'absolute top-2 right-2 text-xs font-semibold px-2 py-1 rounded bg-green-100 text-green-800';
         console.log('Status: Online');
-        showStatus('Connection restored. Syncing pending scans...', 'info');
-        syncOfflineScans(); // Attempt sync immediately when back online
+        // Only sync if app is configured correctly
+        if (currentCheckpoint && currentRace && SCRIPT_URL !== 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL') {
+             showStatus('Connection restored. Syncing pending scans...', 'info');
+             syncOfflineScans(); // Attempt sync immediately when back online
+        } else if (SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL') {
+             // This case should no longer happen if URL is correctly set above
+             showStatus('Online, but App Script URL not configured.', 'warning');
+        } else {
+             // This case happens if the page is loaded without parameters
+             showStatus('Online, but Checkpoint/Race missing in URL.', 'warning');
+        }
     } else {
         connectionStatusElement.textContent = 'Offline';
         connectionStatusElement.className = 'absolute top-2 right-2 text-xs font-semibold px-2 py-1 rounded bg-yellow-100 text-yellow-800';
@@ -145,9 +161,14 @@ function handleOnlineStatus() {
 }
 
 async function fetchRunnerData() {
+    // Should only be called if currentRace is set
     if (!currentRace) return;
-    if (SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbzYS0RC4S9oGb4ZGsyEukO9-RclUYEjC4OOg0XSgkBa-tdtqvU8Mm5IC2Y2mqN243Kd/exec') {
-        showStatus('Error: App Script URL not configured.', 'error', true);
+    // *** Crucial Check ***
+    if (SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL' || !SCRIPT_URL) {
+        // This check is now mainly a safeguard; the URL should be set.
+        showStatus('Error: App Script URL not configured in app.js.', 'error', true);
+        console.error('SCRIPT_URL is not set.');
+        totalActiveRunnersElement.textContent = 'CFG'; // Indicate config error
         return;
     }
 
@@ -158,11 +179,14 @@ async function fetchRunnerData() {
     try {
         // Construct URL for GET request to fetch runner list
         const getUrl = `${SCRIPT_URL}?action=getRunners&race=${encodeURIComponent(currentRace)}`;
+        console.log(`Fetching runner data from: ${getUrl}`);
         const response = await fetch(getUrl);
 
         if (!response.ok) {
              const errorText = await response.text();
-             throw new Error(`Failed to fetch runner data: ${response.status} ${errorText || ''}`);
+             // Log the error text from Apps Script if available
+             console.error(`Error response from Apps Script (getRunners): ${errorText}`);
+             throw new Error(`Failed to fetch runner data: ${response.status} ${errorText || response.statusText}`);
         }
 
         const data = await response.json();
@@ -174,17 +198,18 @@ async function fetchRunnerData() {
             totalActiveRunnersElement.textContent = totalActiveRunners;
             scannedBibs.clear(); // Clear scanned set for the new list
             updateStatsUI(); // Update display
-            showStatus(`Loaded ${runnerData.length} runners for ${currentRace}. ${totalActiveRunners} active.`, 'info');
+            showStatus(`Loaded ${runnerData.length} runners for ${currentRace}. ${totalActiveRunners} active. Ready.`, 'info');
             console.log("Runner data loaded:", runnerData);
         } else {
-            throw new Error(data.message || 'Invalid data format received.');
+             // Log error message from Apps Script response if status is not 'success'
+             console.error(`Invalid data format received from Apps Script (getRunners): ${data.message || JSON.stringify(data)}`);
+            throw new Error(data.message || 'Invalid data format received from server.');
         }
     } catch (error) {
+        // Catch fetch errors and errors thrown above
         console.error('Error fetching runner data:', error);
         showStatus(`Error fetching runners: ${error.message}. Stats may be inaccurate.`, 'error');
         totalActiveRunnersElement.textContent = 'Err'; // Indicate error
-        // Decide if the app should proceed without runner data (maybe allow scanning anyway?)
-        // For now, we allow it, but stats will be off.
     } finally {
          loadingSpinnerElement.classList.add('hidden');
     }
@@ -195,7 +220,8 @@ async function syncOfflineScans() {
         console.log("Offline, skipping sync.");
         return;
     }
-    if (SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbzYS0RC4S9oGb4ZGsyEukO9-RclUYEjC4OOg0XSgkBa-tdtqvU8Mm5IC2Y2mqN243Kd/exec') {
+    // *** Crucial Check ***
+    if (SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL' || !SCRIPT_URL) {
         console.error('Cannot sync: Google Apps Script URL not configured.');
         return;
     }
@@ -210,8 +236,7 @@ async function syncOfflineScans() {
         showStatus(`Syncing ${unsynced.length} saved scan(s)...`, 'info');
         console.log("Attempting to sync:", unsynced);
 
-        // Send scans in batches (e.g., 10 at a time) or individually
-        // For simplicity, sending individually here, but batching is better for many scans
+        let allSynced = true;
         for (const scan of unsynced) {
             // Pass the stored name along with the bib during sync
             const success = await sendDataToSheet(scan.bib, scan.checkpoint, scan.timestamp, scan.race, scan.name);
@@ -219,11 +244,19 @@ async function syncOfflineScans() {
                 await db.updateScanStatus(scan.id, 'synced');
                 console.log(`Synced scan ID: ${scan.id}`);
             } else {
+                allSynced = false;
                 console.warn(`Failed to sync scan ID: ${scan.id}. Will retry later.`);
-                // Optional: Implement a max retry count or specific error handling
+                // Stop trying to sync others in this batch if one fails,
+                // as it might indicate a persistent server/network issue.
+                break;
             }
         }
-        showStatus('Sync attempt complete.', 'info');
+        if (allSynced && unsynced.length > 0) {
+             showStatus('Sync complete. All saved scans sent.', 'success');
+        } else if (!allSynced) {
+             showStatus('Sync incomplete. Some scans failed to send. Will retry later.', 'warning');
+        }
+
 
     } catch (error) {
         console.error('Error during sync process:', error);
@@ -236,7 +269,7 @@ async function syncOfflineScans() {
 function initializeScanner() {
     try {
         html5QrCode = new Html5Qrcode("reader");
-        // Don't enable button here, wait for full init in window.onload
+        // Button is enabled in window.onload if init succeeds
     } catch (error) {
         console.error("Failed to initialize Html5Qrcode:", error);
         showStatus(`Error initializing scanner: ${error.message}`, 'error', true);
@@ -247,6 +280,9 @@ function initializeScanner() {
 
 function startScanning() {
     if (isScanning || !html5QrCode) return;
+
+    // --- Start Tone.js context on user gesture ---
+    startToneContext(); // Ensure context is ready before camera starts
 
     const config = { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
      // Try environment camera first, then user
@@ -269,9 +305,9 @@ function startScanning() {
         showStatus('Scanner active. Point at QR code.', 'info');
     })
     .catch((err) => {
-        console.error(`Unable to start scanning: ${err}`);
+        console.error(`Unable to start scanning with environment camera: ${err}`);
         // Try the other camera if environment fails
-        if (err.name === "NotAllowedError" || err.name === "NotFoundError" || err.name === "OverconstrainedError") {
+        if (err.name === "NotAllowedError" || err.name === "NotFoundError" || err.name === "OverconstrainedError" || err.name === "NotReadableError") {
              console.log("Environment camera failed or not found, trying front camera...");
              showStatus('Trying front camera...', 'info');
              html5QrCode.start({ facingMode: "user" }, config, onScanSuccess, onScanFailure)
@@ -318,12 +354,11 @@ function stopScanning() {
             scanButton.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
             readerElement.classList.add('hidden'); // Hide the reader element
             showStatus('Scanner stopped.', 'info');
-            // html5QrCode.clear(); // Often called internally by stop, but can be explicit
-            // html5QrCode = null; // Re-initialize if needed? Or keep instance? Keep for now.
+            // Consider clearing the stream if issues persist on restart
+            // try { html5QrCode.clear(); } catch(e) { console.warn("Error clearing QR code instance", e); }
         });
 }
 
-// ****** MODIFIED onScanSuccess ******
 function onScanSuccess(decodedText, decodedResult) {
     const now = Date.now();
     if (now - lastScanTime < SCAN_THROTTLE_MS) {
@@ -334,27 +369,22 @@ function onScanSuccess(decodedText, decodedResult) {
     const timestamp = new Date().toISOString();
 
     // --- Parse QR Code Data ---
-    // Assuming format "BIB,RUNNER NAME" (e.g., "123,John Doe")
-    // Adjust separator (e.g., ' ') if needed.
     const parts = decodedText.trim().split(',');
     let bibNumber = null;
-    let nameFromQR = null; // Name extracted directly from QR
+    let nameFromQR = null;
 
     if (parts.length >= 1) {
-        bibNumber = parts[0].trim(); // First part is always bib
+        bibNumber = parts[0].trim();
     }
     if (parts.length >= 2) {
-         // Join remaining parts in case name has commas
         nameFromQR = parts.slice(1).join(',').trim();
     }
 
-    // Validate Bib Number (basic check)
     if (!bibNumber || !/^\d+$/.test(bibNumber)) {
         console.warn(`Invalid QR data format: Bib number not found or invalid in "${decodedText}"`);
         showStatus(`Scan Error: Invalid QR data format.`, 'error');
-        // Optional: Vibrate differently for error?
-        if (navigator.vibrate) navigator.vibrate([50, 50, 50]); // Short pulses
-        return; // Stop processing this scan
+        if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+        return;
     }
 
     console.log(`Scan successful: Bib ${bibNumber}, Name (from QR): ${nameFromQR || 'N/A'} at ${timestamp}`);
@@ -362,37 +392,29 @@ function onScanSuccess(decodedText, decodedResult) {
     // --- Feedback ---
     // 1. Vibrate
     if (navigator.vibrate) {
-        navigator.vibrate(150); // Vibrate for 150ms
+        navigator.vibrate(150);
     }
-    // 2. Sound (using Tone.js)
-    try {
-        // Ensure Tone.js context is started (might need earlier user interaction)
-        Tone.start().then(() => {
-            const synth = new Tone.Synth().toDestination();
-            synth.triggerAttackRelease("C5", "8n", Tone.now());
-        });
-    } catch (soundError) {
-        console.warn("Could not play sound:", soundError); // Log warning if sound fails
-    }
+    // 2. Sound (Ensure Tone.js context is started)
+    playSound(); // Call helper function for sound
     // 3. Visual Flash
     document.body.classList.add('scan-success-flash');
     setTimeout(() => {
         document.body.classList.remove('scan-success-flash');
-    }, 600); // Match animation duration
+    }, 600);
 
     // --- Process Scan ---
-    // Pass both bib and the name found in the QR code
     processScanData(bibNumber, timestamp, nameFromQR);
 }
-// ****** END MODIFIED onScanSuccess ******
 
 function onScanFailure(error) {
-    // Log only occasionally or specific errors to avoid console spam
     // console.warn(`Code scan error = ${error}`);
 }
 
 // --- Manual Entry ---
 manualSubmitButton.addEventListener('click', () => {
+    // --- Start Tone.js context on user gesture ---
+    startToneContext(); // Ensure context is ready
+
     const bibNumber = manualBibInput.value.trim();
     if (!bibNumber) {
         showStatus('Please enter a Bib Number.', 'error');
@@ -406,21 +428,22 @@ manualSubmitButton.addEventListener('click', () => {
     const timestamp = new Date().toISOString();
     console.log(`Manual entry: Bib ${bibNumber} at ${timestamp}`);
 
-    // For manual entry, we don't have a name from QR, so pass null/undefined
-    processScanData(bibNumber, timestamp, null);
+    // --- Feedback for Manual Entry ---
+     if (navigator.vibrate) navigator.vibrate(100); // Shorter vibration
+     playSound(); // Play sound
+     // Maybe a different visual flash? Or just rely on status message.
+
+    processScanData(bibNumber, timestamp, null); // Pass null for nameFromQR
 
     manualBibInput.value = ''; // Clear input field
 });
 
 
 // --- Data Processing & Storage ---
-// ****** MODIFIED processScanData ******
-// Added nameFromQR parameter
 async function processScanData(bibNumber, timestamp, nameFromQR) {
      // 1. Determine Runner Name and Status
-     // Prefer name/status from the fetched runner list if available and matches bib
     const runnerInfo = runnerData.find(r => r.bib === bibNumber);
-    const runnerName = runnerInfo ? runnerInfo.name : (nameFromQR || 'Unknown'); // Use list name > QR name > 'Unknown'
+    const runnerName = runnerInfo ? runnerInfo.name : (nameFromQR || 'Unknown');
     const runnerStatus = runnerInfo ? (runnerInfo.status || 'Active') : 'Unknown';
 
     // Display feedback using the determined name
@@ -431,18 +454,18 @@ async function processScanData(bibNumber, timestamp, nameFromQR) {
              showStatus(`Scan: Bib ${bibNumber} (${runnerName})`, 'success');
          }
     } else if (runnerData.length > 0) {
-        // Runner list loaded, but bib not found
+        // Runner list was loaded, but bib not found
         showStatus(`Warning: Bib ${bibNumber} not in list. Scan recorded (${nameFromQR || 'No Name'}).`, 'warning');
     } else {
-         // Runner list not loaded, use QR name if available
+         // Runner list wasn't loaded or failed to load
          showStatus(`Scan: Bib ${bibNumber} (${nameFromQR || 'No Name'})`, 'success');
     }
 
-    // 2. Add to Recent Scans UI (using the determined name)
+    // 2. Add to Recent Scans UI
     addScanToRecentList(bibNumber, timestamp, runnerName);
 
     // 3. Update Stats UI
-    scannedBibs.add(bibNumber); // Add to the set of unique bibs scanned this session
+    scannedBibs.add(bibNumber);
     updateStatsUI();
 
     // 4. Store in IndexedDB
@@ -452,22 +475,22 @@ async function processScanData(bibNumber, timestamp, nameFromQR) {
             checkpoint: currentCheckpoint,
             timestamp: timestamp,
             race: currentRace,
-            name: runnerName, // Store the determined name for potential use during sync
-            status: 'unsynced' // Mark as not yet sent to server
+            name: runnerName, // Store the determined name
+            status: 'unsynced'
         };
         const id = await db.addScan(scanRecord);
         console.log(`Scan stored locally with ID: ${id}, Name: ${runnerName}`);
 
         // 5. Attempt immediate sync if online
         if (navigator.onLine) {
-             // Pass the determined name to the send function
             const success = await sendDataToSheet(bibNumber, currentCheckpoint, timestamp, currentRace, runnerName);
             if (success) {
                 await db.updateScanStatus(id, 'synced');
                 console.log(`Scan ID ${id} synced immediately.`);
             } else {
                  console.warn(`Immediate sync failed for scan ID ${id}. Will retry later.`);
-                 // Status remains 'unsynced'
+                 // Optionally update status message if sync fails immediately
+                 showStatus(`Scan for ${bibNumber} saved, but sync failed. Will retry.`, 'warning');
             }
         } else {
             console.log(`Offline. Scan ID ${id} saved for later sync.`);
@@ -479,24 +502,21 @@ async function processScanData(bibNumber, timestamp, nameFromQR) {
         showStatus(`Error saving scan: ${error.message}`, 'error');
     }
 }
-// ****** END MODIFIED processScanData ******
 
-
-// ****** MODIFIED sendDataToSheet ******
-// Added runnerName parameter
 async function sendDataToSheet(runnerId, checkpoint, timestamp, race, runnerName) {
-    if (SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbzYS0RC4S9oGb4ZGsyEukO9-RclUYEjC4OOg0XSgkBa-tdtqvU8Mm5IC2Y2mqN243Kd/exec') {
+    // *** Crucial Check ***
+    if (SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL' || !SCRIPT_URL) {
         console.error('Cannot send data: Google Apps Script URL not configured.');
         return false; // Indicate failure
     }
 
     const data = {
-        action: 'recordScan', // Add action for backend routing
+        action: 'recordScan',
         bib: runnerId,
         checkpoint: checkpoint,
         timestamp: timestamp,
         race: race,
-        name: runnerName // Send the name determined by the frontend
+        name: runnerName
     };
 
     console.log("Sending data:", data);
@@ -507,72 +527,83 @@ async function sendDataToSheet(runnerId, checkpoint, timestamp, race, runnerName
             mode: 'cors',
             cache: 'no-cache',
             headers: {
-                'Content-Type': 'text/plain', // Sending as text/plain often works better with doPost
+                'Content-Type': 'text/plain', // Keep as text/plain for simple doPost parsing
             },
             redirect: 'follow',
-             // Stringify data and send as plain text for simple doPost parsing
-            body: JSON.stringify(data)
+            body: JSON.stringify(data) // Send stringified JSON
         });
 
-        // Check if response is ok (status 200-299)
         if (!response.ok) {
-            const errorText = await response.text(); // Try to get error details from response
-            throw new Error(`Network response was not ok. Status: ${response.status}. Message: ${errorText || 'No details'}`);
+            const errorText = await response.text();
+            console.error(`Network error sending data: ${response.status} - ${errorText}`);
+             // Try to parse errorText as JSON, maybe Apps Script sent structured error
+             let backendMessage = errorText;
+             try {
+                 const errorJson = JSON.parse(errorText);
+                 if (errorJson && errorJson.message) {
+                     backendMessage = errorJson.message;
+                 }
+             } catch (e) { /* Ignore parsing error, use raw text */ }
+            throw new Error(`Sync failed: ${response.status} ${backendMessage || response.statusText}`);
         }
 
-        const result = await response.json(); // Assuming backend returns JSON
+        const result = await response.json();
 
         if (result.status === 'success') {
             console.log('Data sent successfully:', result.message);
-            // Don't show status message here, as it might overwrite other messages.
-            // Let the calling function handle UI updates.
             return true; // Indicate success
         } else {
             // Log specific error from backend if provided
             console.error('Error from backend:', result.message || 'Unknown error');
+            // Show a more specific error if possible
             showStatus(`Sync Error: ${result.message || 'Unknown error from server.'}`, 'error');
             return false; // Indicate failure
         }
     } catch (error) {
+        // Catches fetch errors and errors thrown above
         console.error('Error sending data:', error);
-        // Show error only if it's likely a persistent issue, not just a temporary network blip
         if (!navigator.onLine) {
              console.warn("Send failed while offline."); // Expected
         } else {
-            // Show network/parsing errors
+            // Show network/parsing errors or errors from backend
             showStatus(`Sync Error: ${error.message}. Will retry.`, 'error');
         }
         return false; // Indicate failure
     }
 }
-// ****** END MODIFIED sendDataToSheet ******
 
 
 // --- UI Updates ---
+let statusTimeoutId = null; // Keep track of the status message timeout
+
 function showStatus(message, type = 'info', permanent = false) {
+    // Clear any existing timeout to prevent old messages from reappearing
+    if (statusTimeoutId) {
+        clearTimeout(statusTimeoutId);
+        statusTimeoutId = null;
+    }
+
     statusMessageElement.textContent = message;
-    // Adjust class based on type, including online/offline status
     let currentType = type;
+    // If offline, most messages become 'warning' unless they are 'error'
     if (!navigator.onLine && type !== 'error') {
-        currentType = 'warning'; // Show warning color if offline, unless it's an error
+        currentType = 'warning';
     }
     statusMessageElement.className = `status-${currentType}`;
     console.log(`Status (${currentType}): ${message}`);
 
-    // Optionally clear the message after a delay, unless permanent
-    if (!permanent) {
-        // Use a variable to track the timeout ID for this specific message
-        const timeoutId = setTimeout(() => {
-            // Check if the current message is still the one we set the timeout for
-            if (statusMessageElement.textContent === message) {
-                 // Restore to a default state based on online status
+    // Set a new timeout unless the message is permanent or an error
+    // Errors should persist until the next status update
+    if (!permanent && type !== 'error') {
+        statusTimeoutId = setTimeout(() => {
+            // Check if the message is still the one we set the timeout for
+            // And if the type is still the same (e.g. hasn't become offline warning)
+            if (statusMessageElement.textContent === message && statusMessageElement.className.includes(`status-${currentType}`)) {
                  const defaultMsg = navigator.onLine ? 'Ready.' : 'Offline. Scans saved locally.';
                  const defaultType = navigator.onLine ? 'info' : 'warning';
-                 // Only update if the message hasn't changed to something else important
-                 if (statusMessageElement.className.includes(`status-${currentType}`)) {
-                      showStatus(defaultMsg, defaultType);
-                 }
+                 showStatus(defaultMsg, defaultType); // Show the default message
             }
+             statusTimeoutId = null; // Clear the timeout ID tracker
         }, 5000); // Clear after 5 seconds
     }
 }
@@ -583,24 +614,16 @@ function updateStatsUI() {
     // totalActiveRunnersElement is updated when runner data is fetched
 }
 
-// ****** MODIFIED addScanToRecentList ******
-// Added name parameter
 function addScanToRecentList(bib, timestamp, name) {
-     const timeString = new Date(timestamp).toLocaleTimeString();
-     // Include name in the recent scan object
+     const timeString = new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit'}); // Format time HH:MM:SS
      recentScans.unshift({ bib: bib, time: timeString, name: name }); // Add to beginning
 
-    // Keep only the last MAX_RECENT_SCANS
     if (recentScans.length > MAX_RECENT_SCANS) {
         recentScans.pop(); // Remove the oldest
     }
     updateRecentScansUI();
 }
-// ****** END MODIFIED addScanToRecentList ******
 
-
-// ****** MODIFIED updateRecentScansUI ******
-// Displays name along with bib and time
 function updateRecentScansUI() {
     recentScansListElement.innerHTML = ''; // Clear existing list
 
@@ -612,18 +635,59 @@ function updateRecentScansUI() {
     recentScans.forEach(scan => {
         const li = document.createElement('li');
         li.className = 'p-2 border-b border-gray-200 last:border-b-0';
-        // Display name if available, otherwise just bib
         const nameText = scan.name && scan.name !== 'Unknown' ? ` (${scan.name})` : '';
+        // Display Bib, Name (if known), and Time
         li.textContent = `Bib: ${scan.bib}${nameText} at ${scan.time}`;
         recentScansListElement.appendChild(li);
     });
 }
-// ****** END MODIFIED updateRecentScansUI ******
+
+// --- Audio Handling ---
+async function startToneContext() {
+    // Start context only once
+    if (!toneJsStarted && typeof Tone !== 'undefined' && Tone.context.state !== 'running') {
+        console.log('Attempting to start Tone.js Audio Context...');
+        try {
+            await Tone.start();
+            toneJsStarted = true;
+            console.log('Tone.js Audio Context started successfully.');
+        } catch (e) {
+            console.error('Failed to start Tone.js context:', e);
+            // Maybe show a warning that sound won't work
+            showStatus('Warning: Could not enable audio chime.', 'warning');
+        }
+    }
+}
+
+function playSound() {
+    // Check if Tone is available and context is running
+    if (!toneJsStarted || typeof Tone === 'undefined' || Tone.context.state !== 'running') {
+        console.warn("Cannot play sound: Tone.js context not started or not running.");
+        // Optionally try starting again, though likely won't work outside user gesture
+        // startToneContext();
+        return;
+    }
+
+    try {
+        // Create synth only when needed
+        const synth = new Tone.Synth().toDestination();
+        synth.triggerAttackRelease("C5", "8n", Tone.now());
+        // Dispose synth after sound plays to free resources
+        setTimeout(() => {
+             if (synth && !synth.disposed) {
+                 synth.dispose();
+             }
+        }, 500); // Dispose after 500ms
+    } catch (soundError) {
+        console.warn("Could not play sound:", soundError);
+    }
+}
+
 
 // --- Event Listeners ---
 scanButton.addEventListener('click', () => {
-    // Ensure Tone.js context is started by user interaction if not already
-    Tone.start();
+    // Ensure Tone.js context is started by this user interaction
+    startToneContext(); // Call this first
 
     if (isScanning) {
         stopScanning();
@@ -631,4 +695,7 @@ scanButton.addEventListener('click', () => {
         startScanning();
     }
 });
+
+// Add listener for manual submit button as well to ensure context starts
+manualSubmitButton.addEventListener('click', startToneContext);
 
