@@ -1,6 +1,5 @@
 // --- Configuration ---
-// IMPORTANT: Replace with your deployed Google Apps Script Web App URL
-// ****** UPDATED SCRIPT URL V2 ******
+// Google Apps Script Web App URL (Should be the correct deployed URL)
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyNZwcNd3NS2I5e8Lq9L4YpSj05_u0UfnKFkmckZzU2-bCju-m_iDGU7tl1_hkYwD1S/exec';
 const SCAN_THROTTLE_MS = 1500; // Min time between successful scans (1.5 seconds)
 const SYNC_INTERVAL_MS = 30000; // Check for unsynced scans every 30 seconds
@@ -141,13 +140,11 @@ function handleOnlineStatus() {
         connectionStatusElement.textContent = 'Online';
         connectionStatusElement.className = 'absolute top-2 right-2 text-xs font-semibold px-2 py-1 rounded bg-green-100 text-green-800';
         console.log('Status: Online');
-        // Only sync if app is configured correctly
-        if (currentCheckpoint && currentRace && SCRIPT_URL !== 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL') {
+        // Only sync if app is configured correctly (checkpoint/race parameters are present)
+        // Removed the redundant SCRIPT_URL check here
+        if (currentCheckpoint && currentRace) {
              showStatus('Connection restored. Syncing pending scans...', 'info');
              syncOfflineScans(); // Attempt sync immediately when back online
-        } else if (SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL') {
-             // This case should no longer happen if URL is correctly set above
-             showStatus('Online, but App Script URL not configured.', 'warning');
         } else {
              // This case happens if the page is loaded without parameters
              showStatus('Online, but Checkpoint/Race missing in URL.', 'warning');
@@ -163,14 +160,7 @@ function handleOnlineStatus() {
 async function fetchRunnerData() {
     // Should only be called if currentRace is set
     if (!currentRace) return;
-    // *** Crucial Check ***
-    if (SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL' || !SCRIPT_URL) {
-        // This check is now mainly a safeguard; the URL should be set.
-        showStatus('Error: App Script URL not configured in app.js.', 'error', true);
-        console.error('SCRIPT_URL is not set.');
-        totalActiveRunnersElement.textContent = 'CFG'; // Indicate config error
-        return;
-    }
+    // Removed the redundant SCRIPT_URL check here - assumes URL at top is correct
 
     loadingSpinnerElement.classList.remove('hidden');
     totalActiveRunnersElement.textContent = '?';
@@ -220,11 +210,7 @@ async function syncOfflineScans() {
         console.log("Offline, skipping sync.");
         return;
     }
-    // *** Crucial Check ***
-    if (SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL' || !SCRIPT_URL) {
-        console.error('Cannot sync: Google Apps Script URL not configured.');
-        return;
-    }
+    // Removed the redundant SCRIPT_URL check here
 
     try {
         const unsynced = await db.getUnsyncedScans();
@@ -256,7 +242,6 @@ async function syncOfflineScans() {
         } else if (!allSynced) {
              showStatus('Sync incomplete. Some scans failed to send. Will retry later.', 'warning');
         }
-
 
     } catch (error) {
         console.error('Error during sync process:', error);
@@ -506,13 +491,7 @@ async function processScanData(bibNumber, timestamp, nameFromQR) {
 }
 
 async function sendDataToSheet(runnerId, checkpoint, timestamp, race, runnerName) {
-    // *** Crucial Check ***
-    if (SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL' || !SCRIPT_URL) {
-        console.error('Cannot send data: Google Apps Script URL not configured.');
-        // Return false, but also show a persistent error if this happens
-        showStatus('Sync failed: App Script URL not configured.', 'error', true);
-        return false; // Indicate failure
-    }
+    // Removed the redundant SCRIPT_URL check here
 
     const data = {
         action: 'recordScan',
