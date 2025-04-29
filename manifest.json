@@ -1,51 +1,51 @@
 {
-  "name": "Race Runner Tracker",
-  "short_name": "RunnerTrack",
+  "name": "TIGER CLAW TIMING",
+  "short_name": "TigerClaw",
   "description": "QR Code scanner for tracking race runners.",
-  "start_url": "/index.html", // Or just "/" if index.html is the root
-  "display": "standalone", // Opens like a native app
-  "background_color": "#f3f4f6", // Light gray background
-  "theme_color": "#4f46e5", // Indigo color for toolbar
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#f3f4f6",
+  "theme_color": "#16a34a",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "images/icon-72x72.png", // Add your icon files
+      "src": "https://placehold.co/72x72/16a34a/ffffff?text=Icon",
       "sizes": "72x72",
       "type": "image/png"
     },
     {
-      "src": "images/icon-96x96.png",
+      "src": "https://placehold.co/96x96/16a34a/ffffff?text=Icon",
       "sizes": "96x96",
       "type": "image/png"
     },
     {
-      "src": "images/icon-128x128.png",
+      "src": "https://placehold.co/128x128/16a34a/ffffff?text=Icon",
       "sizes": "128x128",
       "type": "image/png"
     },
     {
-      "src": "images/icon-144x144.png",
+      "src": "https://placehold.co/144x144/16a34a/ffffff?text=Icon",
       "sizes": "144x144",
       "type": "image/png"
     },
     {
-      "src": "images/icon-152x152.png",
+      "src": "https://placehold.co/152x152/16a34a/ffffff?text=Icon",
       "sizes": "152x152",
       "type": "image/png"
     },
     {
-      "src": "images/icon-192x192.png",
+      "src": "https://placehold.co/192x192/16a34a/ffffff?text=Icon",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable" // Important for adaptive icons
+      "purpose": "any maskable"
     },
     {
-      "src": "images/icon-384x384.png",
+      "src": "https://placehold.co/384x384/16a34a/ffffff?text=Icon",
       "sizes": "384x384",
       "type": "image/png"
     },
     {
-      "src": "images/icon-512x512.png",
+      "src": "https://placehold.co/512x512/16a34a/ffffff?text=Icon",
       "sizes": "512x512",
       "type": "image/png"
     }
