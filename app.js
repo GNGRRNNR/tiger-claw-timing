@@ -1,7 +1,7 @@
 // --- Configuration ---
 // IMPORTANT: Replace with your deployed Google Apps Script Web App URL
 // ****** UPDATED SCRIPT URL ******
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzYS0RC4S9oGb4ZGsyEukO9-RclUYEjC4OOg0XSgkBa-tdtqvU8Mm5IC2Y2mqN243Kd/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyNZwcNd3NS2I5e8Lq9L4YpSj05_u0UfnKFkmckZzU2-bCju-m_iDGU7tl1_hkYwD1S/exec';
 const SCAN_THROTTLE_MS = 1500; // Min time between successful scans (1.5 seconds)
 const SYNC_INTERVAL_MS = 30000; // Check for unsynced scans every 30 seconds
 const MAX_RECENT_SCANS = 5; // How many recent scans to show in the list
@@ -142,10 +142,10 @@ function handleOnlineStatus() {
         connectionStatusElement.className = 'absolute top-2 right-2 text-xs font-semibold px-2 py-1 rounded bg-green-100 text-green-800';
         console.log('Status: Online');
         // Only sync if app is configured correctly
-        if (currentCheckpoint && currentRace && SCRIPT_URL !== 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL') {
+        if (currentCheckpoint && currentRace && SCRIPT_URL !== 'https://script.google.com/macros/s/AKfycbyNZwcNd3NS2I5e8Lq9L4YpSj05_u0UfnKFkmckZzU2-bCju-m_iDGU7tl1_hkYwD1S/exec') {
              showStatus('Connection restored. Syncing pending scans...', 'info');
              syncOfflineScans(); // Attempt sync immediately when back online
-        } else if (SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL') {
+        } else if (SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbyNZwcNd3NS2I5e8Lq9L4YpSj05_u0UfnKFkmckZzU2-bCju-m_iDGU7tl1_hkYwD1S/exec') {
              // This case should no longer happen if URL is correctly set above
              showStatus('Online, but App Script URL not configured.', 'warning');
         } else {
@@ -164,7 +164,7 @@ async function fetchRunnerData() {
     // Should only be called if currentRace is set
     if (!currentRace) return;
     // *** Crucial Check ***
-    if (SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL' || !SCRIPT_URL) {
+    if (SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbyNZwcNd3NS2I5e8Lq9L4YpSj05_u0UfnKFkmckZzU2-bCju-m_iDGU7tl1_hkYwD1S/exec' || !SCRIPT_URL) {
         // This check is now mainly a safeguard; the URL should be set.
         showStatus('Error: App Script URL not configured in app.js.', 'error', true);
         console.error('SCRIPT_URL is not set.');
@@ -221,7 +221,7 @@ async function syncOfflineScans() {
         return;
     }
     // *** Crucial Check ***
-    if (SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL' || !SCRIPT_URL) {
+    if (SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbyNZwcNd3NS2I5e8Lq9L4YpSj05_u0UfnKFkmckZzU2-bCju-m_iDGU7tl1_hkYwD1S/exec' || !SCRIPT_URL) {
         console.error('Cannot sync: Google Apps Script URL not configured.');
         return;
     }
@@ -505,7 +505,7 @@ async function processScanData(bibNumber, timestamp, nameFromQR) {
 
 async function sendDataToSheet(runnerId, checkpoint, timestamp, race, runnerName) {
     // *** Crucial Check ***
-    if (SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL' || !SCRIPT_URL) {
+    if (SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbyNZwcNd3NS2I5e8Lq9L4YpSj05_u0UfnKFkmckZzU2-bCju-m_iDGU7tl1_hkYwD1S/exec' || !SCRIPT_URL) {
         console.error('Cannot send data: Google Apps Script URL not configured.');
         return false; // Indicate failure
     }
