@@ -1,6 +1,7 @@
 // --- Configuration ---
 // Google Apps Script Web App URL (Should be the correct deployed URL)
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyNZwcNd3NS2I5e8Lq9L4YpSj05_u0UfnKFkmckZzU2-bCju-m_iDGU7tl1_hkYwD1S/exec';
+// ****** UPDATED SCRIPT URL V3 ******
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwBFM5H7PbU-nbl7cTljAVK7BqndYkbp-ybGYJBUmFwafywkMI-pb-auUqNAsuHa_UD/exec';
 const SCAN_THROTTLE_MS = 1500; // Min time between successful scans (1.5 seconds)
 const SYNC_INTERVAL_MS = 30000; // Check for unsynced scans every 30 seconds
 const MAX_RECENT_SCANS = 5; // How many recent scans to show in the list
@@ -487,7 +488,7 @@ async function processScanData(bibNumber, timestamp, nameFromQR) {
     }
 }
 
-// ****** UPDATED sendDataToSheet ******
+// ****** sendDataToSheet uses text/plain Content-Type ******
 async function sendDataToSheet(runnerId, checkpoint, timestamp, race, runnerName) {
 
     const data = {
@@ -507,7 +508,7 @@ async function sendDataToSheet(runnerId, checkpoint, timestamp, race, runnerName
             mode: 'cors', // Keep mode as 'cors'
             cache: 'no-cache',
             headers: {
-                // ****** Changed Content-Type back to text/plain ******
+                // ****** Using text/plain Content-Type ******
                 'Content-Type': 'text/plain',
             },
             redirect: 'follow',
@@ -554,7 +555,7 @@ async function sendDataToSheet(runnerId, checkpoint, timestamp, race, runnerName
         return false; // Indicate failure
     }
 }
-// ****** END UPDATED sendDataToSheet ******
+// ****** END sendDataToSheet ******
 
 
 // --- UI Updates ---
