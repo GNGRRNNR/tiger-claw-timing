@@ -504,11 +504,11 @@ async function sendDataToSheet(runnerId, checkpoint, timestamp, race, runnerName
     try {
         const response = await fetch(SCRIPT_URL, {
             method: 'POST',
-            mode: 'cors',
+            mode: 'cors', // Keep mode as 'cors'
             cache: 'no-cache',
             headers: {
-                // ****** Changed Content-Type back to application/json ******
-                'Content-Type': 'application/json',
+                // ****** Changed Content-Type back to text/plain ******
+                'Content-Type': 'text/plain',
             },
             redirect: 'follow',
             body: JSON.stringify(data) // Send stringified JSON
