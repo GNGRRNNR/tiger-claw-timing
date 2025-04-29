@@ -29,7 +29,7 @@ let currentRace = null;
 let runnerData = []; // Holds { bib: '101', name: 'John Doe', status: '' }
 let totalActiveRunners = 0;
 let scannedBibs = new Set(); // Track unique bibs scanned *at this checkpoint* in this session
-let recentScans = []; // Array of { bib: '101', time: 'HH:MM:SS' }
+let recentScans = []; // Array of { bib: '101', time: 'HH:MM:SS', name: 'Jane Doe' }
 let syncIntervalId = null;
 let deferredInstallPrompt = null; // For PWA installation
 
@@ -79,8 +79,8 @@ window.addEventListener('load', async () => {
     syncOfflineScans(); // Attempt initial sync
 
     showStatus('Ready. Enter Manual Bib or Start Scan.', 'info');
-    scanButton.disabled = false;
-    scanButton.textContent = 'Start QR Code Scan';
+    scanButton.disabled = false; // Re-enable button after setup
+    scanButton.textContent = 'Start QR Code Scan'; // Set correct text
 });
 
 // --- PWA & Service Worker ---
@@ -213,7 +213,8 @@ async function syncOfflineScans() {
         // Send scans in batches (e.g., 10 at a time) or individually
         // For simplicity, sending individually here, but batching is better for many scans
         for (const scan of unsynced) {
-            const success = await sendDataToSheet(scan.bib, scan.checkpoint, scan.timestamp, scan.race);
+            // Pass the stored name along with the bib during sync
+            const success = await sendDataToSheet(scan.bib, scan.checkpoint, scan.timestamp, scan.race, scan.name);
             if (success) {
                 await db.updateScanStatus(scan.id, 'synced');
                 console.log(`Synced scan ID: ${scan.id}`);
@@ -235,8 +236,7 @@ async function syncOfflineScans() {
 function initializeScanner() {
     try {
         html5QrCode = new Html5Qrcode("reader");
-        scanButton.disabled = false;
-        scanButton.textContent = 'Start QR Code Scan';
+        // Don't enable button here, wait for full init in window.onload
     } catch (error) {
         console.error("Failed to initialize Html5Qrcode:", error);
         showStatus(`Error initializing scanner: ${error.message}`, 'error', true);
@@ -271,8 +271,9 @@ function startScanning() {
     .catch((err) => {
         console.error(`Unable to start scanning: ${err}`);
         // Try the other camera if environment fails
-        if (err.name === "NotAllowedError" || err.name === "NotFoundError") {
-             console.log("Trying front camera...");
+        if (err.name === "NotAllowedError" || err.name === "NotFoundError" || err.name === "OverconstrainedError") {
+             console.log("Environment camera failed or not found, trying front camera...");
+             showStatus('Trying front camera...', 'info');
              html5QrCode.start({ facingMode: "user" }, config, onScanSuccess, onScanFailure)
                  .then(() => {
                      isScanning = true;
@@ -283,13 +284,17 @@ function startScanning() {
                  })
                  .catch(err2 => {
                       console.error(`Unable to start scanning with front camera either: ${err2}`);
-                      showStatus(`Scanner Error: ${err.message}. Check camera permissions.`, 'error');
+                      showStatus(`Scanner Error: ${err2.message}. Check camera permissions.`, 'error');
                       readerElement.classList.add('hidden'); // Hide reader on error
                       isScanning = false; // Ensure state is correct
+                      scanButton.textContent = 'Scanner Error';
+                      scanButton.disabled = true;
                  });
         } else {
             showStatus(`Scanner Error: ${err.message}. Check permissions.`, 'error');
              readerElement.classList.add('hidden');
+             scanButton.textContent = 'Scanner Error';
+             scanButton.disabled = true;
         }
     });
 }
@@ -318,6 +323,7 @@ function stopScanning() {
         });
 }
 
+// ****** MODIFIED onScanSuccess ******
 function onScanSuccess(decodedText, decodedResult) {
     const now = Date.now();
     if (now - lastScanTime < SCAN_THROTTLE_MS) {
@@ -326,9 +332,32 @@ function onScanSuccess(decodedText, decodedResult) {
     }
     lastScanTime = now;
     const timestamp = new Date().toISOString();
-    const bibNumber = decodedText.trim(); // Assume QR code contains only the bib number
 
-    console.log(`Scan successful: Bib ${bibNumber} at ${timestamp}`);
+    // --- Parse QR Code Data ---
+    // Assuming format "BIB,RUNNER NAME" (e.g., "123,John Doe")
+    // Adjust separator (e.g., ' ') if needed.
+    const parts = decodedText.trim().split(',');
+    let bibNumber = null;
+    let nameFromQR = null; // Name extracted directly from QR
+
+    if (parts.length >= 1) {
+        bibNumber = parts[0].trim(); // First part is always bib
+    }
+    if (parts.length >= 2) {
+         // Join remaining parts in case name has commas
+        nameFromQR = parts.slice(1).join(',').trim();
+    }
+
+    // Validate Bib Number (basic check)
+    if (!bibNumber || !/^\d+$/.test(bibNumber)) {
+        console.warn(`Invalid QR data format: Bib number not found or invalid in "${decodedText}"`);
+        showStatus(`Scan Error: Invalid QR data format.`, 'error');
+        // Optional: Vibrate differently for error?
+        if (navigator.vibrate) navigator.vibrate([50, 50, 50]); // Short pulses
+        return; // Stop processing this scan
+    }
+
+    console.log(`Scan successful: Bib ${bibNumber}, Name (from QR): ${nameFromQR || 'N/A'} at ${timestamp}`);
 
     // --- Feedback ---
     // 1. Vibrate
@@ -337,9 +366,11 @@ function onScanSuccess(decodedText, decodedResult) {
     }
     // 2. Sound (using Tone.js)
     try {
-        const synth = new Tone.Synth().toDestination();
-        // Play a C5 note for a short duration
-        synth.triggerAttackRelease("C5", "8n", Tone.now());
+        // Ensure Tone.js context is started (might need earlier user interaction)
+        Tone.start().then(() => {
+            const synth = new Tone.Synth().toDestination();
+            synth.triggerAttackRelease("C5", "8n", Tone.now());
+        });
     } catch (soundError) {
         console.warn("Could not play sound:", soundError); // Log warning if sound fails
     }
@@ -350,8 +381,10 @@ function onScanSuccess(decodedText, decodedResult) {
     }, 600); // Match animation duration
 
     // --- Process Scan ---
-    processScanData(bibNumber, timestamp);
+    // Pass both bib and the name found in the QR code
+    processScanData(bibNumber, timestamp, nameFromQR);
 }
+// ****** END MODIFIED onScanSuccess ******
 
 function onScanFailure(error) {
     // Log only occasionally or specific errors to avoid console spam
@@ -373,36 +406,40 @@ manualSubmitButton.addEventListener('click', () => {
     const timestamp = new Date().toISOString();
     console.log(`Manual entry: Bib ${bibNumber} at ${timestamp}`);
 
-    processScanData(bibNumber, timestamp);
+    // For manual entry, we don't have a name from QR, so pass null/undefined
+    processScanData(bibNumber, timestamp, null);
 
     manualBibInput.value = ''; // Clear input field
 });
 
 
 // --- Data Processing & Storage ---
-async function processScanData(bibNumber, timestamp) {
-     // 1. Basic Validation (Optional: Check against fetched runnerData if available)
-    const runner = runnerData.find(r => r.bib === bibNumber);
-    const runnerName = runner ? runner.name : 'Unknown'; // Get name if found
-    const runnerStatus = runner ? (runner.status || 'Active') : 'Unknown';
+// ****** MODIFIED processScanData ******
+// Added nameFromQR parameter
+async function processScanData(bibNumber, timestamp, nameFromQR) {
+     // 1. Determine Runner Name and Status
+     // Prefer name/status from the fetched runner list if available and matches bib
+    const runnerInfo = runnerData.find(r => r.bib === bibNumber);
+    const runnerName = runnerInfo ? runnerInfo.name : (nameFromQR || 'Unknown'); // Use list name > QR name > 'Unknown'
+    const runnerStatus = runnerInfo ? (runnerInfo.status || 'Active') : 'Unknown';
 
-    if (runner) {
+    // Display feedback using the determined name
+    if (runnerInfo) {
          if (runnerStatus === 'DNS' || runnerStatus === 'DNF') {
-             showStatus(`Warning: Runner ${bibNumber} (${runnerName}) has status ${runnerStatus}. Scan recorded.`, 'warning');
+             showStatus(`Warning: ${runnerStatus} - Bib ${bibNumber} (${runnerName}). Scan recorded.`, 'warning');
          } else {
-             showStatus(`Scan recorded: Bib ${bibNumber} (${runnerName})`, 'success');
+             showStatus(`Scan: Bib ${bibNumber} (${runnerName})`, 'success');
          }
     } else if (runnerData.length > 0) {
-        // Only show warning if runner list was loaded but bib not found
-        showStatus(`Warning: Bib ${bibNumber} not found in ${currentRace} list. Scan recorded anyway.`, 'warning');
+        // Runner list loaded, but bib not found
+        showStatus(`Warning: Bib ${bibNumber} not in list. Scan recorded (${nameFromQR || 'No Name'}).`, 'warning');
     } else {
-         // Runner list wasn't loaded, just record it
-         showStatus(`Scan recorded: Bib ${bibNumber}`, 'success');
+         // Runner list not loaded, use QR name if available
+         showStatus(`Scan: Bib ${bibNumber} (${nameFromQR || 'No Name'})`, 'success');
     }
 
-
-    // 2. Add to Recent Scans UI
-    addScanToRecentList(bibNumber, timestamp);
+    // 2. Add to Recent Scans UI (using the determined name)
+    addScanToRecentList(bibNumber, timestamp, runnerName);
 
     // 3. Update Stats UI
     scannedBibs.add(bibNumber); // Add to the set of unique bibs scanned this session
@@ -415,14 +452,16 @@ async function processScanData(bibNumber, timestamp) {
             checkpoint: currentCheckpoint,
             timestamp: timestamp,
             race: currentRace,
+            name: runnerName, // Store the determined name for potential use during sync
             status: 'unsynced' // Mark as not yet sent to server
         };
         const id = await db.addScan(scanRecord);
-        console.log(`Scan stored locally with ID: ${id}`);
+        console.log(`Scan stored locally with ID: ${id}, Name: ${runnerName}`);
 
         // 5. Attempt immediate sync if online
         if (navigator.onLine) {
-            const success = await sendDataToSheet(bibNumber, currentCheckpoint, timestamp, currentRace);
+             // Pass the determined name to the send function
+            const success = await sendDataToSheet(bibNumber, currentCheckpoint, timestamp, currentRace, runnerName);
             if (success) {
                 await db.updateScanStatus(id, 'synced');
                 console.log(`Scan ID ${id} synced immediately.`);
@@ -440,8 +479,12 @@ async function processScanData(bibNumber, timestamp) {
         showStatus(`Error saving scan: ${error.message}`, 'error');
     }
 }
+// ****** END MODIFIED processScanData ******
 
-async function sendDataToSheet(runnerId, checkpoint, timestamp, race) {
+
+// ****** MODIFIED sendDataToSheet ******
+// Added runnerName parameter
+async function sendDataToSheet(runnerId, checkpoint, timestamp, race, runnerName) {
     if (SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL') {
         console.error('Cannot send data: Google Apps Script URL not configured.');
         return false; // Indicate failure
@@ -452,7 +495,8 @@ async function sendDataToSheet(runnerId, checkpoint, timestamp, race) {
         bib: runnerId,
         checkpoint: checkpoint,
         timestamp: timestamp,
-        race: race
+        race: race,
+        name: runnerName // Send the name determined by the frontend
     };
 
     console.log("Sending data:", data);
@@ -484,7 +528,10 @@ async function sendDataToSheet(runnerId, checkpoint, timestamp, race) {
             // Let the calling function handle UI updates.
             return true; // Indicate success
         } else {
-            throw new Error(result.message || 'Unknown error from server.');
+            // Log specific error from backend if provided
+            console.error('Error from backend:', result.message || 'Unknown error');
+            showStatus(`Sync Error: ${result.message || 'Unknown error from server.'}`, 'error');
+            return false; // Indicate failure
         }
     } catch (error) {
         console.error('Error sending data:', error);
@@ -492,11 +539,13 @@ async function sendDataToSheet(runnerId, checkpoint, timestamp, race) {
         if (!navigator.onLine) {
              console.warn("Send failed while offline."); // Expected
         } else {
+            // Show network/parsing errors
             showStatus(`Sync Error: ${error.message}. Will retry.`, 'error');
         }
         return false; // Indicate failure
     }
 }
+// ****** END MODIFIED sendDataToSheet ******
 
 
 // --- UI Updates ---
@@ -512,28 +561,34 @@ function showStatus(message, type = 'info', permanent = false) {
 
     // Optionally clear the message after a delay, unless permanent
     if (!permanent) {
-        setTimeout(() => {
-            // Clear only if the message hasn't been updated since
+        // Use a variable to track the timeout ID for this specific message
+        const timeoutId = setTimeout(() => {
+            // Check if the current message is still the one we set the timeout for
             if (statusMessageElement.textContent === message) {
-                 // Restore to a default state, perhaps based on online status
-                 if (navigator.onLine) {
-                     showStatus('Ready.', 'info');
-                 } else {
-                      showStatus('Offline. Scans saved locally.', 'warning');
+                 // Restore to a default state based on online status
+                 const defaultMsg = navigator.onLine ? 'Ready.' : 'Offline. Scans saved locally.';
+                 const defaultType = navigator.onLine ? 'info' : 'warning';
+                 // Only update if the message hasn't changed to something else important
+                 if (statusMessageElement.className.includes(`status-${currentType}`)) {
+                      showStatus(defaultMsg, defaultType);
                  }
             }
         }, 5000); // Clear after 5 seconds
     }
 }
 
+
 function updateStatsUI() {
     scannedCountElement.textContent = scannedBibs.size;
     // totalActiveRunnersElement is updated when runner data is fetched
 }
 
-function addScanToRecentList(bib, timestamp) {
+// ****** MODIFIED addScanToRecentList ******
+// Added name parameter
+function addScanToRecentList(bib, timestamp, name) {
      const timeString = new Date(timestamp).toLocaleTimeString();
-     recentScans.unshift({ bib: bib, time: timeString }); // Add to beginning
+     // Include name in the recent scan object
+     recentScans.unshift({ bib: bib, time: timeString, name: name }); // Add to beginning
 
     // Keep only the last MAX_RECENT_SCANS
     if (recentScans.length > MAX_RECENT_SCANS) {
@@ -541,7 +596,11 @@ function addScanToRecentList(bib, timestamp) {
     }
     updateRecentScansUI();
 }
+// ****** END MODIFIED addScanToRecentList ******
 
+
+// ****** MODIFIED updateRecentScansUI ******
+// Displays name along with bib and time
 function updateRecentScansUI() {
     recentScansListElement.innerHTML = ''; // Clear existing list
 
@@ -553,14 +612,17 @@ function updateRecentScansUI() {
     recentScans.forEach(scan => {
         const li = document.createElement('li');
         li.className = 'p-2 border-b border-gray-200 last:border-b-0';
-        li.textContent = `Bib: ${scan.bib} at ${scan.time}`;
+        // Display name if available, otherwise just bib
+        const nameText = scan.name && scan.name !== 'Unknown' ? ` (${scan.name})` : '';
+        li.textContent = `Bib: ${scan.bib}${nameText} at ${scan.time}`;
         recentScansListElement.appendChild(li);
     });
 }
+// ****** END MODIFIED updateRecentScansUI ******
 
 // --- Event Listeners ---
 scanButton.addEventListener('click', () => {
-    // Ensure Tone.js context is started by user interaction
+    // Ensure Tone.js context is started by user interaction if not already
     Tone.start();
 
     if (isScanning) {
@@ -569,3 +631,4 @@ scanButton.addEventListener('click', () => {
         startScanning();
     }
 });
+
