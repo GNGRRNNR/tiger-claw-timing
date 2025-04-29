@@ -1,13 +1,14 @@
 // sw.js - Basic Service Worker for Caching App Shell
 
-const CACHE_NAME = 'runner-tracker-cache-v2'; // Increment version on changes
+const CACHE_NAME = 'runner-tracker-cache-v3'; // Increment version on changes
+// ****** Simplified CORE_ASSETS ******
+// Assuming sw.js is at the same level as index.html, app.js, etc.
 const CORE_ASSETS = [
-    '/', // Cache the root HTML
-    'index.html', // Explicitly cache index.html
+    'index.html', // Cache index.html specifically
     'app.js',
     'db.js',
     'manifest.json'
-    // Add paths to local icons if you created them e.g., 'images/icon-192x192.png'
+    // Add paths to local icons relative to sw.js if you created them e.g., 'images/icon-192x192.png'
 ];
 
 const EXTERNAL_ASSETS = [
@@ -33,9 +34,11 @@ self.addEventListener('install', event => {
                         console.log('Service Worker: Core assets cached.');
                         // Attempt to cache external assets, but don't block installation if they fail
                         console.log('Service Worker: Attempting to cache external assets...');
-                        cache.addAll(EXTERNAL_ASSETS).catch(error => {
-                            console.warn('Service Worker: Failed to cache some external assets:', error);
-                            // Installation still succeeds even if external assets fail
+                        // Use individual add requests for external assets for more resilience
+                        EXTERNAL_ASSETS.forEach(url => {
+                            cache.add(url).catch(error => {
+                                console.warn(`Service Worker: Failed to cache external asset: ${url}`, error);
+                            });
                         });
                     });
             })
@@ -100,7 +103,9 @@ self.addEventListener('fetch', event => {
                     .then(networkResponse => {
                          // Optional: Dynamically cache successfully fetched external assets
                          // Only cache successful responses and external assets if desired
-                         if (networkResponse.ok && EXTERNAL_ASSETS.some(url => event.request.url.startsWith(url))) {
+                         // Check if the request URL is one of the external assets we might want to cache
+                         const isExternalAsset = EXTERNAL_ASSETS.some(url => event.request.url.startsWith(url));
+                         if (networkResponse.ok && isExternalAsset) {
                              const responseToCache = networkResponse.clone(); // Clone response
                              caches.open(CACHE_NAME)
                                  .then(cache => {
@@ -113,8 +118,9 @@ self.addEventListener('fetch', event => {
                     .catch(error => {
                         console.error('Service Worker: Fetch failed; returning offline fallback or error for:', event.request.url, error);
                         // Optional: Return a generic offline fallback page for HTML requests
+                        // Check if it's a navigation request before returning offline page
                         // if (event.request.mode === 'navigate') {
-                        //     return caches.match('/offline.html'); // You would need to cache an offline.html page
+                        //     return caches.match('index.html'); // Try returning cached index.html as fallback
                         // }
                         // For other asset types, just let the browser handle the error
                     });
