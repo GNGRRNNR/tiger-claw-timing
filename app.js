@@ -1,6 +1,6 @@
 // --- Configuration ---
 // IMPORTANT: Replace with your deployed Google Apps Script Web App URL
-// ****** UPDATED SCRIPT URL ******
+// ****** UPDATED SCRIPT URL V2 ******
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyNZwcNd3NS2I5e8Lq9L4YpSj05_u0UfnKFkmckZzU2-bCju-m_iDGU7tl1_hkYwD1S/exec';
 const SCAN_THROTTLE_MS = 1500; // Min time between successful scans (1.5 seconds)
 const SYNC_INTERVAL_MS = 30000; // Check for unsynced scans every 30 seconds
@@ -142,10 +142,10 @@ function handleOnlineStatus() {
         connectionStatusElement.className = 'absolute top-2 right-2 text-xs font-semibold px-2 py-1 rounded bg-green-100 text-green-800';
         console.log('Status: Online');
         // Only sync if app is configured correctly
-        if (currentCheckpoint && currentRace && SCRIPT_URL !== 'https://script.google.com/macros/s/AKfycbyNZwcNd3NS2I5e8Lq9L4YpSj05_u0UfnKFkmckZzU2-bCju-m_iDGU7tl1_hkYwD1S/exec') {
+        if (currentCheckpoint && currentRace && SCRIPT_URL !== 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL') {
              showStatus('Connection restored. Syncing pending scans...', 'info');
              syncOfflineScans(); // Attempt sync immediately when back online
-        } else if (SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbyNZwcNd3NS2I5e8Lq9L4YpSj05_u0UfnKFkmckZzU2-bCju-m_iDGU7tl1_hkYwD1S/exec') {
+        } else if (SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL') {
              // This case should no longer happen if URL is correctly set above
              showStatus('Online, but App Script URL not configured.', 'warning');
         } else {
@@ -164,7 +164,7 @@ async function fetchRunnerData() {
     // Should only be called if currentRace is set
     if (!currentRace) return;
     // *** Crucial Check ***
-    if (SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbyNZwcNd3NS2I5e8Lq9L4YpSj05_u0UfnKFkmckZzU2-bCju-m_iDGU7tl1_hkYwD1S/exec' || !SCRIPT_URL) {
+    if (SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL' || !SCRIPT_URL) {
         // This check is now mainly a safeguard; the URL should be set.
         showStatus('Error: App Script URL not configured in app.js.', 'error', true);
         console.error('SCRIPT_URL is not set.');
@@ -221,7 +221,7 @@ async function syncOfflineScans() {
         return;
     }
     // *** Crucial Check ***
-    if (SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbyNZwcNd3NS2I5e8Lq9L4YpSj05_u0UfnKFkmckZzU2-bCju-m_iDGU7tl1_hkYwD1S/exec' || !SCRIPT_URL) {
+    if (SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL' || !SCRIPT_URL) {
         console.error('Cannot sync: Google Apps Script URL not configured.');
         return;
     }
@@ -487,10 +487,12 @@ async function processScanData(bibNumber, timestamp, nameFromQR) {
             if (success) {
                 await db.updateScanStatus(id, 'synced');
                 console.log(`Scan ID ${id} synced immediately.`);
+                // Update status message to confirm successful sync
+                showStatus(`Scan for ${bibNumber} synced successfully!`, 'success');
             } else {
                  console.warn(`Immediate sync failed for scan ID ${id}. Will retry later.`);
-                 // Optionally update status message if sync fails immediately
-                 showStatus(`Scan for ${bibNumber} saved, but sync failed. Will retry.`, 'warning');
+                 // Status message is already updated by sendDataToSheet on failure
+                 // showStatus(`Scan for ${bibNumber} saved, but sync failed. Will retry.`, 'warning');
             }
         } else {
             console.log(`Offline. Scan ID ${id} saved for later sync.`);
@@ -505,8 +507,10 @@ async function processScanData(bibNumber, timestamp, nameFromQR) {
 
 async function sendDataToSheet(runnerId, checkpoint, timestamp, race, runnerName) {
     // *** Crucial Check ***
-    if (SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbyNZwcNd3NS2I5e8Lq9L4YpSj05_u0UfnKFkmckZzU2-bCju-m_iDGU7tl1_hkYwD1S/exec' || !SCRIPT_URL) {
+    if (SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL' || !SCRIPT_URL) {
         console.error('Cannot send data: Google Apps Script URL not configured.');
+        // Return false, but also show a persistent error if this happens
+        showStatus('Sync failed: App Script URL not configured.', 'error', true);
         return false; // Indicate failure
     }
 
@@ -547,6 +551,7 @@ async function sendDataToSheet(runnerId, checkpoint, timestamp, race, runnerName
             throw new Error(`Sync failed: ${response.status} ${backendMessage || response.statusText}`);
         }
 
+        // Try parsing the response as JSON, even if just checking status
         const result = await response.json();
 
         if (result.status === 'success') {
@@ -560,10 +565,11 @@ async function sendDataToSheet(runnerId, checkpoint, timestamp, race, runnerName
             return false; // Indicate failure
         }
     } catch (error) {
-        // Catches fetch errors and errors thrown above
+        // Catches fetch errors, network errors, JSON parsing errors, and errors thrown above
         console.error('Error sending data:', error);
         if (!navigator.onLine) {
              console.warn("Send failed while offline."); // Expected
+             // Don't show error message if offline, sync will retry
         } else {
             // Show network/parsing errors or errors from backend
             showStatus(`Sync Error: ${error.message}. Will retry.`, 'error');
