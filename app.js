@@ -146,7 +146,7 @@ function handleOnlineStatus() {
 
 async function fetchRunnerData() {
     if (!currentRace) return;
-    if (SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL') {
+    if (SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbzYS0RC4S9oGb4ZGsyEukO9-RclUYEjC4OOg0XSgkBa-tdtqvU8Mm5IC2Y2mqN243Kd/exec') {
         showStatus('Error: App Script URL not configured.', 'error', true);
         return;
     }
@@ -195,7 +195,7 @@ async function syncOfflineScans() {
         console.log("Offline, skipping sync.");
         return;
     }
-    if (SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL') {
+    if (SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbzYS0RC4S9oGb4ZGsyEukO9-RclUYEjC4OOg0XSgkBa-tdtqvU8Mm5IC2Y2mqN243Kd/exec') {
         console.error('Cannot sync: Google Apps Script URL not configured.');
         return;
     }
@@ -485,7 +485,7 @@ async function processScanData(bibNumber, timestamp, nameFromQR) {
 // ****** MODIFIED sendDataToSheet ******
 // Added runnerName parameter
 async function sendDataToSheet(runnerId, checkpoint, timestamp, race, runnerName) {
-    if (SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL') {
+    if (SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbzYS0RC4S9oGb4ZGsyEukO9-RclUYEjC4OOg0XSgkBa-tdtqvU8Mm5IC2Y2mqN243Kd/exec') {
         console.error('Cannot send data: Google Apps Script URL not configured.');
         return false; // Indicate failure
     }
