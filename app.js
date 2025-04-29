@@ -141,7 +141,6 @@ function handleOnlineStatus() {
         connectionStatusElement.className = 'absolute top-2 right-2 text-xs font-semibold px-2 py-1 rounded bg-green-100 text-green-800';
         console.log('Status: Online');
         // Only sync if app is configured correctly (checkpoint/race parameters are present)
-        // Removed the redundant SCRIPT_URL check here
         if (currentCheckpoint && currentRace) {
              showStatus('Connection restored. Syncing pending scans...', 'info');
              syncOfflineScans(); // Attempt sync immediately when back online
@@ -160,7 +159,6 @@ function handleOnlineStatus() {
 async function fetchRunnerData() {
     // Should only be called if currentRace is set
     if (!currentRace) return;
-    // Removed the redundant SCRIPT_URL check here - assumes URL at top is correct
 
     loadingSpinnerElement.classList.remove('hidden');
     totalActiveRunnersElement.textContent = '?';
@@ -210,7 +208,6 @@ async function syncOfflineScans() {
         console.log("Offline, skipping sync.");
         return;
     }
-    // Removed the redundant SCRIPT_URL check here
 
     try {
         const unsynced = await db.getUnsyncedScans();
@@ -490,8 +487,8 @@ async function processScanData(bibNumber, timestamp, nameFromQR) {
     }
 }
 
+// ****** UPDATED sendDataToSheet ******
 async function sendDataToSheet(runnerId, checkpoint, timestamp, race, runnerName) {
-    // Removed the redundant SCRIPT_URL check here
 
     const data = {
         action: 'recordScan',
@@ -510,7 +507,8 @@ async function sendDataToSheet(runnerId, checkpoint, timestamp, race, runnerName
             mode: 'cors',
             cache: 'no-cache',
             headers: {
-                'Content-Type': 'text/plain', // Keep as text/plain for simple doPost parsing
+                // ****** Changed Content-Type back to application/json ******
+                'Content-Type': 'application/json',
             },
             redirect: 'follow',
             body: JSON.stringify(data) // Send stringified JSON
@@ -556,6 +554,7 @@ async function sendDataToSheet(runnerId, checkpoint, timestamp, race, runnerName
         return false; // Indicate failure
     }
 }
+// ****** END UPDATED sendDataToSheet ******
 
 
 // --- UI Updates ---
