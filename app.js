@@ -5,7 +5,7 @@ const SCAN_THROTTLE_MS = 1500;
 const SYNC_INTERVAL_MS = 30000;
 const MAX_RECENT_SCANS = 5;
 const RUNNER_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
-const FLASH_DURATION_MS = 350; // Slightly longer flash
+const FLASH_DURATION_MS = 350;
 // --- End Configuration ---
 
 // --- DOM Elements ---
@@ -108,58 +108,36 @@ window.addEventListener('load', async () => {
 
 // --- PWA & Service Worker ---
 function setupServiceWorker() { if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').then(reg => console.log('SW registered:', reg.scope)).catch(err => console.error('SW registration failed:', err)); } }
-function isIOS() {
-    // More robust iOS detection
-    return [
-        'iPad Simulator', 'iPhone Simulator', 'iPod Simulator', 'iPad', 'iPhone', 'iPod'
-    ].includes(navigator.platform)
-    // iPad on iOS 13 detection
-    || (navigator.userAgent.includes("Mac") && "ontouchend" in document)
-    || /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-}
+function isIOS() { return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); } // Updated check
 
-// ****** UPDATED setupInstallButton for iOS ******
+// ****** UPDATED setupInstallButton ******
 function setupInstallButton() {
      if (isIOS()) {
-         // Show instructions for iOS
          if (iosInstallInstructionsElement) {
-             // Use innerHTML to render the share icon image correctly
-             // Using a more standard SVG for the share icon
              iosInstallInstructionsElement.innerHTML = `To add to Home Screen: Tap the Share button <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-box-arrow-up" viewBox="0 0 16 16" style="display: inline; height: 1.1em; vertical-align: text-bottom; margin: 0 0.1em;"><path fill-rule="evenodd" d="M.5 9.9a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1H1.707l3.147 3.146a.5.5 0 0 1-.708.708L1 11.707V14.5a.5.5 0 0 1-1 0v-5z"/><path fill-rule="evenodd" d="M15.5 9.4a.5.5 0 0 1 0-1h-4a.5.5 0 0 1 0-1h4a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0V9.9H1.5a.5.5 0 0 1-.5-.5zM7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/></svg>, then scroll down and tap 'Add to Home Screen'.`;
              iosInstallInstructionsElement.classList.remove('hidden');
              console.log('iOS detected, showing install instructions.');
-         } else {
-              console.error("iOS instructions element not found in HTML.");
-         }
-         // Hide the generic install button if it exists
+         } else { console.error("iOS instructions element not found."); }
          if (installButton) installButton.classList.add('hidden');
-
      } else {
-         // For non-iOS, listen for the install prompt event
          window.addEventListener('beforeinstallprompt', (event) => {
-            event.preventDefault();
-            deferredInstallPrompt = event;
-            if (installButton) installButton.classList.remove('hidden'); // Show the button
-            if (iosInstallInstructionsElement) iosInstallInstructionsElement.classList.add('hidden'); // Hide iOS instructions
-            console.log('\'beforeinstallprompt\' event was fired.');
+            event.preventDefault(); deferredInstallPrompt = event;
+            if (installButton) installButton.classList.remove('hidden');
+            if (iosInstallInstructionsElement) iosInstallInstructionsElement.classList.add('hidden');
+            console.log('beforeinstallprompt fired.');
         });
-
         if (installButton) {
             installButton.addEventListener('click', async () => {
                 if (!deferredInstallPrompt) { console.log('Install prompt not available.'); return; }
                 deferredInstallPrompt.prompt();
                 const { outcome } = await deferredInstallPrompt.userChoice;
                 console.log(`User response: ${outcome}`);
-                deferredInstallPrompt = null;
-                installButton.classList.add('hidden');
+                deferredInstallPrompt = null; installButton.classList.add('hidden');
             });
-        } else {
-             console.error("Generic install button element not found in HTML.");
-        }
+        } else { console.error("Install button element not found."); }
      }
-
      window.addEventListener('appinstalled', () => {
-        console.log('PWA was installed');
+        console.log('PWA installed');
         if (installButton) installButton.classList.add('hidden');
         if (iosInstallInstructionsElement) iosInstallInstructionsElement.classList.add('hidden');
         deferredInstallPrompt = null;
@@ -229,40 +207,64 @@ manualSubmitButton.addEventListener('click', () => {
 
 
 // --- Data Processing & Storage ---
-// (processScanData remains the same - doesn't force count fetch)
+// ****** UPDATED processScanData to fix potential error ******
 async function processScanData(bibNumber, timestamp, nameFromQR) {
-    const runnerInfo = runnerData.find(r => r.bib === bibNumber);
+    // Make sure bibNumber is treated as a string for consistency
+    const bibNumStr = String(bibNumber);
+
+    // 1. Determine Runner Name and Status
+    const runnerInfo = runnerData.find(r => r.bib === bibNumStr); // Use string comparison
     const runnerName = runnerInfo ? runnerInfo.name : (nameFromQR || 'Unknown');
     const runnerStatus = runnerInfo ? (runnerInfo.status || 'Active') : 'Unknown';
+
+    // Display feedback using the determined name
     if (runnerInfo) {
-         if (runnerStatus === 'DNS' || runnerStatus === 'DNF') showStatus(`Warning: ${runnerStatus} - Bib ${bibNumber} (${runnerName}). Scan recorded.`, 'warning');
-         else showStatus(`Scan: Bib ${bibNumber} (${runnerName})`, 'success');
-    } else if (runnerData.length > 0 || totalActiveRunners > 0) showStatus(`Warning: Bib ${bibNumber} not in list. Scan recorded (${nameFromQR || 'No Name'}).`, 'warning');
-    else showStatus(`Scan: Bib ${bibNumber} (${nameFromQR || 'No Name'})`, 'success');
-    addScanToRecentList(bibNumber, timestamp, runnerName);
+         if (runnerStatus === 'DNS' || runnerStatus === 'DNF') showStatus(`Warning: ${runnerStatus} - Bib ${bibNumStr} (${runnerName}). Scan recorded.`, 'warning');
+         else showStatus(`Scan: Bib ${bibNumStr} (${runnerName})`, 'success');
+    } else if (runnerData.length > 0 || totalActiveRunners > 0) showStatus(`Warning: Bib ${bibNumStr} not in list. Scan recorded (${nameFromQR || 'No Name'}).`, 'warning');
+    else showStatus(`Scan: Bib ${bibNumStr} (${nameFromQR || 'No Name'})`, 'success');
+
+    // 2. Add to Recent Scans UI
+    addScanToRecentList(bibNumStr, timestamp, runnerName);
+
+    // 3. Store in IndexedDB
     try {
-        const scanRecord = { bib, checkpoint: currentCheckpoint, timestamp, race: currentRace, name: runnerName, status: 'unsynced' };
-        const id = await db.addScan(scanRecord);
+        const scanRecord = {
+            bib: bibNumStr, // Ensure bib is stored as string
+            checkpoint: currentCheckpoint,
+            timestamp: timestamp,
+            race: currentRace,
+            name: runnerName,
+            status: 'unsynced'
+        };
+        const id = await db.addScan(scanRecord); // Pass the object
         console.log(`Scan stored locally with ID: ${id}, Name: ${runnerName}`);
+
+        // 4. Attempt immediate sync if online
         if (navigator.onLine) {
-            const success = await sendDataToSheet(bibNumber, currentCheckpoint, timestamp, currentRace, runnerName);
+            // Pass bibNumStr to sendDataToSheet
+            const success = await sendDataToSheet(bibNumStr, currentCheckpoint, timestamp, currentRace, runnerName);
             if (success) {
                 await db.updateScanStatus(id, 'synced');
                 console.log(`Scan ID ${id} synced immediately.`);
-                showStatus(`Scan for ${bibNumber} synced successfully!`, 'success');
+                showStatus(`Scan for ${bibNumStr} synced successfully!`, 'success');
                 // Don't force fetch count here, rely on manual refresh or interval
             } else {
                  console.warn(`Immediate sync failed for scan ID ${id}. Will retry later.`);
             }
         } else {
             console.log(`Offline. Scan ID ${id} saved for later sync.`);
-            showStatus(`Offline: Scan for ${bibNumber} saved locally.`, 'warning');
+            showStatus(`Offline: Scan for ${bibNumStr} saved locally.`, 'warning');
         }
+
     } catch (error) {
-        console.error('Error processing or storing scan:', error);
-        showStatus(`Error saving scan: ${error.message}`, 'error');
+        // Log the specific error message
+        console.error('Error in processScanData try block:', error);
+        console.error('Error stack:', error.stack); // Log stack trace
+        showStatus(`Error saving scan: ${error.message}`, 'error'); // Show the actual error
     }
 }
+// ****** END UPDATED processScanData ******
 
 // --- sendDataToSheet function remains the same (using text/plain) ---
 async function sendDataToSheet(runnerId, checkpoint, timestamp, race, runnerName) {
@@ -386,7 +388,7 @@ async function handleRefreshStatsClick() {
             fetchScanCount(true)  // Force fetch latest scan count
         ]);
         // Status message updated inside fetch functions on success/error
-        // Or set a generic success message here if preferred
+        // Set a generic success message here after both complete
         showStatus('Stats refreshed.', 'info');
 
     } catch (error) {
@@ -403,4 +405,3 @@ async function handleRefreshStatsClick() {
     }
 }
 // ****** END UPDATED handleRefreshStatsClick ******
-
