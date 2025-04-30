@@ -1,7 +1,7 @@
 // --- Configuration ---
 // Google Apps Script Web App URL (Should be the correct deployed URL)
 // ****** UPDATED SCRIPT URL V3 ******
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwytbu1IDlXT3dOGKwQiS4U2i4KT3MSdsKSrzqKPgJ5evW1VkmJ9iCloB1UsnxnyOYC/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxScdvFhcKI8HQ382XUDnEaWiqj5ZpJnm06QOy_YWPDfI8fhsjAqIWqo0p6rgharY8/exec';
 const SCAN_THROTTLE_MS = 1500; // Min time between successful scans (1.5 seconds)
 const SYNC_INTERVAL_MS = 30000; // Check for unsynced scans every 30 seconds
 const MAX_RECENT_SCANS = 5; // How many recent scans to show in the list
