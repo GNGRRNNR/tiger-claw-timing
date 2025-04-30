@@ -5,7 +5,7 @@ const SCAN_THROTTLE_MS = 1500;
 const SYNC_INTERVAL_MS = 30000;
 const MAX_RECENT_SCANS = 5;
 const RUNNER_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
-const FLASH_DURATION_MS = 500; // Slightly longer duration for indicator
+const FLASH_DURATION_MS = 250; // Duration for background flash
 // --- End Configuration ---
 
 // --- DOM Elements ---
@@ -22,10 +22,10 @@ const manualSubmitButton = document.getElementById('manualSubmitButton');
 const recentScansListElement = document.getElementById('recentScansList');
 const installButton = document.getElementById('installButton');
 const statsDisplayElement = document.getElementById('statsDisplay');
-// const flashOverlayElement = document.getElementById('flashOverlay'); // Keep commented out or remove
 const iosInstallInstructionsElement = document.getElementById('iosInstallInstructions');
 const refreshStatsButton = document.getElementById('refreshStatsButton');
-const scanIndicatorElement = document.getElementById('scanIndicator'); // Added Scan Indicator
+// const scanIndicatorElement = document.getElementById('scanIndicator'); // No longer using this
+const appContainerElement = document.getElementById('appContainer'); // Main app container for flash
 
 // --- App State ---
 let html5QrCode = null;
@@ -86,11 +86,36 @@ window.addEventListener('load', async () => {
     runnerRefreshIntervalId = setInterval(() => fetchRunnerData(false), RUNNER_REFRESH_INTERVAL_MS);
     syncOfflineScans();
 
+    // --- Setup Event Listeners ---
+    if (scanButton) {
+        scanButton.addEventListener('click', () => {
+            startToneContext(); // Ensure audio context is ready
+            if (isScanning) stopScanning(); else startScanning();
+        });
+    } else {
+        console.error("Scan button not found!");
+    }
+
+    if (manualSubmitButton) {
+        manualSubmitButton.addEventListener('click', handleManualSubmit); // Separate handler
+    } else {
+         console.error("Manual submit button not found!");
+    }
+
+    if (refreshStatsButton) {
+        refreshStatsButton.addEventListener('click', handleRefreshStatsClick);
+    } else {
+         console.error("Refresh stats button not found!");
+    }
+    // --- End Setup Event Listeners ---
+
+
     if (currentCheckpoint && currentRace) {
         showStatus('Ready. Enter Manual Bib or Start Scan.', 'info');
-        scanButton.disabled = false; scanButton.textContent = 'Start QR Code Scan';
-        if (refreshStatsButton) {
-            refreshStatsButton.addEventListener('click', handleRefreshStatsClick);
+        // Enable scan button only if scanner initialized successfully
+        if (html5QrCode) {
+             scanButton.disabled = false;
+             scanButton.textContent = 'Start QR Code Scan';
         }
     } else {
         showStatus('Initialization incomplete due to config error.', 'error', true);
@@ -149,7 +174,7 @@ function startScanning() { if (isScanning || !html5QrCode) return; startToneCont
 function stopScanning() { if (!isScanning || !html5QrCode) return; html5QrCode.stop().then(() => { console.log("QR Code scanning stopped."); }).catch((err) => { console.error(`Failed to stop scanning cleanly: ${err}`); }).finally(() => { isScanning = false; scanButton.textContent = 'Start QR Code Scan'; scanButton.classList.remove('bg-red-600', 'hover:bg-red-700'); scanButton.classList.add('bg-indigo-600', 'hover:bg-indigo-700'); readerElement.classList.add('hidden'); showStatus('Scanner stopped.', 'info'); }); }
 function onScanFailure(error) { /* console.warn(`Code scan error = ${error}`); */ }
 
-// --- Modified onScanSuccess to trigger flash overlay ---
+// --- Modified onScanSuccess to trigger background flash ---
 function onScanSuccess(decodedText, decodedResult) {
     const now = Date.now();
     if (now - lastScanTime < SCAN_THROTTLE_MS) { console.log("Scan throttled."); return; }
@@ -166,17 +191,18 @@ function onScanSuccess(decodedText, decodedResult) {
     console.log(`Scan successful: Bib ${bibNumber}, Name (QR): ${nameFromQR || 'N/A'} at ${timestamp}`);
 
     // --- Feedback ---
-    triggerFlashFeedback(); // Trigger flash overlay
-    if (navigator.vibrate) navigator.vibrate(150); // Attempt vibration
-    playSound(); // Attempt sound
+    triggerFlashFeedback(); // Trigger background flash
+    if (navigator.vibrate) navigator.vibrate(150);
+    playSound();
 
     // --- Process Scan ---
     processScanData(bibNumber, timestamp, nameFromQR);
 }
 
-// --- Modified Manual Entry handler to trigger flash overlay ---
-manualSubmitButton.addEventListener('click', () => {
-    startToneContext();
+// --- Manual Entry Handler ---
+// ****** UPDATED handleManualSubmit ******
+function handleManualSubmit() {
+    startToneContext(); // Ensure audio context started
     const bibNumber = manualBibInput.value.trim();
     if (!bibNumber) { showStatus('Please enter a Bib Number.', 'error'); return; }
     if (!/^\d+$/.test(bibNumber)) { showStatus('Invalid Bib Number format.', 'error'); return; }
@@ -184,14 +210,15 @@ manualSubmitButton.addEventListener('click', () => {
     console.log(`Manual entry: Bib ${bibNumber} at ${timestamp}`);
 
     // --- Feedback ---
-    triggerFlashFeedback(); // Trigger flash overlay
-    if (navigator.vibrate) navigator.vibrate(100); // Attempt vibration
-    playSound(); // Attempt sound
+    triggerFlashFeedback(); // Trigger background flash
+    if (navigator.vibrate) navigator.vibrate(100);
+    playSound();
 
     // --- Process Scan ---
-    processScanData(bibNumber, timestamp, null);
-    manualBibInput.value = '';
-});
+    processScanData(bibNumber, timestamp, null); // Call existing processing function
+    manualBibInput.value = ''; // Clear input after processing
+}
+// ****** END UPDATED handleManualSubmit ******
 
 
 // --- Data Processing & Storage ---
@@ -239,18 +266,18 @@ function addScanToRecentList(bib, timestamp, name) { const timeString = new Date
 function updateRecentScansUI() { recentScansListElement.innerHTML = ''; if (recentScans.length === 0) { recentScansListElement.innerHTML = '<li class="p-2 text-gray-500 italic">No scans yet.</li>'; return; } recentScans.forEach(scan => { const li = document.createElement('li'); li.className = 'p-2 border-b border-gray-200 last:border-b-0'; const nameText = scan.name && scan.name !== 'Unknown' ? ` (${scan.name})` : ''; li.textContent = `Bib: ${scan.bib}${nameText} at ${scan.time}`; recentScansListElement.appendChild(li); }); }
 
 // --- Flash Feedback ---
-// ****** UPDATED triggerFlashFeedback to use OVERLAY ******
+// ****** UPDATED triggerFlashFeedback to use BACKGROUND FLASH ******
 function triggerFlashFeedback() {
-    if (!flashOverlayElement) {
-        console.warn("Flash overlay element not found");
+    if (!appContainerElement) {
+        console.warn("App container element not found for flash");
         return;
     }
-    // Use classList to ensure styles are applied correctly
-    flashOverlayElement.classList.add('visible');
+    // Add the flash class
+    appContainerElement.classList.add('app-flash');
 
-    // Set timeout to remove the class after the duration
+    // Remove the class after the duration
     setTimeout(() => {
-        flashOverlayElement.classList.remove('visible');
+        appContainerElement.classList.remove('app-flash');
     }, FLASH_DURATION_MS);
 }
 // ****** END UPDATED triggerFlashFeedback ******
@@ -263,51 +290,9 @@ function playSound() { if (!toneJsStarted || typeof Tone === 'undefined' || Tone
 
 
 // --- Event Listeners ---
-scanButton.addEventListener('click', () => { startToneContext(); if (isScanning) stopScanning(); else startScanning(); });
-manualSubmitButton.addEventListener('click', startToneContext);
+// Moved to init function
 
 // --- Manual Refresh Handler ---
-// ****** UPDATED handleRefreshStatsClick ******
-async function handleRefreshStatsClick() {
-    if (!navigator.onLine) {
-        showStatus('Cannot refresh stats while offline.', 'warning');
-        return;
-    }
-    // Prevent multiple clicks while a refresh is in progress
-    if (isFetchingRunners || isFetchingScanCount) {
-        console.log("Already refreshing stats.");
-        return;
-    }
-
-    console.log("Manual refresh triggered.");
-    showStatus('Refreshing stats from server...', 'info');
-    refreshStatsButton.disabled = true; // Disable button immediately
-    loadingSpinnerElement.classList.remove('hidden'); // Show spinner
-
-    try {
-        // Fetch both counts and runner list concurrently
-        await Promise.allSettled([
-            fetchRunnerData(true), // Force fetch latest runner list
-            fetchScanCount(true)  // Force fetch latest scan count
-        ]);
-        // Set a generic success message here after both complete,
-        // unless an error message was already shown by fetch functions
-        if (!statusMessageElement.className.includes('status-error') && !statusMessageElement.className.includes('status-warning')) {
-             showStatus('Stats refreshed.', 'info');
-        }
-
-    } catch (error) {
-         // Should be caught within fetch functions, but just in case
-         console.error("Error during manual refresh:", error);
-         showStatus('Error refreshing stats.', 'error');
-    } finally {
-        // Re-enable button *only if still online* after fetches complete
-        loadingSpinnerElement.classList.add('hidden'); // Hide spinner
-        if (navigator.onLine) {
-            refreshStatsButton.disabled = false;
-        }
-        // If offline after fetches, the handleOnlineStatus function should disable it
-    }
-}
-// ****** END UPDATED handleRefreshStatsClick ******
+// (handleRefreshStatsClick remains the same)
+async function handleRefreshStatsClick() { if (!navigator.onLine) { showStatus('Cannot refresh stats while offline.', 'warning'); return; } if (isFetchingRunners || isFetchingScanCount) { console.log("Already refreshing stats."); return; } console.log("Manual refresh triggered."); showStatus('Refreshing stats from server...', 'info'); refreshStatsButton.disabled = true; loadingSpinnerElement.classList.remove('hidden'); try { await Promise.allSettled([ fetchRunnerData(true), fetchScanCount(true) ]); if (!statusMessageElement.className.includes('status-error') && !statusMessageElement.className.includes('status-warning')) { showStatus('Stats refreshed.', 'info'); } } catch (error) { console.error("Error during manual refresh:", error); showStatus('Error refreshing stats.', 'error'); } finally { loadingSpinnerElement.classList.add('hidden'); if (navigator.onLine) { refreshStatsButton.disabled = false; } } }
 
