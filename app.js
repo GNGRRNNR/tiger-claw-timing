@@ -5,7 +5,7 @@ const SCAN_THROTTLE_MS = 1500;
 const SYNC_INTERVAL_MS = 30000;
 const MAX_RECENT_SCANS = 5;
 const RUNNER_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
-const FLASH_DURATION_MS = 250; // Duration for background flash
+const FLASH_DURATION_MS = 400; // Duration for reticle flash
 // --- End Configuration ---
 
 // --- DOM Elements ---
@@ -24,8 +24,8 @@ const installButton = document.getElementById('installButton');
 const statsDisplayElement = document.getElementById('statsDisplay');
 const iosInstallInstructionsElement = document.getElementById('iosInstallInstructions');
 const refreshStatsButton = document.getElementById('refreshStatsButton');
-// const scanIndicatorElement = document.getElementById('scanIndicator'); // No longer using this
-const appContainerElement = document.getElementById('appContainer'); // Main app container for flash
+// const appContainerElement = document.getElementById('appContainer'); // No longer using background flash
+let targetingOverlayElement = null; // Will get this inside #reader later
 
 // --- App State ---
 let html5QrCode = null;
@@ -89,31 +89,23 @@ window.addEventListener('load', async () => {
     // --- Setup Event Listeners ---
     if (scanButton) {
         scanButton.addEventListener('click', () => {
-            startToneContext(); // Ensure audio context is ready
+            startToneContext();
             if (isScanning) stopScanning(); else startScanning();
         });
-    } else {
-        console.error("Scan button not found!");
-    }
+    } else { console.error("Scan button not found!"); }
 
     if (manualSubmitButton) {
-        manualSubmitButton.addEventListener('click', handleManualSubmit); // Separate handler
-    } else {
-         console.error("Manual submit button not found!");
-    }
+        manualSubmitButton.addEventListener('click', handleManualSubmit);
+    } else { console.error("Manual submit button not found!"); }
 
     if (refreshStatsButton) {
         refreshStatsButton.addEventListener('click', handleRefreshStatsClick);
-    } else {
-         console.error("Refresh stats button not found!");
-    }
+    } else { console.error("Refresh stats button not found!"); }
     // --- End Setup Event Listeners ---
-
 
     if (currentCheckpoint && currentRace) {
         showStatus('Ready. Enter Manual Bib or Start Scan.', 'info');
-        // Enable scan button only if scanner initialized successfully
-        if (html5QrCode) {
+        if (html5QrCode) { // Check if scanner initialized
              scanButton.disabled = false;
              scanButton.textContent = 'Start QR Code Scan';
         }
@@ -174,7 +166,7 @@ function startScanning() { if (isScanning || !html5QrCode) return; startToneCont
 function stopScanning() { if (!isScanning || !html5QrCode) return; html5QrCode.stop().then(() => { console.log("QR Code scanning stopped."); }).catch((err) => { console.error(`Failed to stop scanning cleanly: ${err}`); }).finally(() => { isScanning = false; scanButton.textContent = 'Start QR Code Scan'; scanButton.classList.remove('bg-red-600', 'hover:bg-red-700'); scanButton.classList.add('bg-indigo-600', 'hover:bg-indigo-700'); readerElement.classList.add('hidden'); showStatus('Scanner stopped.', 'info'); }); }
 function onScanFailure(error) { /* console.warn(`Code scan error = ${error}`); */ }
 
-// --- Modified onScanSuccess to trigger background flash ---
+// --- Modified onScanSuccess to trigger reticle flash ---
 function onScanSuccess(decodedText, decodedResult) {
     const now = Date.now();
     if (now - lastScanTime < SCAN_THROTTLE_MS) { console.log("Scan throttled."); return; }
@@ -191,7 +183,7 @@ function onScanSuccess(decodedText, decodedResult) {
     console.log(`Scan successful: Bib ${bibNumber}, Name (QR): ${nameFromQR || 'N/A'} at ${timestamp}`);
 
     // --- Feedback ---
-    triggerFlashFeedback(); // Trigger background flash
+    triggerFlashFeedback(); // Trigger reticle flash
     if (navigator.vibrate) navigator.vibrate(150);
     playSound();
 
@@ -210,7 +202,7 @@ function handleManualSubmit() {
     console.log(`Manual entry: Bib ${bibNumber} at ${timestamp}`);
 
     // --- Feedback ---
-    triggerFlashFeedback(); // Trigger background flash
+    triggerFlashFeedback(); // Trigger reticle flash
     if (navigator.vibrate) navigator.vibrate(100);
     playSound();
 
@@ -266,18 +258,28 @@ function addScanToRecentList(bib, timestamp, name) { const timeString = new Date
 function updateRecentScansUI() { recentScansListElement.innerHTML = ''; if (recentScans.length === 0) { recentScansListElement.innerHTML = '<li class="p-2 text-gray-500 italic">No scans yet.</li>'; return; } recentScans.forEach(scan => { const li = document.createElement('li'); li.className = 'p-2 border-b border-gray-200 last:border-b-0'; const nameText = scan.name && scan.name !== 'Unknown' ? ` (${scan.name})` : ''; li.textContent = `Bib: ${scan.bib}${nameText} at ${scan.time}`; recentScansListElement.appendChild(li); }); }
 
 // --- Flash Feedback ---
-// ****** UPDATED triggerFlashFeedback to use BACKGROUND FLASH ******
+// ****** UPDATED triggerFlashFeedback to use RETICLE FLASH ******
 function triggerFlashFeedback() {
-    if (!appContainerElement) {
-        console.warn("App container element not found for flash");
+    // Find the overlay dynamically each time, in case the reader was re-initialized
+    targetingOverlayElement = readerElement ? readerElement.querySelector('.targeting-overlay') : null;
+
+    if (!targetingOverlayElement) {
+        console.warn("Targeting overlay element not found for flash");
+        // Fallback: Flash the app container background?
+        // if (appContainerElement) {
+        //     appContainerElement.classList.add('app-flash');
+        //     setTimeout(() => { appContainerElement.classList.remove('app-flash'); }, FLASH_DURATION_MS);
+        // }
         return;
     }
     // Add the flash class
-    appContainerElement.classList.add('app-flash');
+    targetingOverlayElement.classList.add('scan-success');
 
     // Remove the class after the duration
     setTimeout(() => {
-        appContainerElement.classList.remove('app-flash');
+        if (targetingOverlayElement) { // Check again in case it disappeared
+             targetingOverlayElement.classList.remove('scan-success');
+        }
     }, FLASH_DURATION_MS);
 }
 // ****** END UPDATED triggerFlashFeedback ******
