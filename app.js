@@ -5,7 +5,7 @@ const SCAN_THROTTLE_MS = 1500;
 const SYNC_INTERVAL_MS = 30000;
 const MAX_RECENT_SCANS = 5;
 const RUNNER_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
-const FLASH_DURATION_MS = 350;
+const FLASH_DURATION_MS = 500; // Slightly longer duration for indicator
 // --- End Configuration ---
 
 // --- DOM Elements ---
@@ -22,9 +22,10 @@ const manualSubmitButton = document.getElementById('manualSubmitButton');
 const recentScansListElement = document.getElementById('recentScansList');
 const installButton = document.getElementById('installButton');
 const statsDisplayElement = document.getElementById('statsDisplay');
-const flashOverlayElement = document.getElementById('flashOverlay'); // Using overlay again
+// const flashOverlayElement = document.getElementById('flashOverlay'); // Keep commented out or remove
 const iosInstallInstructionsElement = document.getElementById('iosInstallInstructions');
 const refreshStatsButton = document.getElementById('refreshStatsButton');
+const scanIndicatorElement = document.getElementById('scanIndicator'); // Added Scan Indicator
 
 // --- App State ---
 let html5QrCode = null;
@@ -47,12 +48,11 @@ let isFetchingRunners = false;
 window.addEventListener('load', async () => {
     showStatus('Initializing application...', 'info');
     setupServiceWorker();
-    setupInstallButton(); // Sets up install button OR iOS instructions
-    handleOnlineStatus(); // Initial check + disables refresh button if offline
+    setupInstallButton();
+    handleOnlineStatus();
     window.addEventListener('online', handleOnlineStatus);
     window.addEventListener('offline', handleOnlineStatus);
 
-    // 1. Get Checkpoint/Race from URL
     const urlParams = new URLSearchParams(window.location.search);
     currentCheckpoint = urlParams.get('checkpoint');
     currentRace = urlParams.get('race');
@@ -63,41 +63,32 @@ window.addEventListener('load', async () => {
         scanButton.disabled = true; scanButton.textContent = 'Configuration Error';
         console.error("URL must include ?checkpoint=CHECKPOINT_NAME&race=RACE_NAME");
         if(statsDisplayElement) statsDisplayElement.classList.add('hidden');
-        if (refreshStatsButton) refreshStatsButton.disabled = true; // Disable refresh on error
+        if (refreshStatsButton) refreshStatsButton.disabled = true;
         return;
     }
     checkpointDisplayElement.textContent = `${currentCheckpoint} (${currentRace})`;
     if(statsDisplayElement) statsDisplayElement.classList.remove('hidden');
 
-    // 2. Initialize IndexedDB
     try { await db.init(); showStatus('Database ready.', 'info'); }
     catch (error) { showStatus(`Error initializing database: ${error.message}`, 'error', true); return; }
 
-    // 3. Initial Fetch of Runner List and Scan Count
     showStatus('Loading initial race data...', 'info');
     loadingSpinnerElement.classList.remove('hidden');
-    if (refreshStatsButton) refreshStatsButton.disabled = true; // Disable refresh during initial load
+    if (refreshStatsButton) refreshStatsButton.disabled = true;
     await Promise.allSettled([ fetchRunnerData(true), fetchScanCount(true) ]);
     loadingSpinnerElement.classList.add('hidden');
-    // Re-enable refresh button *only if online* after initial load attempt
     if (refreshStatsButton && navigator.onLine) refreshStatsButton.disabled = false;
 
-    // 4. Initialize Scanner
     initializeScanner();
-
-    // 5. Load recent scans
     updateRecentScansUI();
 
-    // 6. Start periodic sync and runner list refresh
     syncIntervalId = setInterval(syncOfflineScans, SYNC_INTERVAL_MS);
     runnerRefreshIntervalId = setInterval(() => fetchRunnerData(false), RUNNER_REFRESH_INTERVAL_MS);
     syncOfflineScans();
 
-    // 7. Enable UI & Add Refresh Button Listener
     if (currentCheckpoint && currentRace) {
         showStatus('Ready. Enter Manual Bib or Start Scan.', 'info');
         scanButton.disabled = false; scanButton.textContent = 'Start QR Code Scan';
-        // Listener added here, button enabled state handled above and in handleOnlineStatus/handleRefreshStatsClick
         if (refreshStatsButton) {
             refreshStatsButton.addEventListener('click', handleRefreshStatsClick);
         }
@@ -108,9 +99,7 @@ window.addEventListener('load', async () => {
 
 // --- PWA & Service Worker ---
 function setupServiceWorker() { if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').then(reg => console.log('SW registered:', reg.scope)).catch(err => console.error('SW registration failed:', err)); } }
-function isIOS() { return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); } // Updated check
-
-// ****** UPDATED setupInstallButton ******
+function isIOS() { return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
 function setupInstallButton() {
      if (isIOS()) {
          if (iosInstallInstructionsElement) {
@@ -143,7 +132,6 @@ function setupInstallButton() {
         deferredInstallPrompt = null;
     });
 }
-// ****** END UPDATED setupInstallButton ******
 
 
 // --- Network & Syncing ---
@@ -207,133 +195,48 @@ manualSubmitButton.addEventListener('click', () => {
 
 
 // --- Data Processing & Storage ---
-// ****** UPDATED processScanData to fix potential error ******
+// (processScanData remains the same - uses bibNumStr)
 async function processScanData(bibNumber, timestamp, nameFromQR) {
-    // Make sure bibNumber is treated as a string for consistency
-    const bibNumStr = String(bibNumber);
-
-    // 1. Determine Runner Name and Status
-    const runnerInfo = runnerData.find(r => r.bib === bibNumStr); // Use string comparison
+    const bibNumStr = String(bibNumber); // Ensure string
+    const runnerInfo = runnerData.find(r => r.bib === bibNumStr);
     const runnerName = runnerInfo ? runnerInfo.name : (nameFromQR || 'Unknown');
     const runnerStatus = runnerInfo ? (runnerInfo.status || 'Active') : 'Unknown';
-
-    // Display feedback using the determined name
-    if (runnerInfo) {
-         if (runnerStatus === 'DNS' || runnerStatus === 'DNF') showStatus(`Warning: ${runnerStatus} - Bib ${bibNumStr} (${runnerName}). Scan recorded.`, 'warning');
-         else showStatus(`Scan: Bib ${bibNumStr} (${runnerName})`, 'success');
-    } else if (runnerData.length > 0 || totalActiveRunners > 0) showStatus(`Warning: Bib ${bibNumStr} not in list. Scan recorded (${nameFromQR || 'No Name'}).`, 'warning');
+    if (runnerInfo) { if (runnerStatus === 'DNS' || runnerStatus === 'DNF') showStatus(`Warning: ${runnerStatus} - Bib ${bibNumStr} (${runnerName}). Scan recorded.`, 'warning'); else showStatus(`Scan: Bib ${bibNumStr} (${runnerName})`, 'success'); }
+    else if (runnerData.length > 0 || totalActiveRunners > 0) showStatus(`Warning: Bib ${bibNumStr} not in list. Scan recorded (${nameFromQR || 'No Name'}).`, 'warning');
     else showStatus(`Scan: Bib ${bibNumStr} (${nameFromQR || 'No Name'})`, 'success');
-
-    // 2. Add to Recent Scans UI
     addScanToRecentList(bibNumStr, timestamp, runnerName);
-
-    // 3. Store in IndexedDB
     try {
-        const scanRecord = {
-            bib: bibNumStr, // Ensure bib is stored as string
-            checkpoint: currentCheckpoint,
-            timestamp: timestamp,
-            race: currentRace,
-            name: runnerName,
-            status: 'unsynced'
-        };
-        const id = await db.addScan(scanRecord); // Pass the object
-        console.log(`Scan stored locally with ID: ${id}, Name: ${runnerName}`);
-
-        // 4. Attempt immediate sync if online
+        const scanRecord = { bib: bibNumStr, checkpoint: currentCheckpoint, timestamp, race: currentRace, name: runnerName, status: 'unsynced' };
+        const id = await db.addScan(scanRecord); console.log(`Scan stored locally with ID: ${id}, Name: ${runnerName}`);
         if (navigator.onLine) {
-            // Pass bibNumStr to sendDataToSheet
             const success = await sendDataToSheet(bibNumStr, currentCheckpoint, timestamp, currentRace, runnerName);
-            if (success) {
-                await db.updateScanStatus(id, 'synced');
-                console.log(`Scan ID ${id} synced immediately.`);
-                showStatus(`Scan for ${bibNumStr} synced successfully!`, 'success');
-                // Don't force fetch count here, rely on manual refresh or interval
-            } else {
-                 console.warn(`Immediate sync failed for scan ID ${id}. Will retry later.`);
-            }
-        } else {
-            console.log(`Offline. Scan ID ${id} saved for later sync.`);
-            showStatus(`Offline: Scan for ${bibNumStr} saved locally.`, 'warning');
-        }
-
-    } catch (error) {
-        // Log the specific error message
-        console.error('Error in processScanData try block:', error);
-        console.error('Error stack:', error.stack); // Log stack trace
-        showStatus(`Error saving scan: ${error.message}`, 'error'); // Show the actual error
-    }
+            if (success) { await db.updateScanStatus(id, 'synced'); console.log(`Scan ID ${id} synced immediately.`); showStatus(`Scan for ${bibNumStr} synced successfully!`, 'success'); /* Don't force fetch count */ }
+            else { console.warn(`Immediate sync failed for scan ID ${id}. Will retry later.`); }
+        } else { console.log(`Offline. Scan ID ${id} saved for later sync.`); showStatus(`Offline: Scan for ${bibNumStr} saved locally.`, 'warning'); }
+    } catch (error) { console.error('Error in processScanData try block:', error); console.error('Error stack:', error.stack); showStatus(`Error saving scan: ${error.message}`, 'error'); }
 }
-// ****** END UPDATED processScanData ******
 
 // --- sendDataToSheet function remains the same (using text/plain) ---
 async function sendDataToSheet(runnerId, checkpoint, timestamp, race, runnerName) {
     const data = { action: 'recordScan', bib: runnerId, checkpoint, timestamp, race, name: runnerName };
     console.log("Sending data:", data);
     try {
-        const response = await fetch(SCRIPT_URL, {
-            method: 'POST', mode: 'cors', cache: 'no-cache',
-            headers: { 'Content-Type': 'text/plain' }, redirect: 'follow',
-            body: JSON.stringify(data)
-        });
-        if (!response.ok) {
-            const errorText = await response.text(); console.error(`Network error sending data: ${response.status} - ${errorText}`);
-             let backendMessage = errorText; try { const errorJson = JSON.parse(errorText); if (errorJson && errorJson.message) backendMessage = errorJson.message; } catch (e) {}
-            throw new Error(`Sync failed: ${response.status} ${backendMessage || response.statusText}`);
-        }
+        const response = await fetch(SCRIPT_URL, { method: 'POST', mode: 'cors', cache: 'no-cache', headers: { 'Content-Type': 'text/plain' }, redirect: 'follow', body: JSON.stringify(data) });
+        if (!response.ok) { const errorText = await response.text(); console.error(`Network error sending data: ${response.status} - ${errorText}`); let backendMessage = errorText; try { const errorJson = JSON.parse(errorText); if (errorJson && errorJson.message) backendMessage = errorJson.message; } catch (e) {} throw new Error(`Sync failed: ${response.status} ${backendMessage || response.statusText}`); }
         const result = await response.json();
         if (result.status === 'success') { console.log('Data sent successfully:', result.message); return true; }
         else { console.error('Error from backend:', result.message || 'Unknown error'); showStatus(`Sync Error: ${result.message || 'Unknown error from server.'}`, 'error'); return false; }
-    } catch (error) {
-        console.error('Error sending data:', error);
-        if (navigator.onLine) showStatus(`Sync Error: ${error.message}. Will retry.`, 'error');
-        else console.warn("Send failed while offline.");
-        return false;
-    }
+    } catch (error) { console.error('Error sending data:', error); if (navigator.onLine) showStatus(`Sync Error: ${error.message}. Will retry.`, 'error'); else console.warn("Send failed while offline."); return false; }
 }
 
 
 // --- UI Updates ---
 let statusTimeoutId = null;
 
-function showStatus(message, type = 'info', permanent = false) {
-    if (statusTimeoutId) clearTimeout(statusTimeoutId);
-    statusMessageElement.textContent = message;
-    let currentType = type; if (!navigator.onLine && type !== 'error') currentType = 'warning';
-    statusMessageElement.className = `status-${currentType}`; console.log(`Status (${currentType}): ${message}`);
-    if (!permanent && type !== 'error') {
-        statusTimeoutId = setTimeout(() => {
-            if (statusMessageElement.textContent === message && statusMessageElement.className.includes(`status-${currentType}`)) {
-                 const defaultMsg = navigator.onLine ? 'Ready.' : 'Offline. Scans saved locally.';
-                 const defaultType = navigator.onLine ? 'info' : 'warning'; showStatus(defaultMsg, defaultType);
-            } statusTimeoutId = null;
-        }, 5000);
-    }
-}
-
-function updateStatsUI() {
-    const totalText = totalActiveRunners > 0 ? totalActiveRunners : (runnerData.length > 0 ? '0' : 'N/A');
-    scannedCountElement.textContent = currentScanCount; // Always show fetched count
-    totalActiveRunnersElement.textContent = totalText;
-    console.log(`UI Stats Updated: Scanned (Sheet): ${currentScanCount}, Active Runners: ${totalText}`);
-}
-
-function addScanToRecentList(bib, timestamp, name) {
-     const timeString = new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit'});
-     recentScans.unshift({ bib: bib, time: timeString, name: name });
-    if (recentScans.length > MAX_RECENT_SCANS) recentScans.pop();
-    updateRecentScansUI();
-}
-
-function updateRecentScansUI() {
-    recentScansListElement.innerHTML = '';
-    if (recentScans.length === 0) { recentScansListElement.innerHTML = '<li class="p-2 text-gray-500 italic">No scans yet.</li>'; return; }
-    recentScans.forEach(scan => {
-        const li = document.createElement('li'); li.className = 'p-2 border-b border-gray-200 last:border-b-0';
-        const nameText = scan.name && scan.name !== 'Unknown' ? ` (${scan.name})` : '';
-        li.textContent = `Bib: ${scan.bib}${nameText} at ${scan.time}`; recentScansListElement.appendChild(li);
-    });
-}
+function showStatus(message, type = 'info', permanent = false) { if (statusTimeoutId) clearTimeout(statusTimeoutId); statusMessageElement.textContent = message; let currentType = type; if (!navigator.onLine && type !== 'error') currentType = 'warning'; statusMessageElement.className = `status-${currentType}`; console.log(`Status (${currentType}): ${message}`); if (!permanent && type !== 'error') { statusTimeoutId = setTimeout(() => { if (statusMessageElement.textContent === message && statusMessageElement.className.includes(`status-${currentType}`)) { const defaultMsg = navigator.onLine ? 'Ready.' : 'Offline. Scans saved locally.'; const defaultType = navigator.onLine ? 'info' : 'warning'; showStatus(defaultMsg, defaultType); } statusTimeoutId = null; }, 5000); } }
+function updateStatsUI() { const totalText = totalActiveRunners > 0 ? totalActiveRunners : (runnerData.length > 0 ? '0' : 'N/A'); scannedCountElement.textContent = currentScanCount; totalActiveRunnersElement.textContent = totalText; console.log(`UI Stats Updated: Scanned (Sheet): ${currentScanCount}, Active Runners: ${totalText}`); }
+function addScanToRecentList(bib, timestamp, name) { const timeString = new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit'}); recentScans.unshift({ bib: bib, time: timeString, name: name }); if (recentScans.length > MAX_RECENT_SCANS) recentScans.pop(); updateRecentScansUI(); }
+function updateRecentScansUI() { recentScansListElement.innerHTML = ''; if (recentScans.length === 0) { recentScansListElement.innerHTML = '<li class="p-2 text-gray-500 italic">No scans yet.</li>'; return; } recentScans.forEach(scan => { const li = document.createElement('li'); li.className = 'p-2 border-b border-gray-200 last:border-b-0'; const nameText = scan.name && scan.name !== 'Unknown' ? ` (${scan.name})` : ''; li.textContent = `Bib: ${scan.bib}${nameText} at ${scan.time}`; recentScansListElement.appendChild(li); }); }
 
 // --- Flash Feedback ---
 // ****** UPDATED triggerFlashFeedback to use OVERLAY ******
@@ -387,9 +290,11 @@ async function handleRefreshStatsClick() {
             fetchRunnerData(true), // Force fetch latest runner list
             fetchScanCount(true)  // Force fetch latest scan count
         ]);
-        // Status message updated inside fetch functions on success/error
-        // Set a generic success message here after both complete
-        showStatus('Stats refreshed.', 'info');
+        // Set a generic success message here after both complete,
+        // unless an error message was already shown by fetch functions
+        if (!statusMessageElement.className.includes('status-error') && !statusMessageElement.className.includes('status-warning')) {
+             showStatus('Stats refreshed.', 'info');
+        }
 
     } catch (error) {
          // Should be caught within fetch functions, but just in case
@@ -405,3 +310,4 @@ async function handleRefreshStatsClick() {
     }
 }
 // ****** END UPDATED handleRefreshStatsClick ******
+
