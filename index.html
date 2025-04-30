@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#16a34a"/>
-    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#16a34a"/> <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="https://placehold.co/192x192/16a34a/ffffff?text=Icon"> <title>TIGER CLAW TIMING</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
@@ -42,8 +41,26 @@
         .status-info { background-color: #e0f2fe; color: #075985; border: 1px solid #7dd3fc; }
         .status-warning { background-color: #fef9c3; color: #854d0e; border: 1px solid #fde047; }
 
-        /* Flash Overlay (Hidden, not used currently) */
-        #flashOverlay { display: none; }
+        /* Full Screen Flash Overlay */
+        #flashOverlay {
+            position: fixed; /* Cover the whole viewport */
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(74, 222, 128, 0.9); /* Semi-transparent bright green */
+            z-index: 9999; /* Ensure it's on top */
+            display: none; /* Hidden by default */
+            opacity: 0;
+            transition: opacity 0.1s ease-out; /* Quick fade out */
+            pointer-events: none; /* Allow clicks through when invisible */
+        }
+        #flashOverlay.visible {
+            display: block;
+            opacity: 1;
+            /* pointer-events: auto; */ /* Keep as none so user can't interact */
+        }
+
 
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #4f46e5; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; display: inline-block; margin-left: 8px; vertical-align: middle; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -55,29 +72,16 @@
         #refreshStatsButton:hover { background-color: #e5e7eb; }
         #refreshStatsButton:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        /* ****** Targeting Overlay Styles ****** */
-        .targeting-overlay {
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            /* Create the box */
-            border: 4px dashed rgba(255, 255, 255, 0.5); /* Dashed white lines */
-            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5); /* Dim area outside */
-            width: 70%; /* Size of the target box */
-            height: 70%;
-            margin: auto; /* Center the box */
-            border-radius: 8px;
-            pointer-events: none; /* Allow clicks through */
-            z-index: 5; /* Above video, below indicator text */
-            transition: border-color 0.1s ease-out, box-shadow 0.1s ease-out;
+        #scanIndicator { /* Style for overlay text if used */
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(16, 185, 129, 0.75); color: white;
+            font-size: 2.5rem; font-weight: bold; display: flex;
+            align-items: center; justify-content: center; text-align: center;
+            z-index: 10; border-radius: 0.5rem; opacity: 0;
+            transition: opacity 0.2s ease-in-out; pointer-events: none;
+            visibility: hidden;
         }
-        /* Style for successful scan flash */
-        .targeting-overlay.scan-success {
-            border-color: #10b981; /* Bright Emerald */
-            border-width: 6px; /* Slightly thicker */
-            border-style: solid; /* Solid border on flash */
-            box-shadow: 0 0 0 9999px rgba(16, 185, 129, 0.3); /* Greenish dim */
-        }
-        /* ************************************* */
+        #scanIndicator.visible { opacity: 1; visibility: visible; }
 
     </style>
 </head>
@@ -101,8 +105,7 @@
 
         <div id="scanner-container">
             <div id="reader" class="hidden">
-                 <div class="targeting-overlay"></div>
-            </div>
+                 </div>
             <div id="scanIndicator" class="hidden">SCANNED!</div>
         </div>
 
@@ -114,8 +117,7 @@
         <details class="mb-4 bg-gray-50 p-3 rounded-md border border-gray-200">
             <summary class="text-sm font-medium text-gray-700 cursor-pointer">Manual Bib Entry</summary>
             <div class="mt-3 flex items-center gap-2">
-                <label for="manualBibInput" class="sr-only">Bib Number:</label>
-                <input type="number" id="manualBibInput" placeholder="Bib #" class="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 w-24 flex-shrink">
+                <label for="manualBibInput" class="sr-only">Bib Number:</label> <input type="number" id="manualBibInput" placeholder="Bib #" class="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 w-24 flex-shrink">
                 <button id="manualSubmitButton" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md text-sm flex-shrink-0">
                     Submit
                 </button>
