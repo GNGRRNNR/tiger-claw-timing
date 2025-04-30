@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#16a34a"/> <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#16a34a"/>
+    <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="https://placehold.co/192x192/16a34a/ffffff?text=Icon"> <title>TIGER CLAW TIMING</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
@@ -15,12 +16,26 @@
     <style>
         body { font-family: 'Inter', sans-serif; }
         #reader {
-            width: 100%;
-            border: 2px solid #e2e8f0; border-radius: 0.5rem;
-            overflow: hidden; margin: 1rem auto; background-color: #000;
-            position: relative; min-height: 250px;
+            width: 100%; /* Take full width of its container */
+            max-width: 600px; /* Allow it to be wider on larger screens */
+            margin-left: auto;
+            margin-right: auto;
+            border: 2px solid #e2e8f0; /* Default border */
+            border-radius: 0.5rem;
+            overflow: hidden;
+            margin-top: 1rem; /* Add margin */
+            margin-bottom: 1rem; /* Add margin */
+            background-color: #000;
+            position: relative; /* Needed for absolute positioning */
+            aspect-ratio: 1 / 1; /* Make it square-ish */
         }
-         #reader video { display: block; width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; }
+         #reader video {
+             display: block;
+             position: absolute;
+             top: 0; left: 0;
+             width: 100%; height: 100%;
+             object-fit: cover; /* Cover the container */
+        }
         #statusMessage { min-height: 50px; border-radius: 0.375rem; padding: 0.75rem 1rem; margin-top: 1rem; text-align: center; font-weight: 500; }
         .status-success { background-color: #dcfce7; color: #166534; border: 1px solid #86efac; }
         .status-error { background-color: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
@@ -40,23 +55,29 @@
         #refreshStatsButton:hover { background-color: #e5e7eb; }
         #refreshStatsButton:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        #scanIndicator { /* Style for overlay text if used */
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background-color: rgba(16, 185, 129, 0.75); color: white;
-            font-size: 2.5rem; font-weight: bold; display: flex;
-            align-items: center; justify-content: center; text-align: center;
-            z-index: 10; border-radius: 0.5rem; opacity: 0;
-            transition: opacity 0.2s ease-in-out; pointer-events: none;
-            visibility: hidden;
+        /* ****** Targeting Overlay Styles ****** */
+        .targeting-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            /* Create the box */
+            border: 4px dashed rgba(255, 255, 255, 0.5); /* Dashed white lines */
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5); /* Dim area outside */
+            width: 70%; /* Size of the target box */
+            height: 70%;
+            margin: auto; /* Center the box */
+            border-radius: 8px;
+            pointer-events: none; /* Allow clicks through */
+            z-index: 5; /* Above video, below indicator text */
+            transition: border-color 0.1s ease-out, box-shadow 0.1s ease-out;
         }
-        #scanIndicator.visible { opacity: 1; visibility: visible; }
-
-        /* ****** NEW: Style for the app container background flash ****** */
-        .app-container.app-flash {
-            background-color: #34d399 !important; /* Bright Emerald Green */
-            transition: background-color 0.05s ease-in !important; /* Fast transition */
+        /* Style for successful scan flash */
+        .targeting-overlay.scan-success {
+            border-color: #10b981; /* Bright Emerald */
+            border-width: 6px; /* Slightly thicker */
+            border-style: solid; /* Solid border on flash */
+            box-shadow: 0 0 0 9999px rgba(16, 185, 129, 0.3); /* Greenish dim */
         }
-        /* ************************************************************** */
+        /* ************************************* */
 
     </style>
 </head>
@@ -64,7 +85,7 @@
 
     <div id="flashOverlay"></div>
 
-    <div id="appContainer" class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md relative transition-colors duration-200 ease-out">
+    <div id="appContainer" class="bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl relative transition-colors duration-200 ease-out">
         <div id="connectionStatus" class="absolute top-2 right-2 text-xs font-semibold px-2 py-1 rounded"></div>
 
         <h1 class="text-2xl font-bold text-center text-gray-800 mb-1">TIGER CLAW TIMING</h1>
@@ -79,8 +100,10 @@
         </div>
 
         <div id="scanner-container">
-            <div id="reader" class="hidden"></div>
-            <div id="scanIndicator">SCANNED!</div>
+            <div id="reader" class="hidden">
+                 <div class="targeting-overlay"></div>
+            </div>
+            <div id="scanIndicator" class="hidden">SCANNED!</div>
         </div>
 
 
@@ -91,12 +114,14 @@
         <details class="mb-4 bg-gray-50 p-3 rounded-md border border-gray-200">
             <summary class="text-sm font-medium text-gray-700 cursor-pointer">Manual Bib Entry</summary>
             <div class="mt-3 flex items-center gap-2">
-                <label for="manualBibInput" class="sr-only">Bib Number:</label> <input type="number" id="manualBibInput" placeholder="Bib #" class="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 w-24 flex-shrink">
+                <label for="manualBibInput" class="sr-only">Bib Number:</label>
+                <input type="number" id="manualBibInput" placeholder="Bib #" class="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 w-24 flex-shrink">
                 <button id="manualSubmitButton" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md text-sm flex-shrink-0">
                     Submit
                 </button>
             </div>
         </details>
+
         <div id="statusMessage" class="status-info">
             Initializing... Please wait.
         </div>
