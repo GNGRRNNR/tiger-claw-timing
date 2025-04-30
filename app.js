@@ -1,6 +1,6 @@
 // --- Configuration ---
-// Google Apps Script Web App URL (Should be the correct deployed URL)
-// ****** UPDATED SCRIPT URL V3 ******
+// Google Apps Script Web App URL (Points to script bound to "2025 TIGER CLAW SCANS + RESULTS")
+// ****** UPDATED SCRIPT URL V4 ******
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxScdvFhcKI8HQ382XUDnEaWiqj5ZpJnm06QOy_YWPDfI8fhsjAqIWqo0p6rgharY8/exec';
 const SCAN_THROTTLE_MS = 1500; // Min time between successful scans (1.5 seconds)
 const SYNC_INTERVAL_MS = 30000; // Check for unsynced scans every 30 seconds
@@ -70,6 +70,8 @@ window.addEventListener('load', async () => {
     }
 
     // 3. Fetch Runner Data (Retry logic might be needed for flaky connections)
+    // *** NOTE: This will fail until the doGet function is added back to the Apps Script ***
+    // *** We will ignore the failure for now and proceed with scan testing ***
     await fetchRunnerData(); // This now only runs if checkpoint/race are present
 
     // 4. Initialize Scanner
@@ -175,7 +177,14 @@ async function fetchRunnerData() {
              const errorText = await response.text();
              // Log the error text from Apps Script if available
              console.error(`Error response from Apps Script (getRunners): ${errorText}`);
-             throw new Error(`Failed to fetch runner data: ${response.status} ${errorText || response.statusText}`);
+             // Don't throw error here, just log and continue without runner data
+             showStatus(`Warning: Could not fetch runner list (${response.status}). Stats will be based on scans only.`, 'warning');
+             runnerData = []; // Ensure runnerData is empty
+             totalActiveRunners = 0; // Set active runners to 0 or unknown
+             totalActiveRunnersElement.textContent = 'N/A'; // Indicate data unavailable
+             scannedBibs.clear();
+             updateStatsUI();
+             return; // Stop trying to process response
         }
 
         const data = await response.json();
@@ -192,13 +201,23 @@ async function fetchRunnerData() {
         } else {
              // Log error message from Apps Script response if status is not 'success'
              console.error(`Invalid data format received from Apps Script (getRunners): ${data.message || JSON.stringify(data)}`);
-            throw new Error(data.message || 'Invalid data format received from server.');
+             // Continue without runner data
+             showStatus(`Warning: Invalid runner data received. Stats will be based on scans only.`, 'warning');
+             runnerData = [];
+             totalActiveRunners = 0;
+             totalActiveRunnersElement.textContent = 'N/A';
+             scannedBibs.clear();
+             updateStatsUI();
         }
     } catch (error) {
-        // Catch fetch errors and errors thrown above
+        // Catch fetch errors (like CORS or network errors if doGet is missing/wrong)
         console.error('Error fetching runner data:', error);
-        showStatus(`Error fetching runners: ${error.message}. Stats may be inaccurate.`, 'error');
+        showStatus(`Error fetching runners: ${error.message}. Stats will be based on scans only.`, 'error');
+        runnerData = [];
+        totalActiveRunners = 0;
         totalActiveRunnersElement.textContent = 'Err'; // Indicate error
+        scannedBibs.clear();
+        updateStatsUI();
     } finally {
          loadingSpinnerElement.classList.add('hidden');
     }
@@ -425,6 +444,7 @@ manualSubmitButton.addEventListener('click', () => {
 // --- Data Processing & Storage ---
 async function processScanData(bibNumber, timestamp, nameFromQR) {
      // 1. Determine Runner Name and Status
+     // Use runnerData if available, otherwise use QR name or 'Unknown'
     const runnerInfo = runnerData.find(r => r.bib === bibNumber);
     const runnerName = runnerInfo ? runnerInfo.name : (nameFromQR || 'Unknown');
     const runnerStatus = runnerInfo ? (runnerInfo.status || 'Active') : 'Unknown';
@@ -436,8 +456,8 @@ async function processScanData(bibNumber, timestamp, nameFromQR) {
          } else {
              showStatus(`Scan: Bib ${bibNumber} (${runnerName})`, 'success');
          }
-    } else if (runnerData.length > 0) {
-        // Runner list was loaded, but bib not found
+    } else if (runnerData.length > 0 || totalActiveRunners > 0) { // Check if runner list was expected
+        // Runner list was loaded/expected, but bib not found
         showStatus(`Warning: Bib ${bibNumber} not in list. Scan recorded (${nameFromQR || 'No Name'}).`, 'warning');
     } else {
          // Runner list wasn't loaded or failed to load
@@ -447,7 +467,7 @@ async function processScanData(bibNumber, timestamp, nameFromQR) {
     // 2. Add to Recent Scans UI
     addScanToRecentList(bibNumber, timestamp, runnerName);
 
-    // 3. Update Stats UI
+    // 3. Update Stats UI - Increment local count regardless of runner list status
     scannedBibs.add(bibNumber);
     updateStatsUI();
 
@@ -595,8 +615,10 @@ function showStatus(message, type = 'info', permanent = false) {
 
 
 function updateStatsUI() {
+    // Display local scanned count / total active (if available)
+    const totalText = totalActiveRunners > 0 ? totalActiveRunners : (runnerData.length > 0 ? '0' : 'N/A');
     scannedCountElement.textContent = scannedBibs.size;
-    // totalActiveRunnersElement is updated when runner data is fetched
+    totalActiveRunnersElement.textContent = totalText;
 }
 
 function addScanToRecentList(bib, timestamp, name) {
