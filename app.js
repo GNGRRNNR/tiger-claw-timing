@@ -4,13 +4,13 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwZhevUNNbiBcozjivgW
 const SCAN_THROTTLE_MS = 1500; // Min time between successful scans (1.5 seconds)
 const SYNC_INTERVAL_MS = 30000; // Check for unsynced scans every 30 seconds
 const MAX_RECENT_SCANS = 5; // How many recent scans to show in the list
-const RUNNER_REFRESH_INTERVAL_MS = 5 * 60 * 1000; // Refresh runner list every 5 minutes (for DNF updates)
+const RUNNER_REFRESH_INTERVAL_MS = 5 * 60 * 1000; // Refresh runner list every 5 minutes
 // const SCAN_COUNT_REFRESH_INTERVAL_MS = 60 * 1000; // REMOVED - Refresh scan count is now manual
-const FLASH_DURATION_MS = 300; // How long the green flash stays visible
+const FLASH_DURATION_MS = 400; // How long the border flash stays visible
 // --- End Configuration ---
 
 // --- DOM Elements ---
-const readerElement = document.getElementById('reader');
+const readerElement = document.getElementById('reader'); // QR Reader element itself
 const scanButton = document.getElementById('scanButton');
 const statusMessageElement = document.getElementById('statusMessage');
 const connectionStatusElement = document.getElementById('connectionStatus');
@@ -23,9 +23,9 @@ const manualSubmitButton = document.getElementById('manualSubmitButton');
 const recentScansListElement = document.getElementById('recentScansList');
 const installButton = document.getElementById('installButton');
 const statsDisplayElement = document.getElementById('statsDisplay');
-const flashOverlayElement = document.getElementById('flashOverlay');
+// const flashOverlayElement = document.getElementById('flashOverlay'); // REMOVED
 const iosInstallInstructionsElement = document.getElementById('iosInstallInstructions');
-const refreshStatsButton = document.getElementById('refreshStatsButton'); // Added Refresh Button
+const refreshStatsButton = document.getElementById('refreshStatsButton');
 
 // --- App State ---
 let html5QrCode = null;
@@ -39,7 +39,6 @@ let currentScanCount = 0;
 let recentScans = [];
 let syncIntervalId = null;
 let runnerRefreshIntervalId = null;
-// let scanCountRefreshIntervalId = null; // REMOVED
 let deferredInstallPrompt = null;
 let toneJsStarted = false;
 let isFetchingScanCount = false;
@@ -86,10 +85,9 @@ window.addEventListener('load', async () => {
     // 5. Load recent scans
     updateRecentScansUI();
 
-    // 6. Start periodic sync and *runner list* refresh
+    // 6. Start periodic sync and runner list refresh
     syncIntervalId = setInterval(syncOfflineScans, SYNC_INTERVAL_MS);
     runnerRefreshIntervalId = setInterval(() => fetchRunnerData(false), RUNNER_REFRESH_INTERVAL_MS);
-    // scanCountRefreshIntervalId = setInterval(() => fetchScanCount(false), SCAN_COUNT_REFRESH_INTERVAL_MS); // REMOVED
     syncOfflineScans();
 
     // 7. Enable UI & Add Refresh Button Listener
@@ -97,185 +95,84 @@ window.addEventListener('load', async () => {
         showStatus('Ready. Enter Manual Bib or Start Scan.', 'info');
         scanButton.disabled = false; scanButton.textContent = 'Start QR Code Scan';
         if (refreshStatsButton) {
-            refreshStatsButton.disabled = false; // Enable refresh button
+            refreshStatsButton.disabled = false;
             refreshStatsButton.addEventListener('click', handleRefreshStatsClick);
         }
     } else {
         showStatus('Initialization incomplete due to config error.', 'error', true);
-         if (refreshStatsButton) refreshStatsButton.disabled = true; // Disable if config error
+         if (refreshStatsButton) refreshStatsButton.disabled = true;
     }
 });
 
 // --- PWA & Service Worker ---
 // (setupServiceWorker, isIOS, setupInstallButton remain the same)
-function setupServiceWorker() {
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js')
-            .then(registration => console.log('Service Worker registered with scope:', registration.scope))
-            .catch(error => console.error('Service Worker registration failed:', error));
-    }
-}
-function isIOS() {
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-}
-function setupInstallButton() {
-     if (isIOS()) {
-         if (iosInstallInstructionsElement) {
-             iosInstallInstructionsElement.innerHTML = `To install on iOS: Tap the Share button <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' viewBox='0 0 16 16'%3E%3Cpath d='M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z'/%3E%3Cpath d='M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z'/%3E%3C/svg%3E" alt="Share Icon" style="display: inline; height: 1em; vertical-align: middle;">, then scroll down and tap 'Add to Home Screen'.`;
-             iosInstallInstructionsElement.classList.remove('hidden');
-         }
-         console.log('iOS detected, showing install instructions.');
-     } else {
-         window.addEventListener('beforeinstallprompt', (event) => {
-            event.preventDefault();
-            deferredInstallPrompt = event;
-            if (installButton) installButton.classList.remove('hidden');
-            console.log('\'beforeinstallprompt\' event was fired.');
-        });
-        if (installButton) {
-            installButton.addEventListener('click', async () => {
-                if (!deferredInstallPrompt) { console.log('Install prompt not available.'); return; }
-                deferredInstallPrompt.prompt();
-                const { outcome } = await deferredInstallPrompt.userChoice;
-                console.log(`User response: ${outcome}`);
-                deferredInstallPrompt = null;
-                installButton.classList.add('hidden');
-            });
-        }
-     }
-     window.addEventListener('appinstalled', () => {
-        console.log('PWA was installed');
-        if (installButton) installButton.classList.add('hidden');
-        if (iosInstallInstructionsElement) iosInstallInstructionsElement.classList.add('hidden');
-        deferredInstallPrompt = null;
-    });
-}
+function setupServiceWorker() { if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').then(reg => console.log('SW registered:', reg.scope)).catch(err => console.error('SW registration failed:', err)); } }
+function isIOS() { return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream; }
+function setupInstallButton() { if (isIOS()) { if (iosInstallInstructionsElement) { iosInstallInstructionsElement.innerHTML = `To install on iOS: Tap the Share button <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' viewBox='0 0 16 16'%3E%3Cpath d='M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z'/%3E%3Cpath d='M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z'/%3E%3C/svg%3E" alt="Share" style="display:inline;height:1em;vertical-align:middle;">, then 'Add to Home Screen'.`; iosInstallInstructionsElement.classList.remove('hidden'); } console.log('iOS detected.'); } else { window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredInstallPrompt = e; if (installButton) installButton.classList.remove('hidden'); console.log('beforeinstallprompt fired.'); }); if (installButton) { installButton.addEventListener('click', async () => { if (!deferredInstallPrompt) return; deferredInstallPrompt.prompt(); const { outcome } = await deferredInstallPrompt.userChoice; console.log(`Install outcome: ${outcome}`); deferredInstallPrompt = null; installButton.classList.add('hidden'); }); } } window.addEventListener('appinstalled', () => { console.log('PWA installed'); if (installButton) installButton.classList.add('hidden'); if (iosInstallInstructionsElement) iosInstallInstructionsElement.classList.add('hidden'); deferredInstallPrompt = null; }); }
 
 
 // --- Network & Syncing ---
-// (handleOnlineStatus, fetchRunnerData, fetchScanCount remain the same)
-function handleOnlineStatus() {
-    if (navigator.onLine) {
-        connectionStatusElement.textContent = 'Online';
-        connectionStatusElement.className = 'absolute top-2 right-2 text-xs font-semibold px-2 py-1 rounded bg-green-100 text-green-800';
-        console.log('Status: Online');
-        if (currentCheckpoint && currentRace) {
-             showStatus('Connection restored. Syncing & refreshing...', 'info');
-             syncOfflineScans();
-             fetchRunnerData(true);
-             fetchScanCount(true);
-             if (refreshStatsButton) refreshStatsButton.disabled = false; // Re-enable refresh button
-        } else {
-             showStatus('Online, but Checkpoint/Race missing in URL.', 'warning');
-              if (refreshStatsButton) refreshStatsButton.disabled = true;
-        }
-    } else {
-        connectionStatusElement.textContent = 'Offline';
-        connectionStatusElement.className = 'absolute top-2 right-2 text-xs font-semibold px-2 py-1 rounded bg-yellow-100 text-yellow-800';
-        showStatus('Connection lost. Scans will be saved locally.', 'warning');
-        console.log('Status: Offline');
-        if (refreshStatsButton) refreshStatsButton.disabled = true; // Disable refresh button when offline
-    }
-}
-async function fetchRunnerData(force = false) {
-    if (!currentRace || isFetchingRunners) return;
-    if (!force && !navigator.onLine) return;
-    isFetchingRunners = true; console.log(`Fetching runner data (force=${force})...`);
-    if (force && refreshStatsButton) refreshStatsButton.disabled = true; // Disable button during forced refresh
-    if (force) loadingSpinnerElement.classList.remove('hidden');
-    try {
-        const getUrl = `${SCRIPT_URL}?action=getRunners&race=${encodeURIComponent(currentRace)}&t=${Date.now()}`;
-        const response = await fetch(getUrl);
-        if (!response.ok) {
-             const errorText = await response.text(); console.error(`Error response (getRunners): ${errorText}`);
-             showStatus(`Warning: Could not refresh runner list (${response.status}).`, 'warning'); return;
-        }
-        const data = await response.json();
-        if (data.status === 'success' && Array.isArray(data.runners)) {
-            runnerData = data.runners;
-            totalActiveRunners = runnerData.filter(r => !r.status || (r.status.toUpperCase() !== 'DNS' && r.status.toUpperCase() !== 'DNF')).length;
-            console.log(`Refreshed runner data: ${runnerData.length} total, ${totalActiveRunners} active.`);
-            updateStatsUI();
-        } else {
-             console.error(`Invalid data format (getRunners): ${data.message || JSON.stringify(data)}`);
-             showStatus(`Warning: Invalid runner data received.`, 'warning');
-        }
-    } catch (error) {
-        console.error('Error fetching runner data:', error);
-        showStatus(`Error refreshing runners: ${error.message}.`, 'error');
-    } finally {
-         isFetchingRunners = false;
-         if (force && navigator.onLine) refreshStatsButton.disabled = false; // Re-enable if online
-         if (force) loadingSpinnerElement.classList.add('hidden');
-    }
-}
-async function fetchScanCount(force = false) {
-    if (!currentRace || !currentCheckpoint || isFetchingScanCount) return;
-    if (!force && !navigator.onLine) return;
-    isFetchingScanCount = true; console.log(`Fetching scan count (force=${force})...`);
-    if (force && refreshStatsButton) refreshStatsButton.disabled = true; // Disable button during forced refresh
-    if (force) loadingSpinnerElement.classList.remove('hidden');
-    try {
-        const getUrl = `${SCRIPT_URL}?action=getScanCount&race=${encodeURIComponent(currentRace)}&checkpoint=${encodeURIComponent(currentCheckpoint)}&t=${Date.now()}`;
-        const response = await fetch(getUrl);
-        if (!response.ok) {
-             const errorText = await response.text(); console.error(`Error response (getScanCount): ${errorText}`);
-             showStatus(`Warning: Could not refresh scan count (${response.status}).`, 'warning'); return;
-        }
-        const data = await response.json();
-        if (data.status === 'success' && typeof data.scanCount === 'number') {
-            currentScanCount = data.scanCount; console.log(`Refreshed scan count: ${currentScanCount}`);
-            updateStatsUI();
-        } else {
-             console.error(`Invalid data format (getScanCount): ${data.message || JSON.stringify(data)}`);
-             showStatus(`Warning: Invalid scan count data received.`, 'warning');
-        }
-    } catch (error) {
-        console.error('Error fetching scan count:', error);
-        showStatus(`Error refreshing scan count: ${error.message}.`, 'error');
-    } finally {
-        isFetchingScanCount = false;
-        if (force && navigator.onLine) refreshStatsButton.disabled = false; // Re-enable if online
-        if (force) loadingSpinnerElement.classList.add('hidden');
-    }
-}
-
-// --- Modified syncOfflineScans to NOT force fetchScanCount ---
-async function syncOfflineScans() {
-    if (!navigator.onLine) { console.log("Offline, skipping sync."); return; }
-    try {
-        const unsynced = await db.getUnsyncedScans();
-        if (unsynced.length === 0) { console.log("No unsynced scans."); return; }
-        showStatus(`Syncing ${unsynced.length} saved scan(s)...`, 'info'); console.log("Attempting to sync:", unsynced);
-        let allSynced = true; let successfullySyncedCount = 0;
-        for (const scan of unsynced) {
-            const success = await sendDataToSheet(scan.bib, scan.checkpoint, scan.timestamp, scan.race, scan.name);
-            if (success) { await db.updateScanStatus(scan.id, 'synced'); console.log(`Synced scan ID: ${scan.id}`); successfullySyncedCount++; }
-            else { allSynced = false; console.warn(`Failed to sync scan ID: ${scan.id}. Will retry later.`); break; }
-        }
-        if (allSynced && unsynced.length > 0) showStatus('Sync complete. All saved scans sent.', 'success');
-        else if (!allSynced) showStatus('Sync incomplete. Some scans failed to send. Will retry later.', 'warning');
-        // Don't automatically fetch count here, rely on manual refresh or next interval
-        // if (successfullySyncedCount > 0) fetchScanCount(true);
-    } catch (error) { console.error('Error during sync process:', error); showStatus(`Error during sync: ${error.message}`, 'error'); }
-}
+// (handleOnlineStatus, fetchRunnerData, fetchScanCount, syncOfflineScans remain the same)
+function handleOnlineStatus() { if (navigator.onLine) { connectionStatusElement.textContent = 'Online'; connectionStatusElement.className = 'absolute top-2 right-2 text-xs font-semibold px-2 py-1 rounded bg-green-100 text-green-800'; console.log('Status: Online'); if (currentCheckpoint && currentRace) { showStatus('Connection restored. Syncing & refreshing...', 'info'); syncOfflineScans(); fetchRunnerData(true); fetchScanCount(true); if (refreshStatsButton) refreshStatsButton.disabled = false; } else { showStatus('Online, but Checkpoint/Race missing in URL.', 'warning'); if (refreshStatsButton) refreshStatsButton.disabled = true; } } else { connectionStatusElement.textContent = 'Offline'; connectionStatusElement.className = 'absolute top-2 right-2 text-xs font-semibold px-2 py-1 rounded bg-yellow-100 text-yellow-800'; showStatus('Connection lost. Scans saved locally.', 'warning'); console.log('Status: Offline'); if (refreshStatsButton) refreshStatsButton.disabled = true; } }
+async function fetchRunnerData(force = false) { if (!currentRace || isFetchingRunners) return; if (!force && !navigator.onLine) return; isFetchingRunners = true; console.log(`Fetching runner data (force=${force})...`); if (force && refreshStatsButton) refreshStatsButton.disabled = true; if (force) loadingSpinnerElement.classList.remove('hidden'); try { const getUrl = `${SCRIPT_URL}?action=getRunners&race=${encodeURIComponent(currentRace)}&t=${Date.now()}`; const response = await fetch(getUrl); if (!response.ok) { const errorText = await response.text(); console.error(`Error response (getRunners): ${errorText}`); showStatus(`Warning: Could not refresh runner list (${response.status}).`, 'warning'); return; } const data = await response.json(); if (data.status === 'success' && Array.isArray(data.runners)) { runnerData = data.runners; totalActiveRunners = runnerData.filter(r => !r.status || (r.status.toUpperCase() !== 'DNS' && r.status.toUpperCase() !== 'DNF')).length; console.log(`Refreshed runner data: ${runnerData.length} total, ${totalActiveRunners} active.`); updateStatsUI(); } else { console.error(`Invalid data format (getRunners): ${data.message || JSON.stringify(data)}`); showStatus(`Warning: Invalid runner data received.`, 'warning'); } } catch (error) { console.error('Error fetching runner data:', error); showStatus(`Error refreshing runners: ${error.message}.`, 'error'); } finally { isFetchingRunners = false; if (force && navigator.onLine) refreshStatsButton.disabled = false; if (force) loadingSpinnerElement.classList.add('hidden'); } }
+async function fetchScanCount(force = false) { if (!currentRace || !currentCheckpoint || isFetchingScanCount) return; if (!force && !navigator.onLine) return; isFetchingScanCount = true; console.log(`Fetching scan count (force=${force})...`); if (force && refreshStatsButton) refreshStatsButton.disabled = true; if (force) loadingSpinnerElement.classList.remove('hidden'); try { const getUrl = `${SCRIPT_URL}?action=getScanCount&race=${encodeURIComponent(currentRace)}&checkpoint=${encodeURIComponent(currentCheckpoint)}&t=${Date.now()}`; const response = await fetch(getUrl); if (!response.ok) { const errorText = await response.text(); console.error(`Error response (getScanCount): ${errorText}`); showStatus(`Warning: Could not refresh scan count (${response.status}).`, 'warning'); return; } const data = await response.json(); if (data.status === 'success' && typeof data.scanCount === 'number') { currentScanCount = data.scanCount; console.log(`Refreshed scan count: ${currentScanCount}`); updateStatsUI(); } else { console.error(`Invalid data format (getScanCount): ${data.message || JSON.stringify(data)}`); showStatus(`Warning: Invalid scan count data received.`, 'warning'); } } catch (error) { console.error('Error fetching scan count:', error); showStatus(`Error refreshing scan count: ${error.message}.`, 'error'); } finally { isFetchingScanCount = false; if (force && navigator.onLine) refreshStatsButton.disabled = false; if (force) loadingSpinnerElement.classList.add('hidden'); } }
+async function syncOfflineScans() { if (!navigator.onLine) { console.log("Offline, skipping sync."); return; } try { const unsynced = await db.getUnsyncedScans(); if (unsynced.length === 0) { console.log("No unsynced scans."); return; } showStatus(`Syncing ${unsynced.length} saved scan(s)...`, 'info'); console.log("Attempting to sync:", unsynced); let allSynced = true; let successfullySyncedCount = 0; for (const scan of unsynced) { const success = await sendDataToSheet(scan.bib, scan.checkpoint, scan.timestamp, scan.race, scan.name); if (success) { await db.updateScanStatus(scan.id, 'synced'); console.log(`Synced scan ID: ${scan.id}`); successfullySyncedCount++; } else { allSynced = false; console.warn(`Failed to sync scan ID: ${scan.id}. Will retry later.`); break; } } if (allSynced && unsynced.length > 0) showStatus('Sync complete. All saved scans sent.', 'success'); else if (!allSynced) showStatus('Sync incomplete. Some scans failed to send. Will retry later.', 'warning'); /* Don't auto-fetch count: if (successfullySyncedCount > 0) fetchScanCount(true); */ } catch (error) { console.error('Error during sync process:', error); showStatus(`Error during sync: ${error.message}`, 'error'); } }
 
 
 // --- QR Scanner Logic ---
-// (initializeScanner, startScanning, stopScanning, onScanFailure, onScanSuccess remain the same)
+// (initializeScanner, startScanning, stopScanning, onScanFailure remain the same)
 function initializeScanner() { try { html5QrCode = new Html5Qrcode("reader"); } catch (error) { console.error("Failed to initialize Html5Qrcode:", error); showStatus(`Error initializing scanner: ${error.message}`, 'error', true); scanButton.disabled = true; scanButton.textContent = 'Scanner Error'; } }
 function startScanning() { if (isScanning || !html5QrCode) return; startToneContext(); const config = { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 }; const cameraConfig = { facingMode: "environment" }; showStatus('Starting scanner...', 'info'); readerElement.classList.remove('hidden'); html5QrCode.start(cameraConfig, config, onScanSuccess, onScanFailure).then(() => { isScanning = true; scanButton.textContent = 'Stop Scan'; scanButton.classList.remove('bg-indigo-600', 'hover:bg-indigo-700'); scanButton.classList.add('bg-red-600', 'hover:bg-red-700'); showStatus('Scanner active. Point at QR code.', 'info'); }).catch((err) => { console.error(`Unable to start scanning with environment camera: ${err}`); if (err.name === "NotAllowedError" || err.name === "NotFoundError" || err.name === "OverconstrainedError" || err.name === "NotReadableError") { console.log("Trying front camera..."); showStatus('Trying front camera...', 'info'); html5QrCode.start({ facingMode: "user" }, config, onScanSuccess, onScanFailure).then(() => { isScanning = true; scanButton.textContent = 'Stop Scan'; scanButton.classList.remove('bg-indigo-600', 'hover:bg-indigo-700'); scanButton.classList.add('bg-red-600', 'hover:bg-red-700'); showStatus('Scanner active (using front camera).', 'info'); }).catch(err2 => { console.error(`Unable to start scanning with front camera either: ${err2}`); showStatus(`Scanner Error: ${err2.message}. Check permissions.`, 'error'); readerElement.classList.add('hidden'); isScanning = false; scanButton.textContent = 'Scanner Error'; scanButton.disabled = true; }); } else { showStatus(`Scanner Error: ${err.message}. Check permissions.`, 'error'); readerElement.classList.add('hidden'); scanButton.textContent = 'Scanner Error'; scanButton.disabled = true; } }); }
 function stopScanning() { if (!isScanning || !html5QrCode) return; html5QrCode.stop().then(() => { console.log("QR Code scanning stopped."); }).catch((err) => { console.error(`Failed to stop scanning cleanly: ${err}`); }).finally(() => { isScanning = false; scanButton.textContent = 'Start QR Code Scan'; scanButton.classList.remove('bg-red-600', 'hover:bg-red-700'); scanButton.classList.add('bg-indigo-600', 'hover:bg-indigo-700'); readerElement.classList.add('hidden'); showStatus('Scanner stopped.', 'info'); }); }
 function onScanFailure(error) { /* console.warn(`Code scan error = ${error}`); */ }
-function onScanSuccess(decodedText, decodedResult) { const now = Date.now(); if (now - lastScanTime < SCAN_THROTTLE_MS) { console.log("Scan throttled."); return; } lastScanTime = now; const timestamp = new Date().toISOString(); const parts = decodedText.trim().split(','); let bibNumber = null, nameFromQR = null; if (parts.length >= 1) bibNumber = parts[0].trim(); if (parts.length >= 2) nameFromQR = parts.slice(1).join(',').trim(); if (!bibNumber || !/^\d+$/.test(bibNumber)) { console.warn(`Invalid QR data format: "${decodedText}"`); showStatus(`Scan Error: Invalid QR data format.`, 'error'); if (navigator.vibrate) navigator.vibrate([50, 50, 50]); return; } console.log(`Scan successful: Bib ${bibNumber}, Name (QR): ${nameFromQR || 'N/A'} at ${timestamp}`); triggerFlashOverlay(); if (navigator.vibrate) navigator.vibrate(150); playSound(); processScanData(bibNumber, timestamp, nameFromQR); }
 
-// --- Manual Entry ---
-// (Manual Entry handler remains the same)
-manualSubmitButton.addEventListener('click', () => { startToneContext(); const bibNumber = manualBibInput.value.trim(); if (!bibNumber) { showStatus('Please enter a Bib Number.', 'error'); return; } if (!/^\d+$/.test(bibNumber)) { showStatus('Invalid Bib Number format.', 'error'); return; } const timestamp = new Date().toISOString(); console.log(`Manual entry: Bib ${bibNumber} at ${timestamp}`); triggerFlashOverlay(); if (navigator.vibrate) navigator.vibrate(100); playSound(); processScanData(bibNumber, timestamp, null); manualBibInput.value = ''; });
+// --- Modified onScanSuccess to trigger border flash ---
+function onScanSuccess(decodedText, decodedResult) {
+    const now = Date.now();
+    if (now - lastScanTime < SCAN_THROTTLE_MS) { console.log("Scan throttled."); return; }
+    lastScanTime = now;
+    const timestamp = new Date().toISOString();
+    const parts = decodedText.trim().split(',');
+    let bibNumber = null, nameFromQR = null;
+    if (parts.length >= 1) bibNumber = parts[0].trim();
+    if (parts.length >= 2) nameFromQR = parts.slice(1).join(',').trim();
+    if (!bibNumber || !/^\d+$/.test(bibNumber)) {
+        console.warn(`Invalid QR data format: "${decodedText}"`); showStatus(`Scan Error: Invalid QR data format.`, 'error');
+        if (navigator.vibrate) navigator.vibrate([50, 50, 50]); return;
+    }
+    console.log(`Scan successful: Bib ${bibNumber}, Name (QR): ${nameFromQR || 'N/A'} at ${timestamp}`);
+
+    // --- Feedback ---
+    triggerFlashFeedback(); // Trigger border flash
+    if (navigator.vibrate) navigator.vibrate(150); // Attempt vibration
+    playSound(); // Attempt sound
+
+    // --- Process Scan ---
+    processScanData(bibNumber, timestamp, nameFromQR);
+}
+
+// --- Modified Manual Entry handler to trigger border flash ---
+manualSubmitButton.addEventListener('click', () => {
+    startToneContext();
+    const bibNumber = manualBibInput.value.trim();
+    if (!bibNumber) { showStatus('Please enter a Bib Number.', 'error'); return; }
+    if (!/^\d+$/.test(bibNumber)) { showStatus('Invalid Bib Number format.', 'error'); return; }
+    const timestamp = new Date().toISOString();
+    console.log(`Manual entry: Bib ${bibNumber} at ${timestamp}`);
+
+    // --- Feedback ---
+    triggerFlashFeedback(); // Trigger border flash
+    if (navigator.vibrate) navigator.vibrate(100); // Attempt vibration
+    playSound(); // Attempt sound
+
+    // --- Process Scan ---
+    processScanData(bibNumber, timestamp, null);
+    manualBibInput.value = '';
+});
 
 
 // --- Data Processing & Storage ---
-// --- Modified processScanData to NOT force fetchScanCount ---
+// (processScanData remains the same - doesn't force count fetch)
 async function processScanData(bibNumber, timestamp, nameFromQR) {
     const runnerInfo = runnerData.find(r => r.bib === bibNumber);
     const runnerName = runnerInfo ? runnerInfo.name : (nameFromQR || 'Unknown');
@@ -286,7 +183,6 @@ async function processScanData(bibNumber, timestamp, nameFromQR) {
     } else if (runnerData.length > 0 || totalActiveRunners > 0) showStatus(`Warning: Bib ${bibNumber} not in list. Scan recorded (${nameFromQR || 'No Name'}).`, 'warning');
     else showStatus(`Scan: Bib ${bibNumber} (${nameFromQR || 'No Name'})`, 'success');
     addScanToRecentList(bibNumber, timestamp, runnerName);
-    // Don't update main stats UI here based on local scan
     try {
         const scanRecord = { bib, checkpoint: currentCheckpoint, timestamp, race: currentRace, name: runnerName, status: 'unsynced' };
         const id = await db.addScan(scanRecord);
@@ -297,8 +193,7 @@ async function processScanData(bibNumber, timestamp, nameFromQR) {
                 await db.updateScanStatus(id, 'synced');
                 console.log(`Scan ID ${id} synced immediately.`);
                 showStatus(`Scan for ${bibNumber} synced successfully!`, 'success');
-                // Don't force fetch count here, let interval or manual refresh handle it
-                // fetchScanCount(true);
+                // Don't force fetch count here, rely on manual refresh or interval
             } else {
                  console.warn(`Immediate sync failed for scan ID ${id}. Will retry later.`);
             }
@@ -381,12 +276,21 @@ function updateRecentScansUI() {
     });
 }
 
-// --- Flash Overlay ---
-function triggerFlashOverlay() {
-    if (!flashOverlayElement) return;
-    flashOverlayElement.classList.add('visible');
-    setTimeout(() => { flashOverlayElement.classList.remove('visible'); }, FLASH_DURATION_MS);
+// --- Flash Feedback ---
+// ****** UPDATED triggerFlashFeedback ******
+function triggerFlashFeedback() {
+    if (!readerElement) return; // Make sure the reader element exists
+
+    // Add the flash class
+    readerElement.classList.add('reader-flash');
+
+    // Remove the class after the duration
+    setTimeout(() => {
+        readerElement.classList.remove('reader-flash');
+    }, FLASH_DURATION_MS);
 }
+// ****** END UPDATED triggerFlashFeedback ******
+
 
 // --- Audio Handling ---
 // (startToneContext and playSound functions remain the same)
@@ -400,27 +304,12 @@ manualSubmitButton.addEventListener('click', startToneContext);
 
 // --- Manual Refresh Handler ---
 async function handleRefreshStatsClick() {
-    if (!navigator.onLine) {
-        showStatus('Cannot refresh stats while offline.', 'warning');
-        return;
-    }
-    console.log("Manual refresh triggered.");
-    showStatus('Refreshing stats from server...', 'info');
-    refreshStatsButton.disabled = true; // Disable button during refresh
-    loadingSpinnerElement.classList.remove('hidden'); // Show spinner
-
-    // Fetch both counts and runner list concurrently
-    await Promise.allSettled([
-        fetchRunnerData(true), // Force fetch latest runner list
-        fetchScanCount(true)  // Force fetch latest scan count
-    ]);
-
-    loadingSpinnerElement.classList.add('hidden'); // Hide spinner
-    if (navigator.onLine) { // Re-enable only if still online
-       refreshStatsButton.disabled = false;
-       showStatus('Stats refreshed.', 'info'); // Update status after refresh
-    } else {
-        showStatus('Offline. Stats may not be latest.', 'warning');
-    }
+    if (!navigator.onLine) { showStatus('Cannot refresh stats while offline.', 'warning'); return; }
+    console.log("Manual refresh triggered."); showStatus('Refreshing stats from server...', 'info');
+    refreshStatsButton.disabled = true; loadingSpinnerElement.classList.remove('hidden');
+    await Promise.allSettled([ fetchRunnerData(true), fetchScanCount(true) ]);
+    loadingSpinnerElement.classList.add('hidden');
+    if (navigator.onLine) { refreshStatsButton.disabled = false; showStatus('Stats refreshed.', 'info'); }
+    else { showStatus('Offline. Stats may not be latest.', 'warning'); }
 }
 
