@@ -1,6 +1,6 @@
     // --- Configuration ---
     // Google Apps Script Web App URL (Points to script bound to "2025 TIGER CLAW SCANS + RESULTS")
-    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxjcjKxJbP-stHCqn46VU_l2CcrWECtWp-ELkmnfrDTbvC3juF-aOWFwSUStmw/exec'; // <-- PASTE LATEST URL HERE!
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyJHFCveEG_yqvTgl7UOlt18lmSF8DuEegr3Zx-XsEBQNFTPzPlZnXytawRyfxtlxM/exec'; // <-- PASTE LATEST URL HERE!
     const SCAN_THROTTLE_MS = 1500;
     const SYNC_INTERVAL_MS = 30000;
     const MAX_RECENT_SCANS = 5;
