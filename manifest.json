@@ -2,7 +2,7 @@
   "name": "TIGER CLAW TIMING",
   "short_name": "TigerClaw",
   "description": "QR Code scanner for tracking race runners.",
-  "start_url": "/index.html",
+"start_url": "index.html",
   "display": "standalone",
   "background_color": "#f3f4f6",
   "theme_color": "#16a34a",
