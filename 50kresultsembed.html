@@ -26,7 +26,7 @@
         .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #4f46e5; border-radius: 50%; width: 1em; height: 1em; /* Smaller spinner */ animation: spin 1s linear infinite; display: inline-block; margin: 0 0.5rem; vertical-align: middle; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .time-small { font-size: 0.8rem; color: #6b7280; }
-        thead th { position: sticky; top: 0; z-index: 10; background-color: #f9fafb; }
+        thead th { position: sticky; top: 0; z-index: 10; background-color: #f9fafb; /* Ensure sticky header has background */ }
         .hidden { display: none; }
     </style>
 </head>
@@ -109,18 +109,64 @@
         const searchInput = document.getElementById('searchInput');
         const rowCountElement = document.getElementById('rowCount');
         const tableHeaders = document.querySelectorAll('#resultsTableContainer th[data-sort]');
-        const loadingSpinner = document.getElementById('loadingSpinner'); // Get spinner element
+        const loadingSpinner = document.getElementById('loadingSpinner');
 
         let refreshIntervalId = null;
-        let allData = []; // Store all fetched data
-        let currentSort = { column: 'bib', direction: 'asc' }; // Default sort
+        let allData = [];
+        let currentSort = { column: 'bib', direction: 'asc' };
         let currentFilter = '';
-        let isFetching = false; // Flag to prevent overlapping fetches
+        let isFetching = false;
 
         // --- Utility Functions ---
         function parseCSV(csvText) { if (!csvText || typeof csvText !== 'string') return []; const lines = csvText.trim().split('\n'); return lines.slice(1).map(line => line.split(',').map(field => field.trim())); }
         function formatTime(dateTimeString) { if (!dateTimeString || dateTimeString.trim() === "") return ""; try { const date = new Date(dateTimeString); if (isNaN(date.getTime()) || date.getFullYear() < 1900) return ""; return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }); } catch (e) { console.error("Error formatting time:", dateTimeString, e); return "Invalid"; } }
-        function formatDuration(durationString) { if (!durationString || isNaN(parseFloat(durationString)) || parseFloat(durationString) <= 0) return ""; try { const ms = parseFloat(durationString) * 24 * 60 * 60 * 1000; if (ms <= 0) return ""; const sec = Math.floor(ms / 1000); const h = Math.floor(sec / 3600); const m = Math.floor((sec % 3600) / 60); const s = sec % 60; return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`; } catch (e) { console.error("Error formatting duration:", durationString, e); return "Invalid"; } }
+
+        // ****** UPDATED formatDuration ******
+        function formatDuration(durationInput) {
+            if (!durationInput) return "";
+            const durationString = String(durationInput).trim(); // Ensure it's a string
+            if (durationString === "") return "";
+
+            // Try parsing as a number (fraction of a day) first
+            const numericValue = parseFloat(durationString);
+            if (!isNaN(numericValue) && numericValue > 0) {
+                try {
+                    const ms = numericValue * 24 * 60 * 60 * 1000;
+                    if (ms <= 0) return "";
+                    const sec = Math.floor(ms / 1000);
+                    const h = Math.floor(sec / 3600);
+                    const m = Math.floor((sec % 3600) / 60);
+                    const s = sec % 60;
+                    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+                } catch (e) {
+                    console.error("Error formatting numeric duration:", durationString, e);
+                    return "Invalid"; // Error during calculation
+                }
+            }
+            // If not a valid number, check if it looks like HH:MM:SS
+            else if (/^\d{1,2}:\d{2}:\d{2}(\.\d+)?$/.test(durationString)) {
+                 // Assume it's already formatted, return as is (or potentially re-format for consistency if needed)
+                 // Let's try splitting and padding to ensure HH:MM:SS
+                 try {
+                     const parts = durationString.split(':');
+                     const h = String(parts[0] || '0').padStart(2, '0');
+                     const m = String(parts[1] || '0').padStart(2, '0');
+                     // Handle potential milliseconds in seconds part
+                     const s = String(Math.floor(parseFloat(parts[2] || '0'))).padStart(2, '0');
+                     return `${h}:${m}:${s}`;
+                 } catch(e) {
+                      console.error("Error parsing pre-formatted duration:", durationString, e);
+                      return "Invalid";
+                 }
+            }
+            // If neither format works, return blank
+            else {
+                // console.warn("Could not format duration:", durationString); // Optional warning
+                return "";
+            }
+        }
+        // ****** END UPDATED formatDuration ******
+
         function getStatusClass(status) { status = status.toUpperCase(); if (status === 'FINISHED') return 'status-finished'; if (status === 'DNF' || status === 'DNS') return 'status-dnf'; if (status === 'ACTIVE') return 'status-active'; return ''; }
         function createLoopSpan(color) { if (!color) return ''; color = color.toUpperCase(); let className = ''; if (color === 'PINK') className = 'loop-pink'; else if (color === 'WHITE') className = 'loop-white'; else if (color === 'YELLOW') className = 'loop-yellow'; else return ''; return `<span class="${className}">${color.substring(0,1)}</span>`; }
 
@@ -141,7 +187,6 @@
         }
 
         // --- UI Update Functions ---
-        // ****** UPDATED updateTable to include all duration formats ******
         function updateTable() {
             const displayData = filterAndSortData();
             resultsBody.innerHTML = ''; // Clear existing rows
@@ -183,7 +228,6 @@
             });
              rowCountElement.textContent = `Showing ${displayData.length} of ${allData.length} runners`;
         }
-        // ****** END UPDATED updateTable ******
 
         function updateSortIcons() { tableHeaders.forEach(th => { const sortKey = th.getAttribute('data-sort'); th.classList.remove('sort-asc', 'sort-desc'); const iconSpan = th.querySelector('.sort-icon'); if (iconSpan) iconSpan.textContent = ''; if (sortKey === currentSort.column) { th.classList.add(currentSort.direction === 'asc' ? 'sort-asc' : 'sort-desc'); if (iconSpan) iconSpan.textContent = currentSort.direction === 'asc' ? ' ▲' : ' ▼'; } }); }
 
