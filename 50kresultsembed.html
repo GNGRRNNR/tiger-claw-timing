@@ -21,11 +21,12 @@
         .loop-pink { background-color: #fce7f3; color: #831843; padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-size: 0.75rem; display: inline-block; margin: 0.1rem; }
         .loop-white { background-color: #f1f5f9; color: #1e293b; padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-size: 0.75rem; display: inline-block; margin: 0.1rem; border: 1px solid #cbd5e1;}
         .loop-yellow { background-color: #fef9c3; color: #713f12; padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-size: 0.75rem; display: inline-block; margin: 0.1rem; }
-        #loadingMessage, #errorMessage { text-align: center; padding: 1rem; font-weight: 500; }
-        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #4f46e5; border-radius: 50%; width: 32px; height: 32px; animation: spin 1s linear infinite; display: inline-block; margin: 0 auto 0.5rem auto; }
+        #loadingMessage { text-align: center; padding: 1rem; font-weight: 500; }
+        #errorMessage { text-align: center; padding: 1rem; font-weight: 500; color: #dc2626; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #4f46e5; border-radius: 50%; width: 1em; height: 1em; /* Smaller spinner */ animation: spin 1s linear infinite; display: inline-block; margin: 0 0.5rem; vertical-align: middle; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .time-small { font-size: 0.8rem; color: #6b7280; }
-        thead th { position: sticky; top: 0; z-index: 10; background-color: #f9fafb; /* Ensure sticky header has background */ }
+        thead th { position: sticky; top: 0; z-index: 10; background-color: #f9fafb; }
         .hidden { display: none; }
     </style>
 </head>
@@ -34,7 +35,9 @@
     <div class="container mx-auto bg-white p-6 rounded-lg shadow-lg">
         <h1 class="text-3xl font-bold text-center text-gray-800 mb-2">Tiger Claw 50k</h1>
         <p class="text-center text-gray-600 mb-4">Live Results</p>
-        <p class="text-center text-xs text-gray-500 mb-6">Last Updated: <span id="lastUpdated">Never</span></p>
+        <p class="text-center text-xs text-gray-500 mb-6">
+            Last Updated: <span id="lastUpdated">Never</span>
+            <span id="loadingSpinner" class="spinner hidden"></span> </p>
 
         <div class="mb-4">
             <label for="searchInput" class="sr-only">Search by Bib or Name:</label>
@@ -42,16 +45,14 @@
         </div>
 
         <div id="loadingMessage" class="text-gray-600">
-            <div class="spinner"></div>
-            <div>Loading results...</div>
+             <div>Loading initial results...</div>
         </div>
         <div id="errorMessage" class="text-red-600 hidden">
             Error loading results. Please try refreshing the page.
             <pre id="errorDetails" class="text-xs text-left mt-2 bg-red-50 p-2 rounded"></pre>
         </div>
 
-        <div id="resultsTableContainer" class="overflow-x-auto hidden">
-            <table class="min-w-full divide-y divide-gray-200 border border-gray-200">
+        <div id="resultsTableContainer" class="overflow-x-auto hidden"> <table class="min-w-full divide-y divide-gray-200 border border-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
                         <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="bib">Bib<span class="sort-icon"></span></th>
@@ -108,11 +109,13 @@
         const searchInput = document.getElementById('searchInput');
         const rowCountElement = document.getElementById('rowCount');
         const tableHeaders = document.querySelectorAll('#resultsTableContainer th[data-sort]');
+        const loadingSpinner = document.getElementById('loadingSpinner'); // Get spinner element
 
         let refreshIntervalId = null;
         let allData = []; // Store all fetched data
         let currentSort = { column: 'bib', direction: 'asc' }; // Default sort
         let currentFilter = '';
+        let isFetching = false; // Flag to prevent overlapping fetches
 
         // --- Utility Functions ---
         function parseCSV(csvText) { if (!csvText || typeof csvText !== 'string') return []; const lines = csvText.trim().split('\n'); return lines.slice(1).map(line => line.split(',').map(field => field.trim())); }
@@ -189,17 +192,57 @@
         function handleFilterInput() { currentFilter = searchInput.value.trim(); console.log(`Filtering by: ${currentFilter}`); updateTable(); }
 
         // --- Data Fetching ---
+        // ****** UPDATED fetchData for smoother refresh ******
         async function fetchData() {
-            console.log("Fetching data..."); loadingMessage.classList.remove('hidden'); errorMessage.classList.add('hidden'); resultsTableContainer.classList.add('hidden');
-            if (!SPREADSHEET_URL || SPREADSHEET_URL === 'YOUR_PUBLISHED_50K_RESULTS_CSV_URL_HERE') { console.error("Spreadsheet URL is not configured."); errorMessage.textContent = "Error: Spreadsheet URL not configured."; errorDetails.textContent = ""; errorMessage.classList.remove('hidden'); loadingMessage.classList.add('hidden'); return; }
+            if (isFetching) {
+                 console.log("Fetch already in progress, skipping.");
+                 return;
+            }
+            isFetching = true;
+            console.log("Fetching data...");
+            // Show spinner next to last updated time, don't hide table
+            if (loadingSpinner) loadingSpinner.classList.remove('hidden');
+            errorMessage.classList.add('hidden'); // Hide previous errors
+
+            if (!SPREADSHEET_URL || SPREADSHEET_URL === 'YOUR_PUBLISHED_50K_RESULTS_CSV_URL_HERE') {
+                 console.error("Spreadsheet URL is not configured.");
+                 errorMessage.textContent = "Error: Spreadsheet URL not configured."; errorDetails.textContent = "";
+                 errorMessage.classList.remove('hidden'); loadingMessage.classList.add('hidden'); // Hide initial loading msg
+                 resultsTableContainer.classList.remove('hidden'); // Ensure table container is visible if previously loaded
+                 isFetching = false; if (loadingSpinner) loadingSpinner.classList.add('hidden'); return;
+            }
+
             try {
-                const url = `${SPREADSHEET_URL}&t=${Date.now()}`; const response = await fetch(url); if (!response.ok) throw new Error(`Network response error: ${response.status} ${response.statusText}`);
-                const csvData = await response.text(); allData = parseCSV(csvData);
-                updateTable(); updateSortIcons();
-                resultsTableContainer.classList.remove('hidden'); loadingMessage.classList.add('hidden'); errorMessage.classList.add('hidden');
+                const url = `${SPREADSHEET_URL}&t=${Date.now()}`;
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`Network response error: ${response.status} ${response.statusText}`);
+
+                const csvData = await response.text();
+                allData = parseCSV(csvData); // Update the main data source
+
+                updateTable(); // Re-filter, re-sort, and re-render the table content
+                updateSortIcons(); // Update sort indicators
+
+                // Ensure table is visible and initial loading message is hidden
+                resultsTableContainer.classList.remove('hidden');
+                loadingMessage.classList.add('hidden');
+                errorMessage.classList.add('hidden');
                 lastUpdatedElement.textContent = new Date().toLocaleTimeString();
-            } catch (error) { console.error('Error fetching/processing data:', error); loadingMessage.classList.add('hidden'); resultsTableContainer.classList.add('hidden'); errorMessage.textContent = "Error loading results."; errorDetails.textContent = `Details: ${error.message}`; errorMessage.classList.remove('hidden'); if (refreshIntervalId) { clearInterval(refreshIntervalId); refreshIntervalId = null; } }
+
+            } catch (error) {
+                console.error('Error fetching/processing data:', error);
+                // Don't hide the table on error, show message instead
+                errorMessage.textContent = "Error loading results. Displaying previous data.";
+                errorDetails.textContent = `Details: ${error.message}`;
+                errorMessage.classList.remove('hidden');
+                // Consider stopping refresh on persistent errors
+                // if (refreshIntervalId) { clearInterval(refreshIntervalId); refreshIntervalId = null; }
+            } finally {
+                 isFetching = false;
+                 if (loadingSpinner) loadingSpinner.classList.add('hidden'); // Hide spinner
+            }
         }
+        // ****** END UPDATED fetchData ******
 
         // --- Initial Setup ---
         searchInput.addEventListener('input', handleFilterInput);
