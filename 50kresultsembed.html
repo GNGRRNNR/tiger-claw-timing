@@ -42,8 +42,8 @@
 <body class="bg-gray-100 p-4 md:p-8">
 
     <div class="container mx-auto bg-white p-6 rounded-lg shadow-lg">
-        <h1 class="text-3xl font-bold text-center text-gray-800 mb-2">2025 Tiger Claw 50k</h1>
-        <p class="text-center text-gray-600 mb-4">Live Results (Unofficial)</p>
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-2">Tiger Claw 50k</h1>
+        <p class="text-center text-gray-600 mb-4">Live Results</p>
         <p class="text-center text-xs text-gray-500 mb-6">
             Last Updated: <span id="lastUpdated">Never</span>
             <span id="loadingSpinner" class="spinner hidden"></span> </p>
@@ -123,48 +123,54 @@
         function parseCSV(csvText) { if (!csvText || typeof csvText !== 'string') return []; const lines = csvText.trim().split('\n'); return lines.slice(1).map(line => line.split(',').map(field => field.trim())); }
         function formatTime(dateTimeString) { if (!dateTimeString || dateTimeString.trim() === "") return ""; try { const date = new Date(dateTimeString); if (isNaN(date.getTime()) || date.getFullYear() < 1900) return ""; return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }); } catch (e) { console.error("Error formatting time:", dateTimeString, e); return "Invalid"; } }
 
-        // ****** UPDATED formatDuration with Logging ******
-        function formatDuration(durationInput, columnName = "Unknown") { // Added columnName for logging
-            if (!durationInput) return "";
+        // ****** UPDATED formatDuration with More Logging ******
+        function formatDuration(durationInput, columnName = "Unknown") {
+            if (durationInput === undefined || durationInput === null) return "";
             const durationString = String(durationInput).trim();
             if (durationString === "") return "";
 
-            // Log the input specifically for the finish elapsed column
-            if (columnName === 'FINISH_ELAPSED') {
-                console.log(`Formatting FINISH_ELAPSED input: "${durationString}" (Type: ${typeof durationInput})`);
-            }
+            // Log the input value and type
+            console.log(`Formatting Duration - Column: ${columnName}, Input: "${durationString}", Type: ${typeof durationInput}`);
 
+            // Try parsing as a number (fraction of a day) first
             const numericValue = parseFloat(durationString);
             if (!isNaN(numericValue) && numericValue > 0) {
                 try {
                     const ms = numericValue * 24 * 60 * 60 * 1000;
-                    if (ms <= 0) return "";
+                    if (ms <= 0) {
+                        console.log(` -> Numeric value <= 0, returning blank.`);
+                        return "";
+                    }
                     const sec = Math.floor(ms / 1000);
                     const h = Math.floor(sec / 3600);
                     const m = Math.floor((sec % 3600) / 60);
                     const s = sec % 60;
                     const formatted = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-                    if (columnName === 'FINISH_ELAPSED') console.log(` -> Formatted as numeric: ${formatted}`);
+                    console.log(` -> Formatted as numeric: ${formatted}`);
                     return formatted;
                 } catch (e) {
                     console.error(`Error formatting numeric duration for ${columnName}:`, durationString, e);
                     return "Invalid";
                 }
-            } else if (/^\d{1,2}:\d{2}:\d{2}(\.\d+)?$/.test(durationString)) {
+            }
+            // If not a valid positive number, check if it looks like HH:MM:SS
+            else if (/^\d{1,2}:\d{2}:\d{2}(\.\d+)?$/.test(durationString)) {
                  try {
                      const parts = durationString.split(':');
                      const h = String(parts[0] || '0').padStart(2, '0');
                      const m = String(parts[1] || '0').padStart(2, '0');
                      const s = String(Math.floor(parseFloat(parts[2] || '0'))).padStart(2, '0');
                      const formatted = `${h}:${m}:${s}`;
-                     if (columnName === 'FINISH_ELAPSED') console.log(` -> Formatted as string: ${formatted}`);
+                     console.log(` -> Formatted as string: ${formatted}`);
                      return formatted;
                  } catch(e) {
                       console.error(`Error parsing pre-formatted duration for ${columnName}:`, durationString, e);
                       return "Invalid";
                  }
-            } else {
-                 if (columnName === 'FINISH_ELAPSED') console.log(` -> Not formatted (returning blank)`);
+            }
+            // If neither format works, return blank
+            else {
+                console.log(` -> Not a valid number or HH:MM:SS format (returning blank)`);
                 return "";
             }
         }
@@ -177,7 +183,7 @@
         function filterAndSortData() { /* ... same as before ... */ let filteredData = allData; if (currentFilter) { const lowerCaseFilter = currentFilter.toLowerCase(); filteredData = allData.filter(row => { const bib = String(row[COL.BIB] || '').toLowerCase(); const name = String(row[COL.NAME] || '').toLowerCase(); return bib.includes(lowerCaseFilter) || name.includes(lowerCaseFilter); }); } const { column, direction } = currentSort; const sortMultiplier = direction === 'asc' ? 1 : -1; filteredData.sort((a, b) => { let valA = a[COL[column.toUpperCase()]]; let valB = b[COL[column.toUpperCase()]]; if (column === 'bib') { valA = parseInt(valA || '0', 10); valB = parseInt(valB || '0', 10); } else if (column.includes('_cp') || column.includes('_scan')) { valA = valA ? new Date(valA).getTime() : (direction === 'asc' ? Infinity : -Infinity); valB = valB ? new Date(valB).getTime() : (direction === 'asc' ? Infinity : -Infinity); if (isNaN(valA)) valA = (direction === 'asc' ? Infinity : -Infinity); if (isNaN(valB)) valB = (direction === 'asc' ? Infinity : -Infinity); } else if (column.includes('_elapsed')) { valA = valA && !isNaN(parseFloat(valA)) ? parseFloat(valA) : (direction === 'asc' ? Infinity : -Infinity); valB = valB && !isNaN(parseFloat(valB)) ? parseFloat(valB) : (direction === 'asc' ? Infinity : -Infinity); } else { valA = String(valA || '').toLowerCase(); valB = String(valB || '').toLowerCase(); } if (valA < valB) return -1 * sortMultiplier; if (valA > valB) return 1 * sortMultiplier; return 0; }); return filteredData; }
 
         // --- UI Update Functions ---
-        // ****** UPDATED updateTable to pass column name to formatDuration ******
+        // ****** UPDATED updateTable to add logging for FINISH_ELAPSED ******
         function updateTable() {
             const displayData = filterAndSortData();
             resultsBody.innerHTML = '';
@@ -190,6 +196,10 @@
 
             displayData.forEach(row => {
                 const tr = document.createElement('tr');
+                // Add specific logging for the raw value before formatting
+                const rawFinishElapsed = row[COL.FINISH_ELAPSED];
+                console.log(`Bib ${row[COL.BIB]}: Raw FINISH_ELAPSED value from CSV: "${rawFinishElapsed}" (Type: ${typeof rawFinishElapsed})`);
+
                 tr.innerHTML = `
                     <td>${row[COL.BIB] || ''}</td>
                     <td>${row[COL.NAME] || ''}</td>
@@ -212,7 +222,7 @@
                     <td>${formatDuration(row[COL.DESC3_ELAPSED], 'DESC3_ELAPSED')}</td>
                     <td>${formatTime(row[COL.RED_CP])}</td>
                     <td>${formatTime(row[COL.FINISH_SCAN])}</td>
-                    <td>${formatDuration(row[COL.FINISH_ELAPSED], 'FINISH_ELAPSED')}</td>
+                    <td>${formatDuration(rawFinishElapsed, 'FINISH_ELAPSED')}</td>
                 `;
                 resultsBody.appendChild(tr);
             });
