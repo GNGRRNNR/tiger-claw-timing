@@ -99,14 +99,7 @@
         // --- Configuration ---
         const SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTHGEvgy3yNGS0uV48XNrMGnbbZNorOFTx6YO0Q7dwrGkgvCkAYt2p6644uScSDqee14uVB8-0xhSGy/pub?gid=1613674231&single=true&output=csv'; // <-- PASTE PUBLISHED CSV URL HERE
         const REFRESH_INTERVAL_MS = 45 * 1000;
-        // Column indices (0-based) from the published CSV
-        const COL = {
-            BIB: 0, NAME: 1, STATUS: 2, GREEN_CP: 3,
-            LOOP1_COLOR: 4, LOOP1_BOTTOM: 5, LOOP1_TOP: 6, LOOP1_ELAPSED: 7, DESC1_ELAPSED: 8,
-            LOOP2_COLOR: 9, LOOP2_BOTTOM: 10, LOOP2_TOP: 11, LOOP2_ELAPSED: 12, DESC2_ELAPSED: 13,
-            LOOP3_COLOR: 14, LOOP3_BOTTOM: 15, LOOP3_TOP: 16, LOOP3_ELAPSED: 17, DESC3_ELAPSED: 18,
-            RED_CP: 19, FINISH_SCAN: 20, FINISH_ELAPSED: 21
-        };
+        const COL = { BIB: 0, NAME: 1, STATUS: 2, GREEN_CP: 3, LOOP1_COLOR: 4, LOOP1_BOTTOM: 5, LOOP1_TOP: 6, LOOP1_ELAPSED: 7, DESC1_ELAPSED: 8, LOOP2_COLOR: 9, LOOP2_BOTTOM: 10, LOOP2_TOP: 11, LOOP2_ELAPSED: 12, DESC2_ELAPSED: 13, LOOP3_COLOR: 14, LOOP3_BOTTOM: 15, LOOP3_TOP: 16, LOOP3_ELAPSED: 17, DESC3_ELAPSED: 18, RED_CP: 19, FINISH_SCAN: 20, FINISH_ELAPSED: 21 };
         // --- End Configuration ---
 
         const resultsBody = document.getElementById('resultsBody');
@@ -129,41 +122,65 @@
         // --- Utility Functions ---
         function parseCSV(csvText) { if (!csvText || typeof csvText !== 'string') return []; const lines = csvText.trim().split('\n'); return lines.slice(1).map(line => line.split(',').map(field => field.trim())); }
         function formatTime(dateTimeString) { if (!dateTimeString || dateTimeString.trim() === "") return ""; try { const date = new Date(dateTimeString); if (isNaN(date.getTime()) || date.getFullYear() < 1900) return ""; return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }); } catch (e) { console.error("Error formatting time:", dateTimeString, e); return "Invalid"; } }
-        function formatDuration(durationInput) {
-            if (!durationInput) return ""; const durationString = String(durationInput).trim(); if (durationString === "") return "";
+
+        // ****** UPDATED formatDuration with Logging ******
+        function formatDuration(durationInput, columnName = "Unknown") { // Added columnName for logging
+            if (!durationInput) return "";
+            const durationString = String(durationInput).trim();
+            if (durationString === "") return "";
+
+            // Log the input specifically for the finish elapsed column
+            if (columnName === 'FINISH_ELAPSED') {
+                console.log(`Formatting FINISH_ELAPSED input: "${durationString}" (Type: ${typeof durationInput})`);
+            }
+
             const numericValue = parseFloat(durationString);
             if (!isNaN(numericValue) && numericValue > 0) {
-                try { const ms = numericValue * 24 * 60 * 60 * 1000; if (ms <= 0) return ""; const sec = Math.floor(ms / 1000); const h = Math.floor(sec / 3600); const m = Math.floor((sec % 3600) / 60); const s = sec % 60; return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`; }
-                catch (e) { console.error("Error formatting numeric duration:", durationString, e); return "Invalid"; }
+                try {
+                    const ms = numericValue * 24 * 60 * 60 * 1000;
+                    if (ms <= 0) return "";
+                    const sec = Math.floor(ms / 1000);
+                    const h = Math.floor(sec / 3600);
+                    const m = Math.floor((sec % 3600) / 60);
+                    const s = sec % 60;
+                    const formatted = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+                    if (columnName === 'FINISH_ELAPSED') console.log(` -> Formatted as numeric: ${formatted}`);
+                    return formatted;
+                } catch (e) {
+                    console.error(`Error formatting numeric duration for ${columnName}:`, durationString, e);
+                    return "Invalid";
+                }
             } else if (/^\d{1,2}:\d{2}:\d{2}(\.\d+)?$/.test(durationString)) {
-                 try { const parts = durationString.split(':'); const h = String(parts[0] || '0').padStart(2, '0'); const m = String(parts[1] || '0').padStart(2, '0'); const s = String(Math.floor(parseFloat(parts[2] || '0'))).padStart(2, '0'); return `${h}:${m}:${s}`; }
-                 catch(e) { console.error("Error parsing pre-formatted duration:", durationString, e); return "Invalid"; }
-            } else { return ""; }
+                 try {
+                     const parts = durationString.split(':');
+                     const h = String(parts[0] || '0').padStart(2, '0');
+                     const m = String(parts[1] || '0').padStart(2, '0');
+                     const s = String(Math.floor(parseFloat(parts[2] || '0'))).padStart(2, '0');
+                     const formatted = `${h}:${m}:${s}`;
+                     if (columnName === 'FINISH_ELAPSED') console.log(` -> Formatted as string: ${formatted}`);
+                     return formatted;
+                 } catch(e) {
+                      console.error(`Error parsing pre-formatted duration for ${columnName}:`, durationString, e);
+                      return "Invalid";
+                 }
+            } else {
+                 if (columnName === 'FINISH_ELAPSED') console.log(` -> Not formatted (returning blank)`);
+                return "";
+            }
         }
+        // ****** END UPDATED formatDuration ******
+
         function getStatusClass(status) { status = status.toUpperCase(); if (status === 'FINISHED') return 'status-finished'; if (status === 'DNF' || status === 'DNS') return 'status-dnf'; if (status === 'ACTIVE') return 'status-active'; return ''; }
         function createLoopSpan(color) { if (!color) return ''; color = color.toUpperCase(); let className = ''; if (color === 'PINK') className = 'loop-pink'; else if (color === 'WHITE') className = 'loop-white'; else if (color === 'YELLOW') className = 'loop-yellow'; else return ''; return `<span class="${className}">${color.substring(0,1)}</span>`; }
 
         // --- Data Processing Functions ---
-        function filterAndSortData() {
-            let filteredData = allData;
-            if (currentFilter) { const lowerCaseFilter = currentFilter.toLowerCase(); filteredData = allData.filter(row => { const bib = String(row[COL.BIB] || '').toLowerCase(); const name = String(row[COL.NAME] || '').toLowerCase(); return bib.includes(lowerCaseFilter) || name.includes(lowerCaseFilter); }); }
-            const { column, direction } = currentSort; const sortMultiplier = direction === 'asc' ? 1 : -1;
-            filteredData.sort((a, b) => {
-                let valA = a[COL[column.toUpperCase()]]; let valB = b[COL[column.toUpperCase()]];
-                if (column === 'bib') { valA = parseInt(valA || '0', 10); valB = parseInt(valB || '0', 10); }
-                else if (column.includes('_cp') || column.includes('_scan')) { valA = valA ? new Date(valA).getTime() : (direction === 'asc' ? Infinity : -Infinity); valB = valB ? new Date(valB).getTime() : (direction === 'asc' ? Infinity : -Infinity); if (isNaN(valA)) valA = (direction === 'asc' ? Infinity : -Infinity); if (isNaN(valB)) valB = (direction === 'asc' ? Infinity : -Infinity); }
-                else if (column.includes('_elapsed')) { valA = valA && !isNaN(parseFloat(valA)) ? parseFloat(valA) : (direction === 'asc' ? Infinity : -Infinity); valB = valB && !isNaN(parseFloat(valB)) ? parseFloat(valB) : (direction === 'asc' ? Infinity : -Infinity); }
-                else { valA = String(valA || '').toLowerCase(); valB = String(valB || '').toLowerCase(); }
-                if (valA < valB) return -1 * sortMultiplier; if (valA > valB) return 1 * sortMultiplier; return 0;
-            });
-            return filteredData;
-        }
+        function filterAndSortData() { /* ... same as before ... */ let filteredData = allData; if (currentFilter) { const lowerCaseFilter = currentFilter.toLowerCase(); filteredData = allData.filter(row => { const bib = String(row[COL.BIB] || '').toLowerCase(); const name = String(row[COL.NAME] || '').toLowerCase(); return bib.includes(lowerCaseFilter) || name.includes(lowerCaseFilter); }); } const { column, direction } = currentSort; const sortMultiplier = direction === 'asc' ? 1 : -1; filteredData.sort((a, b) => { let valA = a[COL[column.toUpperCase()]]; let valB = b[COL[column.toUpperCase()]]; if (column === 'bib') { valA = parseInt(valA || '0', 10); valB = parseInt(valB || '0', 10); } else if (column.includes('_cp') || column.includes('_scan')) { valA = valA ? new Date(valA).getTime() : (direction === 'asc' ? Infinity : -Infinity); valB = valB ? new Date(valB).getTime() : (direction === 'asc' ? Infinity : -Infinity); if (isNaN(valA)) valA = (direction === 'asc' ? Infinity : -Infinity); if (isNaN(valB)) valB = (direction === 'asc' ? Infinity : -Infinity); } else if (column.includes('_elapsed')) { valA = valA && !isNaN(parseFloat(valA)) ? parseFloat(valA) : (direction === 'asc' ? Infinity : -Infinity); valB = valB && !isNaN(parseFloat(valB)) ? parseFloat(valB) : (direction === 'asc' ? Infinity : -Infinity); } else { valA = String(valA || '').toLowerCase(); valB = String(valB || '').toLowerCase(); } if (valA < valB) return -1 * sortMultiplier; if (valA > valB) return 1 * sortMultiplier; return 0; }); return filteredData; }
 
         // --- UI Update Functions ---
-        // ****** UPDATED updateTable to include all duration formats ******
+        // ****** UPDATED updateTable to pass column name to formatDuration ******
         function updateTable() {
             const displayData = filterAndSortData();
-            resultsBody.innerHTML = ''; // Clear existing rows
+            resultsBody.innerHTML = '';
 
             if (!displayData || displayData.length === 0) {
                 resultsBody.innerHTML = `<tr><td colspan="22" class="text-center text-gray-500 py-4">${currentFilter ? 'No matching runners found.' : 'No results data available yet.'}</td></tr>`;
@@ -173,7 +190,6 @@
 
             displayData.forEach(row => {
                 const tr = document.createElement('tr');
-                // Populate all columns based on COL indices, applying formatDuration where needed
                 tr.innerHTML = `
                     <td>${row[COL.BIB] || ''}</td>
                     <td>${row[COL.NAME] || ''}</td>
@@ -182,21 +198,22 @@
                     <td>${createLoopSpan(row[COL.LOOP1_COLOR])}</td>
                     <td>${formatTime(row[COL.LOOP1_BOTTOM])}</td>
                     <td>${formatTime(row[COL.LOOP1_TOP])}</td>
-                    <td>${formatDuration(row[COL.LOOP1_ELAPSED])}</td>
-                    <td>${formatDuration(row[COL.DESC1_ELAPSED])}</td>
+                    <td>${formatDuration(row[COL.LOOP1_ELAPSED], 'LOOP1_ELAPSED')}</td>
+                    <td>${formatDuration(row[COL.DESC1_ELAPSED], 'DESC1_ELAPSED')}</td>
                     <td>${createLoopSpan(row[COL.LOOP2_COLOR])}</td>
                     <td>${formatTime(row[COL.LOOP2_BOTTOM])}</td>
                     <td>${formatTime(row[COL.LOOP2_TOP])}</td>
-                    <td>${formatDuration(row[COL.LOOP2_ELAPSED])}</td>
-                    <td>${formatDuration(row[COL.DESC2_ELAPSED])}</td>
+                    <td>${formatDuration(row[COL.LOOP2_ELAPSED], 'LOOP2_ELAPSED')}</td>
+                    <td>${formatDuration(row[COL.DESC2_ELAPSED], 'DESC2_ELAPSED')}</td>
                     <td>${createLoopSpan(row[COL.LOOP3_COLOR])}</td>
                     <td>${formatTime(row[COL.LOOP3_BOTTOM])}</td>
                     <td>${formatTime(row[COL.LOOP3_TOP])}</td>
-                    <td>${formatDuration(row[COL.LOOP3_ELAPSED])}</td>
-                    <td>${formatDuration(row[COL.DESC3_ELAPSED])}</td>
+                    <td>${formatDuration(row[COL.LOOP3_ELAPSED], 'LOOP3_ELAPSED')}</td>
+                    <td>${formatDuration(row[COL.DESC3_ELAPSED], 'DESC3_ELAPSED')}</td>
                     <td>${formatTime(row[COL.RED_CP])}</td>
                     <td>${formatTime(row[COL.FINISH_SCAN])}</td>
-                    <td>${formatDuration(row[COL.FINISH_ELAPSED])}</td> `;
+                    <td>${formatDuration(row[COL.FINISH_ELAPSED], 'FINISH_ELAPSED')}</td>
+                `;
                 resultsBody.appendChild(tr);
             });
              rowCountElement.textContent = `Showing ${displayData.length} of ${allData.length} runners`;
@@ -210,22 +227,8 @@
         function handleFilterInput() { currentFilter = searchInput.value.trim(); console.log(`Filtering by: ${currentFilter}`); updateTable(); }
 
         // --- Data Fetching ---
-        // ****** UPDATED fetchData for smoother refresh ******
-        async function fetchData() {
-            if (isFetching) { console.log("Fetch already in progress, skipping."); return; }
-            isFetching = true; console.log("Fetching data...");
-            if (loadingSpinner) loadingSpinner.classList.remove('hidden'); errorMessage.classList.add('hidden');
-            if (!SPREADSHEET_URL || SPREADSHEET_URL === 'YOUR_PUBLISHED_50K_RESULTS_CSV_URL_HERE') { console.error("Spreadsheet URL is not configured."); errorMessage.textContent = "Error: Spreadsheet URL not configured."; errorDetails.textContent = ""; errorMessage.classList.remove('hidden'); loadingMessage.classList.add('hidden'); resultsTableContainer.classList.remove('hidden'); isFetching = false; if (loadingSpinner) loadingSpinner.classList.add('hidden'); return; }
-            try {
-                const url = `${SPREADSHEET_URL}&t=${Date.now()}`; const response = await fetch(url); if (!response.ok) throw new Error(`Network response error: ${response.status} ${response.statusText}`);
-                const csvData = await response.text(); allData = parseCSV(csvData);
-                updateTable(); updateSortIcons();
-                resultsTableContainer.classList.remove('hidden'); loadingMessage.classList.add('hidden'); errorMessage.classList.add('hidden');
-                lastUpdatedElement.textContent = new Date().toLocaleTimeString();
-            } catch (error) { console.error('Error fetching/processing data:', error); errorMessage.textContent = "Error loading results. Displaying previous data."; errorDetails.textContent = `Details: ${error.message}`; errorMessage.classList.remove('hidden'); /* if (refreshIntervalId) { clearInterval(refreshIntervalId); refreshIntervalId = null; } */ }
-            finally { isFetching = false; if (loadingSpinner) loadingSpinner.classList.add('hidden'); }
-        }
-        // ****** END UPDATED fetchData ******
+        // (fetchData remains the same)
+        async function fetchData() { if (isFetching) { console.log("Fetch already in progress, skipping."); return; } isFetching = true; console.log("Fetching data..."); if (loadingSpinner) loadingSpinner.classList.remove('hidden'); errorMessage.classList.add('hidden'); if (!SPREADSHEET_URL || SPREADSHEET_URL === 'YOUR_PUBLISHED_50K_RESULTS_CSV_URL_HERE') { console.error("Spreadsheet URL is not configured."); errorMessage.textContent = "Error: Spreadsheet URL not configured."; errorDetails.textContent = ""; errorMessage.classList.remove('hidden'); loadingMessage.classList.add('hidden'); resultsTableContainer.classList.remove('hidden'); isFetching = false; if (loadingSpinner) loadingSpinner.classList.add('hidden'); return; } try { const url = `${SPREADSHEET_URL}&t=${Date.now()}`; const response = await fetch(url); if (!response.ok) throw new Error(`Network response error: ${response.status} ${response.statusText}`); const csvData = await response.text(); allData = parseCSV(csvData); updateTable(); updateSortIcons(); resultsTableContainer.classList.remove('hidden'); loadingMessage.classList.add('hidden'); errorMessage.classList.add('hidden'); lastUpdatedElement.textContent = new Date().toLocaleTimeString(); } catch (error) { console.error('Error fetching/processing data:', error); errorMessage.textContent = "Error loading results. Displaying previous data."; errorDetails.textContent = `Details: ${error.message}`; errorMessage.classList.remove('hidden'); } finally { isFetching = false; if (loadingSpinner) loadingSpinner.classList.add('hidden'); } }
 
         // --- Initial Setup ---
         searchInput.addEventListener('input', handleFilterInput);
