@@ -1,314 +1,213 @@
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Tiger Claw 50k - Live Results</title>
-        <script src="https://cdn.tailwindcss.com"></script>
-        <link rel="preconnect" href="https://fonts.googleapis.com">
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
-        <style>
-            body { font-family: 'Inter', sans-serif; }
-            /* Custom styles for table */
-            th, td { padding: 0.5rem 0.5rem; text-align: left; border-bottom: 1px solid #e5e7eb; white-space: nowrap; } /* Reduced padding, nowrap */
-            th { background-color: #f9fafb; font-weight: 600; cursor: pointer; user-select: none; } /* Make headers clickable */
-            th .sort-icon { display: inline-block; width: 1em; height: 1em; margin-left: 0.3em; opacity: 0.3; vertical-align: middle;}
-            th.sort-asc .sort-icon::after { content: ' ▲'; }
-            th.sort-desc .sort-icon::after { content: ' ▼'; }
-            tbody tr:nth-child(even) { background-color: #f9fafb; }
-            tbody tr:hover { background-color: #f0f9ff; } /* Light blue hover */
-            /* Status/Loop styles remain the same */
-            .status-active { color: #059669; font-weight: 500; } .status-finished { color: #1d4ed8; font-weight: 500; } .status-dnf, .status-dns { color: #dc2626; font-weight: 500; }
-            .loop-pink { background-color: #fce7f3; color: #831843; padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-size: 0.75rem; display: inline-block; margin: 0.1rem; }
-            .loop-white { background-color: #f1f5f9; color: #1e293b; padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-size: 0.75rem; display: inline-block; margin: 0.1rem; border: 1px solid #cbd5e1;}
-            .loop-yellow { background-color: #fef9c3; color: #713f12; padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-size: 0.75rem; display: inline-block; margin: 0.1rem; }
-            #loadingMessage, #errorMessage { text-align: center; padding: 1rem; font-weight: 500; }
-            .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #4f46e5; border-radius: 50%; width: 32px; height: 32px; animation: spin 1s linear infinite; display: inline-block; margin: 0 auto 0.5rem auto; }
-            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-            .time-small { font-size: 0.8rem; color: #6b7280; }
-            thead th { position: sticky; top: 0; z-index: 10; }
-            .hidden { display: none; }
-        </style>
-    </head>
-    <body class="bg-gray-100 p-4 md:p-8">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tiger Claw 50k - Live Results</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        th, td { padding: 0.5rem 0.5rem; text-align: left; border-bottom: 1px solid #e5e7eb; white-space: nowrap; }
+        th { background-color: #f9fafb; font-weight: 600; cursor: pointer; user-select: none; }
+        th .sort-icon { display: inline-block; width: 1em; height: 1em; margin-left: 0.3em; opacity: 0.3; vertical-align: middle;}
+        th.sort-asc .sort-icon::after { content: ' ▲'; }
+        th.sort-desc .sort-icon::after { content: ' ▼'; }
+        tbody tr:nth-child(even) { background-color: #f9fafb; }
+        tbody tr:hover { background-color: #f0f9ff; }
+        .status-active { color: #059669; font-weight: 500; } .status-finished { color: #1d4ed8; font-weight: 500; } .status-dnf, .status-dns { color: #dc2626; font-weight: 500; }
+        .loop-pink { background-color: #fce7f3; color: #831843; padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-size: 0.75rem; display: inline-block; margin: 0.1rem; }
+        .loop-white { background-color: #f1f5f9; color: #1e293b; padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-size: 0.75rem; display: inline-block; margin: 0.1rem; border: 1px solid #cbd5e1;}
+        .loop-yellow { background-color: #fef9c3; color: #713f12; padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-size: 0.75rem; display: inline-block; margin: 0.1rem; }
+        #loadingMessage, #errorMessage { text-align: center; padding: 1rem; font-weight: 500; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #4f46e5; border-radius: 50%; width: 32px; height: 32px; animation: spin 1s linear infinite; display: inline-block; margin: 0 auto 0.5rem auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .time-small { font-size: 0.8rem; color: #6b7280; }
+        thead th { position: sticky; top: 0; z-index: 10; background-color: #f9fafb; /* Ensure sticky header has background */ }
+        .hidden { display: none; }
+    </style>
+</head>
+<body class="bg-gray-100 p-4 md:p-8">
 
-        <div class="container mx-auto bg-white p-6 rounded-lg shadow-lg">
-            <h1 class="text-3xl font-bold text-center text-gray-800 mb-2">Tiger Claw 50k</h1>
-            <p class="text-center text-gray-600 mb-4">Live Results</p>
-            <p class="text-center text-xs text-gray-500 mb-6">Last Updated: <span id="lastUpdated">Never</span></p>
+    <div class="container mx-auto bg-white p-6 rounded-lg shadow-lg">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-2">Tiger Claw 50k</h1>
+        <p class="text-center text-gray-600 mb-4">Live Results</p>
+        <p class="text-center text-xs text-gray-500 mb-6">Last Updated: <span id="lastUpdated">Never</span></p>
 
-            <div class="mb-4">
-                <label for="searchInput" class="sr-only">Search by Bib or Name:</label>
-                <input type="text" id="searchInput" placeholder="Search by Bib or Name..." class="w-full md:w-1/2 lg:w-1/3 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-            </div>
-
-            <div id="loadingMessage" class="text-gray-600">
-                <div class="spinner"></div>
-                <div>Loading results...</div>
-            </div>
-            <div id="errorMessage" class="text-red-600 hidden">
-                Error loading results. Please try refreshing the page.
-                <pre id="errorDetails" class="text-xs text-left mt-2 bg-red-50 p-2 rounded"></pre>
-            </div>
-
-            <div id="resultsTableContainer" class="overflow-x-auto hidden">
-                <table class="min-w-full divide-y divide-gray-200 border border-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="bib">Bib<span class="sort-icon"></span></th>
-                            <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="name">Name<span class="sort-icon"></span></th>
-                            <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="status">Status<span class="sort-icon"></span></th>
-                            <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="green_cp">Green CP<span class="sort-icon"></span></th>
-                            <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lp 1</th>
-                            <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L1 Bot</th>
-                            <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L1 Top</th>
-                            <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="loop1_elapsed">L1 Elapsed<span class="sort-icon"></span></th>
-                            <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">D1 Elapsed</th>
-                            <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lp 2</th>
-                            <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L2 Bot</th>
-                            <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L2 Top</th>
-                            <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="loop2_elapsed">L2 Elapsed<span class="sort-icon"></span></th>
-                            <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">D2 Elapsed</th>
-                            <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lp 3</th>
-                            <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L3 Bot</th>
-                            <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L3 Top</th>
-                            <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="loop3_elapsed">L3 Elapsed<span class="sort-icon"></span></th>
-                            <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">D3 Elapsed</th>
-                            <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="red_cp">Red CP<span class="sort-icon"></span></th>
-                            <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="finish_scan">Finish Scan<span class="sort-icon"></span></th>
-                            <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="finish_elapsed">Total Time<span class="sort-icon"></span></th>
-                        </tr>
-                    </thead>
-                    <tbody id="resultsBody" class="bg-white divide-y divide-gray-200">
-                        </tbody>
-                </table>
-            </div>
-             <p id="rowCount" class="text-xs text-gray-500 mt-2"></p>
+        <div class="mb-4">
+            <label for="searchInput" class="sr-only">Search by Bib or Name:</label>
+            <input type="text" id="searchInput" placeholder="Search by Bib or Name..." class="w-full md:w-1/2 lg:w-1/3 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
         </div>
 
-        <script>
-            // --- Configuration ---
-            const SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTHGEvgy3yNGS0uV48XNrMGnbbZNorOFTx6YO0Q7dwrGkgvCkAYt2p6644uScSDqee14uVB8-0xhSGy/pub?gid=1613674231&single=true&output=csv'; // <-- PASTE PUBLISHED CSV URL HERE
-            const REFRESH_INTERVAL_MS = 45 * 1000;
-            // Column indices (0-based) from the published CSV
-            const COL = {
-                BIB: 0, NAME: 1, STATUS: 2, GREEN_CP: 3,
-                LOOP1_COLOR: 4, LOOP1_BOTTOM: 5, LOOP1_TOP: 6, LOOP1_ELAPSED: 7, DESC1_ELAPSED: 8,
-                LOOP2_COLOR: 9, LOOP2_BOTTOM: 10, LOOP2_TOP: 11, LOOP2_ELAPSED: 12, DESC2_ELAPSED: 13,
-                LOOP3_COLOR: 14, LOOP3_BOTTOM: 15, LOOP3_TOP: 16, LOOP3_ELAPSED: 17, DESC3_ELAPSED: 18,
-                RED_CP: 19, FINISH_SCAN: 20, FINISH_ELAPSED: 21
-            };
-            // --- End Configuration ---
+        <div id="loadingMessage" class="text-gray-600">
+            <div class="spinner"></div>
+            <div>Loading results...</div>
+        </div>
+        <div id="errorMessage" class="text-red-600 hidden">
+            Error loading results. Please try refreshing the page.
+            <pre id="errorDetails" class="text-xs text-left mt-2 bg-red-50 p-2 rounded"></pre>
+        </div>
 
-            const resultsBody = document.getElementById('resultsBody');
-            const loadingMessage = document.getElementById('loadingMessage');
-            const errorMessage = document.getElementById('errorMessage');
-            const errorDetails = document.getElementById('errorDetails');
-            const resultsTableContainer = document.getElementById('resultsTableContainer');
-            const lastUpdatedElement = document.getElementById('lastUpdated');
-            const searchInput = document.getElementById('searchInput');
-            const rowCountElement = document.getElementById('rowCount');
-            const tableHeaders = document.querySelectorAll('#resultsTableContainer th[data-sort]');
+        <div id="resultsTableContainer" class="overflow-x-auto hidden">
+            <table class="min-w-full divide-y divide-gray-200 border border-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="bib">Bib<span class="sort-icon"></span></th>
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="name">Name<span class="sort-icon"></span></th>
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="status">Status<span class="sort-icon"></span></th>
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="green_cp">Green CP<span class="sort-icon"></span></th>
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lp 1</th>
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L1 Bot</th>
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L1 Top</th>
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="loop1_elapsed">L1 Elapsed<span class="sort-icon"></span></th>
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">D1 Elapsed</th>
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lp 2</th>
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L2 Bot</th>
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L2 Top</th>
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="loop2_elapsed">L2 Elapsed<span class="sort-icon"></span></th>
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">D2 Elapsed</th>
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lp 3</th>
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L3 Bot</th>
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L3 Top</th>
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="loop3_elapsed">L3 Elapsed<span class="sort-icon"></span></th>
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">D3 Elapsed</th>
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="red_cp">Red CP<span class="sort-icon"></span></th>
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="finish_scan">Finish Scan<span class="sort-icon"></span></th>
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="finish_elapsed">Total Time<span class="sort-icon"></span></th>
+                    </tr>
+                </thead>
+                <tbody id="resultsBody" class="bg-white divide-y divide-gray-200">
+                    </tbody>
+            </table>
+        </div>
+         <p id="rowCount" class="text-xs text-gray-500 mt-2"></p>
+    </div>
 
-            let refreshIntervalId = null;
-            let allData = []; // Store all fetched data
-            let currentSort = { column: 'bib', direction: 'asc' }; // Default sort
-            let currentFilter = '';
+    <script>
+        // --- Configuration ---
+        const SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTHGEvgy3yNGS0uV48XNrMGnbbZNorOFTx6YO0Q7dwrGkgvCkAYt2p6644uScSDqee14uVB8-0xhSGy/pub?gid=1613674231&single=true&output=csv'; // <-- PASTE PUBLISHED CSV URL HERE
+        const REFRESH_INTERVAL_MS = 45 * 1000;
+        // Column indices (0-based) from the published CSV
+        const COL = {
+            BIB: 0, NAME: 1, STATUS: 2, GREEN_CP: 3,
+            LOOP1_COLOR: 4, LOOP1_BOTTOM: 5, LOOP1_TOP: 6, LOOP1_ELAPSED: 7, DESC1_ELAPSED: 8,
+            LOOP2_COLOR: 9, LOOP2_BOTTOM: 10, LOOP2_TOP: 11, LOOP2_ELAPSED: 12, DESC2_ELAPSED: 13,
+            LOOP3_COLOR: 14, LOOP3_BOTTOM: 15, LOOP3_TOP: 16, LOOP3_ELAPSED: 17, DESC3_ELAPSED: 18,
+            RED_CP: 19, FINISH_SCAN: 20, FINISH_ELAPSED: 21
+        };
+        // --- End Configuration ---
 
-            // --- Utility Functions ---
-            function parseCSV(csvText) { /* ... same as before ... */ if (!csvText || typeof csvText !== 'string') return []; const lines = csvText.trim().split('\n'); return lines.slice(1).map(line => line.split(',').map(field => field.trim())); } // Trim fields
-            function formatTime(dateTimeString) { /* ... same as before ... */ if (!dateTimeString || dateTimeString.trim() === "") return ""; try { const date = new Date(dateTimeString); if (isNaN(date.getTime()) || date.getFullYear() < 1900) return ""; return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }); } catch (e) { console.error("Error formatting time:", dateTimeString, e); return "Invalid"; } }
-            function formatDuration(durationString) { /* ... same as before ... */ if (!durationString || isNaN(parseFloat(durationString)) || parseFloat(durationString) <= 0) return ""; try { const ms = parseFloat(durationString) * 24 * 60 * 60 * 1000; if (ms <= 0) return ""; const sec = Math.floor(ms / 1000); const h = Math.floor(sec / 3600); const m = Math.floor((sec % 3600) / 60); const s = sec % 60; return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`; } catch (e) { console.error("Error formatting duration:", durationString, e); return "Invalid"; } }
-            function getStatusClass(status) { /* ... same as before ... */ status = status.toUpperCase(); if (status === 'FINISHED') return 'status-finished'; if (status === 'DNF' || status === 'DNS') return 'status-dnf'; if (status === 'ACTIVE') return 'status-active'; return ''; }
-            function createLoopSpan(color) { /* ... same as before ... */ if (!color) return ''; color = color.toUpperCase(); let className = ''; if (color === 'PINK') className = 'loop-pink'; else if (color === 'WHITE') className = 'loop-white'; else if (color === 'YELLOW') className = 'loop-yellow'; else return ''; return `<span class="${className}">${color.substring(0,1)}</span>`; }
+        const resultsBody = document.getElementById('resultsBody');
+        const loadingMessage = document.getElementById('loadingMessage');
+        const errorMessage = document.getElementById('errorMessage');
+        const errorDetails = document.getElementById('errorDetails');
+        const resultsTableContainer = document.getElementById('resultsTableContainer');
+        const lastUpdatedElement = document.getElementById('lastUpdated');
+        const searchInput = document.getElementById('searchInput');
+        const rowCountElement = document.getElementById('rowCount');
+        const tableHeaders = document.querySelectorAll('#resultsTableContainer th[data-sort]');
 
-            // --- Data Processing Functions ---
-            function filterAndSortData() {
-                let filteredData = allData;
+        let refreshIntervalId = null;
+        let allData = []; // Store all fetched data
+        let currentSort = { column: 'bib', direction: 'asc' }; // Default sort
+        let currentFilter = '';
 
-                // Apply filter
-                if (currentFilter) {
-                    const lowerCaseFilter = currentFilter.toLowerCase();
-                    filteredData = allData.filter(row => {
-                        const bib = String(row[COL.BIB] || '').toLowerCase();
-                        const name = String(row[COL.NAME] || '').toLowerCase();
-                        return bib.includes(lowerCaseFilter) || name.includes(lowerCaseFilter);
-                    });
-                }
+        // --- Utility Functions ---
+        function parseCSV(csvText) { if (!csvText || typeof csvText !== 'string') return []; const lines = csvText.trim().split('\n'); return lines.slice(1).map(line => line.split(',').map(field => field.trim())); }
+        function formatTime(dateTimeString) { if (!dateTimeString || dateTimeString.trim() === "") return ""; try { const date = new Date(dateTimeString); if (isNaN(date.getTime()) || date.getFullYear() < 1900) return ""; return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }); } catch (e) { console.error("Error formatting time:", dateTimeString, e); return "Invalid"; } }
+        function formatDuration(durationString) { if (!durationString || isNaN(parseFloat(durationString)) || parseFloat(durationString) <= 0) return ""; try { const ms = parseFloat(durationString) * 24 * 60 * 60 * 1000; if (ms <= 0) return ""; const sec = Math.floor(ms / 1000); const h = Math.floor(sec / 3600); const m = Math.floor((sec % 3600) / 60); const s = sec % 60; return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`; } catch (e) { console.error("Error formatting duration:", durationString, e); return "Invalid"; } }
+        function getStatusClass(status) { status = status.toUpperCase(); if (status === 'FINISHED') return 'status-finished'; if (status === 'DNF' || status === 'DNS') return 'status-dnf'; if (status === 'ACTIVE') return 'status-active'; return ''; }
+        function createLoopSpan(color) { if (!color) return ''; color = color.toUpperCase(); let className = ''; if (color === 'PINK') className = 'loop-pink'; else if (color === 'WHITE') className = 'loop-white'; else if (color === 'YELLOW') className = 'loop-yellow'; else return ''; return `<span class="${className}">${color.substring(0,1)}</span>`; }
 
-                // Apply sort
-                const { column, direction } = currentSort;
-                const sortMultiplier = direction === 'asc' ? 1 : -1;
+        // --- Data Processing Functions ---
+        function filterAndSortData() {
+            let filteredData = allData;
+            if (currentFilter) { const lowerCaseFilter = currentFilter.toLowerCase(); filteredData = allData.filter(row => { const bib = String(row[COL.BIB] || '').toLowerCase(); const name = String(row[COL.NAME] || '').toLowerCase(); return bib.includes(lowerCaseFilter) || name.includes(lowerCaseFilter); }); }
+            const { column, direction } = currentSort; const sortMultiplier = direction === 'asc' ? 1 : -1;
+            filteredData.sort((a, b) => {
+                let valA = a[COL[column.toUpperCase()]]; let valB = b[COL[column.toUpperCase()]];
+                if (column === 'bib') { valA = parseInt(valA || '0', 10); valB = parseInt(valB || '0', 10); }
+                else if (column.includes('_cp') || column.includes('_scan')) { valA = valA ? new Date(valA).getTime() : (direction === 'asc' ? Infinity : -Infinity); valB = valB ? new Date(valB).getTime() : (direction === 'asc' ? Infinity : -Infinity); if (isNaN(valA)) valA = (direction === 'asc' ? Infinity : -Infinity); if (isNaN(valB)) valB = (direction === 'asc' ? Infinity : -Infinity); }
+                else if (column.includes('_elapsed')) { valA = valA && !isNaN(parseFloat(valA)) ? parseFloat(valA) : (direction === 'asc' ? Infinity : -Infinity); valB = valB && !isNaN(parseFloat(valB)) ? parseFloat(valB) : (direction === 'asc' ? Infinity : -Infinity); }
+                else { valA = String(valA || '').toLowerCase(); valB = String(valB || '').toLowerCase(); }
+                if (valA < valB) return -1 * sortMultiplier; if (valA > valB) return 1 * sortMultiplier; return 0;
+            });
+            return filteredData;
+        }
 
-                filteredData.sort((a, b) => {
-                    let valA = a[COL[column.toUpperCase()]];
-                    let valB = b[COL[column.toUpperCase()]];
+        // --- UI Update Functions ---
+        // ****** UPDATED updateTable to include all duration formats ******
+        function updateTable() {
+            const displayData = filterAndSortData();
+            resultsBody.innerHTML = ''; // Clear existing rows
 
-                    // Handle specific data types for sorting
-                    if (column === 'bib') {
-                        valA = parseInt(valA || '0', 10);
-                        valB = parseInt(valB || '0', 10);
-                    } else if (column.includes('_cp') || column.includes('_scan')) {
-                        // Sort by time (treat blanks/invalid as very early/late depending on direction)
-                        valA = valA ? new Date(valA).getTime() : (direction === 'asc' ? Infinity : -Infinity);
-                        valB = valB ? new Date(valB).getTime() : (direction === 'asc' ? Infinity : -Infinity);
-                        if (isNaN(valA)) valA = (direction === 'asc' ? Infinity : -Infinity);
-                        if (isNaN(valB)) valB = (direction === 'asc' ? Infinity : -Infinity);
-                    } else if (column.includes('_elapsed')) {
-                         // Sort by duration (treat blanks/invalid as very long/short)
-                        valA = valA && !isNaN(parseFloat(valA)) ? parseFloat(valA) : (direction === 'asc' ? Infinity : -Infinity);
-                        valB = valB && !isNaN(parseFloat(valB)) ? parseFloat(valB) : (direction === 'asc' ? Infinity : -Infinity);
-                    } else {
-                        // Default to string comparison (case-insensitive)
-                        valA = String(valA || '').toLowerCase();
-                        valB = String(valB || '').toLowerCase();
-                    }
-
-                    if (valA < valB) return -1 * sortMultiplier;
-                    if (valA > valB) return 1 * sortMultiplier;
-                    return 0;
-                });
-
-                return filteredData;
+            if (!displayData || displayData.length === 0) {
+                resultsBody.innerHTML = `<tr><td colspan="22" class="text-center text-gray-500 py-4">${currentFilter ? 'No matching runners found.' : 'No results data available yet.'}</td></tr>`;
+                rowCountElement.textContent = `Showing 0 runners`;
+                return;
             }
 
-            // --- UI Update Functions ---
-            function updateTable() {
-                const displayData = filterAndSortData();
-                resultsBody.innerHTML = ''; // Clear existing rows
+            displayData.forEach(row => {
+                const tr = document.createElement('tr');
+                // Populate all columns based on COL indices, applying formatDuration where needed
+                tr.innerHTML = `
+                    <td>${row[COL.BIB] || ''}</td>
+                    <td>${row[COL.NAME] || ''}</td>
+                    <td><span class="${getStatusClass(row[COL.STATUS] || 'Active')}">${row[COL.STATUS] || 'Active'}</span></td>
+                    <td>${formatTime(row[COL.GREEN_CP])}</td>
+                    <td>${createLoopSpan(row[COL.LOOP1_COLOR])}</td>
+                    <td>${formatTime(row[COL.LOOP1_BOTTOM])}</td>
+                    <td>${formatTime(row[COL.LOOP1_TOP])}</td>
+                    <td>${formatDuration(row[COL.LOOP1_ELAPSED])}</td>
+                    <td>${formatDuration(row[COL.DESC1_ELAPSED])}</td>
+                    <td>${createLoopSpan(row[COL.LOOP2_COLOR])}</td>
+                    <td>${formatTime(row[COL.LOOP2_BOTTOM])}</td>
+                    <td>${formatTime(row[COL.LOOP2_TOP])}</td>
+                    <td>${formatDuration(row[COL.LOOP2_ELAPSED])}</td>
+                    <td>${formatDuration(row[COL.DESC2_ELAPSED])}</td>
+                    <td>${createLoopSpan(row[COL.LOOP3_COLOR])}</td>
+                    <td>${formatTime(row[COL.LOOP3_BOTTOM])}</td>
+                    <td>${formatTime(row[COL.LOOP3_TOP])}</td>
+                    <td>${formatDuration(row[COL.LOOP3_ELAPSED])}</td>
+                    <td>${formatDuration(row[COL.DESC3_ELAPSED])}</td>
+                    <td>${formatTime(row[COL.RED_CP])}</td>
+                    <td>${formatTime(row[COL.FINISH_SCAN])}</td>
+                    <td>${formatDuration(row[COL.FINISH_ELAPSED])}</td>
+                `;
+                resultsBody.appendChild(tr);
+            });
+             rowCountElement.textContent = `Showing ${displayData.length} of ${allData.length} runners`;
+        }
+        // ****** END UPDATED updateTable ******
 
-                if (!displayData || displayData.length === 0) {
-                    resultsBody.innerHTML = `<tr><td colspan="22" class="text-center text-gray-500 py-4">${currentFilter ? 'No matching runners found.' : 'No results data available yet.'}</td></tr>`;
-                    rowCountElement.textContent = `Showing 0 runners`;
-                    return;
-                }
+        function updateSortIcons() { tableHeaders.forEach(th => { const sortKey = th.getAttribute('data-sort'); th.classList.remove('sort-asc', 'sort-desc'); const iconSpan = th.querySelector('.sort-icon'); if (iconSpan) iconSpan.textContent = ''; if (sortKey === currentSort.column) { th.classList.add(currentSort.direction === 'asc' ? 'sort-asc' : 'sort-desc'); if (iconSpan) iconSpan.textContent = currentSort.direction === 'asc' ? ' ▲' : ' ▼'; } }); }
 
-                displayData.forEach(row => {
-                    const tr = document.createElement('tr');
-                    // Populate all columns based on COL indices
-                    tr.innerHTML = `
-                        <td>${row[COL.BIB] || ''}</td>
-                        <td>${row[COL.NAME] || ''}</td>
-                        <td><span class="${getStatusClass(row[COL.STATUS] || 'Active')}">${row[COL.STATUS] || 'Active'}</span></td>
-                        <td>${formatTime(row[COL.GREEN_CP])}</td>
-                        <td>${createLoopSpan(row[COL.LOOP1_COLOR])}</td>
-                        <td>${formatTime(row[COL.LOOP1_BOTTOM])}</td>
-                        <td>${formatTime(row[COL.LOOP1_TOP])}</td>
-                        <td>${formatDuration(row[COL.LOOP1_ELAPSED])}</td>
-                        <td>${formatDuration(row[COL.DESC1_ELAPSED])}</td>
-                        <td>${createLoopSpan(row[COL.LOOP2_COLOR])}</td>
-                        <td>${formatTime(row[COL.LOOP2_BOTTOM])}</td>
-                        <td>${formatTime(row[COL.LOOP2_TOP])}</td>
-                        <td>${formatDuration(row[COL.LOOP2_ELAPSED])}</td>
-                        <td>${formatDuration(row[COL.DESC2_ELAPSED])}</td>
-                        <td>${createLoopSpan(row[COL.LOOP3_COLOR])}</td>
-                        <td>${formatTime(row[COL.LOOP3_BOTTOM])}</td>
-                        <td>${formatTime(row[COL.LOOP3_TOP])}</td>
-                        <td>${formatDuration(row[COL.LOOP3_ELAPSED])}</td>
-                        <td>${formatDuration(row[COL.DESC3_ELAPSED])}</td>
-                        <td>${formatTime(row[COL.RED_CP])}</td>
-                        <td>${formatTime(row[COL.FINISH_SCAN])}</td>
-                        <td>${formatDuration(row[COL.FINISH_ELAPSED])}</td>
-                    `;
-                    resultsBody.appendChild(tr);
-                });
-                 rowCountElement.textContent = `Showing ${displayData.length} of ${allData.length} runners`;
-            }
+        // --- Event Handlers ---
+        function handleSortClick(event) { const clickedHeader = event.currentTarget; const sortKey = clickedHeader.getAttribute('data-sort'); if (!sortKey) return; if (currentSort.column === sortKey) { currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc'; } else { currentSort.column = sortKey; currentSort.direction = 'asc'; } console.log(`Sorting by ${currentSort.column}, direction ${currentSort.direction}`); updateTable(); updateSortIcons(); }
+        function handleFilterInput() { currentFilter = searchInput.value.trim(); console.log(`Filtering by: ${currentFilter}`); updateTable(); }
 
-            function updateSortIcons() {
-                tableHeaders.forEach(th => {
-                    const sortKey = th.getAttribute('data-sort');
-                    th.classList.remove('sort-asc', 'sort-desc');
-                    const iconSpan = th.querySelector('.sort-icon');
-                    if (iconSpan) iconSpan.textContent = ''; // Clear icon text
+        // --- Data Fetching ---
+        async function fetchData() {
+            console.log("Fetching data..."); loadingMessage.classList.remove('hidden'); errorMessage.classList.add('hidden'); resultsTableContainer.classList.add('hidden');
+            if (!SPREADSHEET_URL || SPREADSHEET_URL === 'YOUR_PUBLISHED_50K_RESULTS_CSV_URL_HERE') { console.error("Spreadsheet URL is not configured."); errorMessage.textContent = "Error: Spreadsheet URL not configured."; errorDetails.textContent = ""; errorMessage.classList.remove('hidden'); loadingMessage.classList.add('hidden'); return; }
+            try {
+                const url = `${SPREADSHEET_URL}&t=${Date.now()}`; const response = await fetch(url); if (!response.ok) throw new Error(`Network response error: ${response.status} ${response.statusText}`);
+                const csvData = await response.text(); allData = parseCSV(csvData);
+                updateTable(); updateSortIcons();
+                resultsTableContainer.classList.remove('hidden'); loadingMessage.classList.add('hidden'); errorMessage.classList.add('hidden');
+                lastUpdatedElement.textContent = new Date().toLocaleTimeString();
+            } catch (error) { console.error('Error fetching/processing data:', error); loadingMessage.classList.add('hidden'); resultsTableContainer.classList.add('hidden'); errorMessage.textContent = "Error loading results."; errorDetails.textContent = `Details: ${error.message}`; errorMessage.classList.remove('hidden'); if (refreshIntervalId) { clearInterval(refreshIntervalId); refreshIntervalId = null; } }
+        }
 
-                    if (sortKey === currentSort.column) {
-                        th.classList.add(currentSort.direction === 'asc' ? 'sort-asc' : 'sort-desc');
-                        if (iconSpan) iconSpan.textContent = currentSort.direction === 'asc' ? ' ▲' : ' ▼'; // Set icon text
-                    }
-                });
-            }
+        // --- Initial Setup ---
+        searchInput.addEventListener('input', handleFilterInput);
+        tableHeaders.forEach(th => th.addEventListener('click', handleSortClick));
+        fetchData(); // Initial fetch
+        if (REFRESH_INTERVAL_MS > 0) { refreshIntervalId = setInterval(fetchData, REFRESH_INTERVAL_MS); console.log(`Auto-refresh enabled every ${REFRESH_INTERVAL_MS / 1000} seconds.`); }
 
+    </script>
 
-            // --- Event Handlers ---
-            function handleSortClick(event) {
-                const clickedHeader = event.currentTarget;
-                const sortKey = clickedHeader.getAttribute('data-sort');
-                if (!sortKey) return; // Not a sortable column
-
-                if (currentSort.column === sortKey) {
-                    // Toggle direction
-                    currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
-                } else {
-                    // Sort by new column, default ascending
-                    currentSort.column = sortKey;
-                    currentSort.direction = 'asc';
-                }
-                console.log(`Sorting by ${currentSort.column}, direction ${currentSort.direction}`);
-                updateTable(); // Re-render table with new sort
-                updateSortIcons(); // Update visual indicators
-            }
-
-            function handleFilterInput() {
-                currentFilter = searchInput.value.trim();
-                console.log(`Filtering by: ${currentFilter}`);
-                updateTable(); // Re-render table with filter applied
-            }
-
-            // --- Data Fetching ---
-            async function fetchData() {
-                console.log("Fetching data...");
-                loadingMessage.classList.remove('hidden');
-                errorMessage.classList.add('hidden');
-                resultsTableContainer.classList.add('hidden');
-
-                if (!SPREADSHEET_URL || SPREADSHEET_URL === 'YOUR_PUBLISHED_50K_RESULTS_CSV_URL_HERE') {
-                     console.error("Spreadsheet URL is not configured.");
-                     errorMessage.textContent = "Error: Spreadsheet URL not configured."; errorDetails.textContent = "";
-                     errorMessage.classList.remove('hidden'); loadingMessage.classList.add('hidden'); return;
-                }
-
-                try {
-                    const url = `${SPREADSHEET_URL}&t=${Date.now()}`;
-                    const response = await fetch(url);
-                    if (!response.ok) throw new Error(`Network response error: ${response.status} ${response.statusText}`);
-
-                    const csvData = await response.text();
-                    allData = parseCSV(csvData); // Store all data
-
-                    updateTable(); // Filter, sort, and display data
-                    updateSortIcons(); // Ensure sort icons are correct
-
-                    resultsTableContainer.classList.remove('hidden');
-                    loadingMessage.classList.add('hidden'); errorMessage.classList.add('hidden');
-                    lastUpdatedElement.textContent = new Date().toLocaleTimeString();
-
-                } catch (error) {
-                    console.error('Error fetching/processing data:', error);
-                    loadingMessage.classList.add('hidden'); resultsTableContainer.classList.add('hidden');
-                    errorMessage.textContent = "Error loading results."; errorDetails.textContent = `Details: ${error.message}`;
-                    errorMessage.classList.remove('hidden');
-                    if (refreshIntervalId) { clearInterval(refreshIntervalId); refreshIntervalId = null; }
-                }
-            }
-
-            // --- Initial Setup ---
-            // Add event listeners
-            searchInput.addEventListener('input', handleFilterInput);
-            tableHeaders.forEach(th => th.addEventListener('click', handleSortClick));
-
-            // Initial data fetch
-            fetchData();
-
-            // Set up auto-refresh
-            if (REFRESH_INTERVAL_MS > 0) {
-                 refreshIntervalId = setInterval(fetchData, REFRESH_INTERVAL_MS);
-                 console.log(`Auto-refresh enabled every ${REFRESH_INTERVAL_MS / 1000} seconds.`);
-            }
-
-        </script>
-
-    </body>
-    </html>
-    
+</body>
+</html>
