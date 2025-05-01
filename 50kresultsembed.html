@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tiger Claw 50k - Live Results</title>
+    <title>2025 Tiger Claw 50k Live Results</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -97,7 +97,8 @@
 
     <script>
         // --- Configuration ---
-        const SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTHGEvgy3yNGS0uV48XNrMGnbbZNorOFTx6YO0Q7dwrGkgvCkAYt2p6644uScSDqee14uVB8-0xhSGy/pub?gid=1613674231&single=true&output=csv'; // <-- PASTE PUBLISHED CSV URL HERE
+        // ****** UPDATED SPREADSHEET URL ******
+        const SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTHGEvgy3yNGS0uV48XNrMGnbbZNorOFTx6YO0Q7dwrGkgvCkAYt2p6644uScSDqee14uVB8-0xhSGy/pub?gid=1613674231&single=true&output=csv';
         const REFRESH_INTERVAL_MS = 45 * 1000;
         const COL = { BIB: 0, NAME: 1, STATUS: 2, GREEN_CP: 3, LOOP1_COLOR: 4, LOOP1_BOTTOM: 5, LOOP1_TOP: 6, LOOP1_ELAPSED: 7, DESC1_ELAPSED: 8, LOOP2_COLOR: 9, LOOP2_BOTTOM: 10, LOOP2_TOP: 11, LOOP2_ELAPSED: 12, DESC2_ELAPSED: 13, LOOP3_COLOR: 14, LOOP3_BOTTOM: 15, LOOP3_TOP: 16, LOOP3_ELAPSED: 17, DESC3_ELAPSED: 18, RED_CP: 19, FINISH_SCAN: 20, FINISH_ELAPSED: 21 };
         // --- End Configuration ---
@@ -123,24 +124,26 @@
         function parseCSV(csvText) { if (!csvText || typeof csvText !== 'string') return []; const lines = csvText.trim().split('\n'); return lines.slice(1).map(line => line.split(',').map(field => field.trim())); }
         function formatTime(dateTimeString) { if (!dateTimeString || dateTimeString.trim() === "") return ""; try { const date = new Date(dateTimeString); if (isNaN(date.getTime()) || date.getFullYear() < 1900) return ""; return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }); } catch (e) { console.error("Error formatting time:", dateTimeString, e); return "Invalid"; } }
 
-        // ****** SIMPLIFIED formatDuration ******
+        // ****** UPDATED formatDuration to handle negative strings ******
         function formatDuration(durationInput, columnName = "Unknown") {
             if (durationInput === undefined || durationInput === null) return "";
             const durationString = String(durationInput).trim();
-            if (durationString === "") return "";
+            if (durationString === "" || durationString.startsWith('-')) { // Check if blank or starts with '-'
+                 // Log why it's blank
+                 if (durationString.startsWith('-')) {
+                     console.log(`Formatting Duration - Column: ${columnName}, Input: "${durationString}" -> Negative duration, returning blank.`);
+                 }
+                 return "";
+            }
 
-            // Log the input value and type
             console.log(`Formatting Duration - Column: ${columnName}, Input: "${durationString}", Type: ${typeof durationInput}`);
 
-            // ONLY attempt to parse as a number (fraction of a day)
+            // Try parsing as a number (fraction of a day) first
             const numericValue = parseFloat(durationString);
             if (!isNaN(numericValue) && numericValue > 0) {
                 try {
                     const ms = numericValue * 24 * 60 * 60 * 1000;
-                    if (ms <= 0) {
-                        console.log(` -> Numeric value <= 0, returning blank.`);
-                        return "";
-                    }
+                    if (ms <= 0) return ""; // Should be caught by > 0 check, but safety first
                     const sec = Math.floor(ms / 1000);
                     const h = Math.floor(sec / 3600);
                     const m = Math.floor((sec % 3600) / 60);
@@ -153,13 +156,28 @@
                     return "Invalid";
                 }
             }
-            // If not a valid positive number, return blank
+            // Check if it looks like HH:MM:SS (positive only now)
+            else if (/^\d{1,2}:\d{2}:\d{2}(\.\d+)?$/.test(durationString)) {
+                 try {
+                     const parts = durationString.split(':');
+                     const h = String(parts[0] || '0').padStart(2, '0');
+                     const m = String(parts[1] || '0').padStart(2, '0');
+                     const s = String(Math.floor(parseFloat(parts[2] || '0'))).padStart(2, '0');
+                     const formatted = `${h}:${m}:${s}`;
+                     console.log(` -> Formatted as string: ${formatted}`);
+                     return formatted;
+                 } catch(e) {
+                      console.error(`Error parsing pre-formatted duration for ${columnName}:`, durationString, e);
+                      return "Invalid";
+                 }
+            }
+            // If neither format works, return blank
             else {
-                console.log(` -> Input "${durationString}" is not a valid positive number (returning blank)`);
+                console.log(` -> Not a valid positive number or HH:MM:SS format (returning blank)`);
                 return "";
             }
         }
-        // ****** END SIMPLIFIED formatDuration ******
+        // ****** END UPDATED formatDuration ******
 
         function getStatusClass(status) { status = status.toUpperCase(); if (status === 'FINISHED') return 'status-finished'; if (status === 'DNF' || status === 'DNS') return 'status-dnf'; if (status === 'ACTIVE') return 'status-active'; return ''; }
         function createLoopSpan(color) { if (!color) return ''; color = color.toUpperCase(); let className = ''; if (color === 'PINK') className = 'loop-pink'; else if (color === 'WHITE') className = 'loop-white'; else if (color === 'YELLOW') className = 'loop-yellow'; else return ''; return `<span class="${className}">${color.substring(0,1)}</span>`; }
@@ -176,7 +194,7 @@
             displayData.forEach(row => {
                 const tr = document.createElement('tr');
                 const rawFinishElapsed = row[COL.FINISH_ELAPSED]; // Log raw value before formatting
-                console.log(`Bib ${row[COL.BIB]}: Raw FINISH_ELAPSED value from CSV: "${rawFinishElapsed}" (Type: ${typeof rawFinishElapsed})`);
+                // console.log(`Bib ${row[COL.BIB]}: Raw FINISH_ELAPSED value from CSV: "${rawFinishElapsed}" (Type: ${typeof rawFinishElapsed})`); // Keep logging for debug if needed
                 tr.innerHTML = `
                     <td>${row[COL.BIB] || ''}</td><td>${row[COL.NAME] || ''}</td><td><span class="${getStatusClass(row[COL.STATUS] || 'Active')}">${row[COL.STATUS] || 'Active'}</span></td>
                     <td>${formatTime(row[COL.GREEN_CP])}</td><td>${createLoopSpan(row[COL.LOOP1_COLOR])}</td><td>${formatTime(row[COL.LOOP1_BOTTOM])}</td>
