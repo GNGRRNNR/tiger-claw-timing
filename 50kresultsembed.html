@@ -64,15 +64,18 @@
                         <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lp 1</th>
                         <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L1 Bot</th>
                         <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L1 Top</th>
-                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L1 Elapsed</th> <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">D1 Elapsed</th>
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="loop1_elapsed">L1 Elapsed<span class="sort-icon"></span></th>
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">D1 Elapsed</th>
                         <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lp 2</th>
                         <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L2 Bot</th>
                         <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L2 Top</th>
-                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L2 Elapsed</th> <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">D2 Elapsed</th>
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="loop2_elapsed">L2 Elapsed<span class="sort-icon"></span></th>
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">D2 Elapsed</th>
                         <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lp 3</th>
                         <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L3 Bot</th>
                         <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L3 Top</th>
-                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L3 Elapsed</th> <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">D3 Elapsed</th>
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="loop3_elapsed">L3 Elapsed<span class="sort-icon"></span></th>
+                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">D3 Elapsed</th>
                         <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="red_cp">Red CP<span class="sort-icon"></span></th>
                         <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="finish_scan">Finish Scan<span class="sort-icon"></span></th>
                         <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="finish_elapsed">Total Time<span class="sort-icon"></span></th>
@@ -90,7 +93,13 @@
         const SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTHGEvgy3yNGS0uV48XNrMGnbbZNorOFTx6YO0Q7dwrGkgvCkAYt2p6644uScSDqee14uVB8-0xhSGy/pub?gid=1613674231&single=true&output=csv';
         const REFRESH_INTERVAL_MS = 45 * 1000;
         const RACE_START_TIME_MS = Date.UTC(2025, 4, 10, 14, 0, 0); // May 10, 2025 7:00 AM PST
-        const COL = { BIB: 0, NAME: 1, STATUS: 2, GREEN_CP: 3, LOOP1_COLOR: 4, LOOP1_BOTTOM: 5, LOOP1_TOP: 6, /* LOOP1_ELAPSED: 7 */ /* DESC1_ELAPSED: 8 */ LOOP2_COLOR: 9, LOOP2_BOTTOM: 10, LOOP2_TOP: 11, /* LOOP2_ELAPSED: 12 */ /* DESC2_ELAPSED: 13 */ LOOP3_COLOR: 14, LOOP3_BOTTOM: 15, LOOP3_TOP: 16, /* LOOP3_ELAPSED: 17 */ /* DESC3_ELAPSED: 18 */ RED_CP: 19, FINISH_SCAN: 20 /* FINISH_ELAPSED: 21 */ };
+        // Define COL indices based on the *original* spreadsheet structure
+        // The calculatedData array will mirror this structure, storing ms where durations were
+        const COL = { BIB: 0, NAME: 1, STATUS: 2, GREEN_CP: 3,
+                      LOOP1_COLOR: 4, LOOP1_BOTTOM: 5, LOOP1_TOP: 6, LOOP1_ELAPSED: 7, DESC1_ELAPSED: 8,
+                      LOOP2_COLOR: 9, LOOP2_BOTTOM: 10, LOOP2_TOP: 11, LOOP2_ELAPSED: 12, DESC2_ELAPSED: 13,
+                      LOOP3_COLOR: 14, LOOP3_BOTTOM: 15, LOOP3_TOP: 16, LOOP3_ELAPSED: 17, DESC3_ELAPSED: 18,
+                      RED_CP: 19, FINISH_SCAN: 20, FINISH_ELAPSED: 21 };
         // --- End Configuration ---
 
         const resultsBody = document.getElementById('resultsBody');
@@ -105,8 +114,8 @@
         const loadingSpinner = document.getElementById('loadingSpinner');
 
         let refreshIntervalId = null;
-        let allData = [];
-        let calculatedData = []; // Store processed data with calculated times
+        let allData = []; // Stores raw CSV rows
+        let calculatedData = []; // Stores processed data with calculated times
         let currentSort = { column: 'bib', direction: 'asc' };
         let currentFilter = '';
         let isFetching = false;
@@ -114,101 +123,55 @@
         // --- Utility Functions ---
         function parseCSV(csvText) { if (!csvText || typeof csvText !== 'string') return []; const lines = csvText.trim().split('\n'); return lines.slice(1).map(line => line.split(',').map(field => field.trim())); }
         function formatTime(dateTimeString) { if (!dateTimeString || dateTimeString.trim() === "") return ""; try { const date = new Date(dateTimeString); if (isNaN(date.getTime()) || date.getFullYear() < 1900) return ""; return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }); } catch (e) { return ""; } }
-
-        // ****** UPDATED formatMillisecondsToDuration with Logging ******
         function formatMillisecondsToDuration(ms, columnName = "Unknown") {
-            console.log(`Formatting MS - Column: ${columnName}, Input: ${ms}, Type: ${typeof ms}`); // Log input
-            if (ms === undefined || ms === null || isNaN(Number(ms)) || Number(ms) < 0) {
-                 console.log(` -> Invalid or negative ms, returning blank.`);
-                 return "";
-            }
+            // console.log(`Formatting MS - Column: ${columnName}, Input: ${ms}, Type: ${typeof ms}`); // Keep for debugging
+            if (ms === undefined || ms === null || isNaN(Number(ms)) || Number(ms) < 0) { return ""; }
             try {
                 const totalMilliseconds = Number(ms);
-                if (totalMilliseconds < 500) {
-                     console.log(` -> ms < 500, returning 00:00:00.`);
-                     return "00:00:00";
-                }
+                if (totalMilliseconds < 500) { return "00:00:00"; }
                 const totalSeconds = Math.floor(totalMilliseconds / 1000);
                 const hours = Math.floor(totalSeconds / 3600);
                 const minutes = Math.floor((totalSeconds % 3600) / 60);
                 const seconds = totalSeconds % 60;
                 const formatted = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-                console.log(` -> Formatted: ${formatted}`);
+                // console.log(` -> Formatted: ${formatted}`);
                 return formatted;
-            } catch (e) {
-                console.error(`Error formatting milliseconds for ${columnName}:`, ms, e);
-                return "Invalid";
-            }
+            } catch (e) { console.error(`Error formatting milliseconds for ${columnName}:`, ms, e); return "Invalid"; }
         }
-        // ****** END UPDATED formatMillisecondsToDuration ******
-
         function getStatusClass(status) { status = status.toUpperCase(); if (status === 'FINISHED') return 'status-finished'; if (status === 'DNF' || status === 'DNS') return 'status-dnf'; if (status === 'ACTIVE') return 'status-active'; return ''; }
         function createLoopSpan(color) { if (!color) return ''; color = color.toUpperCase(); let className = ''; if (color === 'PINK') className = 'loop-pink'; else if (color === 'WHITE') className = 'loop-white'; else if (color === 'YELLOW') className = 'loop-yellow'; else return ''; return `<span class="${className}">${color.substring(0,1)}</span>`; }
         function getTimeMs(dateString) { if (!dateString) return null; try { const date = new Date(dateString); return isNaN(date.getTime()) ? null : date.getTime(); } catch { return null; } }
 
         // --- Data Processing Functions ---
-        // ****** UPDATED processData with Logging ******
+        // (processData remains the same - calculates ms values)
         function processData(rawData) {
             console.log("Processing raw data into calculated data...");
             return rawData.map(row => {
-                const bib = row[COL.BIB] || ''; // Get bib for logging
-                // console.log(`Processing bib ${bib}...`); // Optional: log each bib
-                const processed = [...row]; // Copy raw data
-
-                // Calculate Loop 1 Elapsed
-                const l1BotMs = getTimeMs(row[COL.LOOP1_BOTTOM]);
-                const l1TopMs = getTimeMs(row[COL.LOOP1_TOP]);
-                const l1ElapsedMs = (l1BotMs && l1TopMs && l1TopMs > l1BotMs) ? (l1TopMs - l1BotMs) : null;
-                processed[COL.LOOP1_ELAPSED] = l1ElapsedMs; // Store calculated ms
-                // if(bib === '101') console.log(`Bib ${bib} L1: Bot=${l1BotMs}, Top=${l1TopMs}, Elapsed=${l1ElapsedMs}`);
-
-                // Calculate Loop 2 Elapsed
-                const l2BotMs = getTimeMs(row[COL.LOOP2_BOTTOM]);
-                const l2TopMs = getTimeMs(row[COL.LOOP2_TOP]);
-                const l2ElapsedMs = (l2BotMs && l2TopMs && l2TopMs > l2BotMs) ? (l2TopMs - l2BotMs) : null;
-                processed[COL.LOOP2_ELAPSED] = l2ElapsedMs;
-                // if(bib === '101') console.log(`Bib ${bib} L2: Bot=${l2BotMs}, Top=${l2TopMs}, Elapsed=${l2ElapsedMs}`);
-
-                // Calculate Loop 3 Elapsed
-                const l3BotMs = getTimeMs(row[COL.LOOP3_BOTTOM]);
-                const l3TopMs = getTimeMs(row[COL.LOOP3_TOP]);
-                const l3ElapsedMs = (l3BotMs && l3TopMs && l3TopMs > l3BotMs) ? (l3TopMs - l3BotMs) : null;
-                processed[COL.LOOP3_ELAPSED] = l3ElapsedMs;
-                // if(bib === '101') console.log(`Bib ${bib} L3: Bot=${l3BotMs}, Top=${l3TopMs}, Elapsed=${l3ElapsedMs}`);
-
-                // Calculate Descent 1 Elapsed
-                const l2BotTimeForDesc1 = getTimeMs(row[COL.LOOP2_BOTTOM]);
-                const d1ElapsedMs = (l1TopMs && l2BotTimeForDesc1 && l2BotTimeForDesc1 > l1TopMs) ? (l2BotTimeForDesc1 - l1TopMs) : null;
-                processed[COL.DESC1_ELAPSED] = d1ElapsedMs;
-                // if(bib === '101') console.log(`Bib ${bib} D1: L1Top=${l1TopMs}, L2Bot=${l2BotTimeForDesc1}, Elapsed=${d1ElapsedMs}`);
-
-                 // Calculate Descent 2 Elapsed
-                const l3BotTimeForDesc2 = getTimeMs(row[COL.LOOP3_BOTTOM]);
-                const d2ElapsedMs = (l2TopMs && l3BotTimeForDesc2 && l3BotTimeForDesc2 > l2TopMs) ? (l3BotTimeForDesc2 - l2TopMs) : null;
-                processed[COL.DESC2_ELAPSED] = d2ElapsedMs;
-                // if(bib === '101') console.log(`Bib ${bib} D2: L2Top=${l2TopMs}, L3Bot=${l3BotTimeForDesc2}, Elapsed=${d2ElapsedMs}`);
-
-                 // Calculate Descent 3 Elapsed
-                const redCpMs = getTimeMs(row[COL.RED_CP]);
-                const d3ElapsedMs = (l3TopMs && redCpMs && redCpMs > l3TopMs) ? (redCpMs - l3TopMs) : null;
-                processed[COL.DESC3_ELAPSED] = d3ElapsedMs;
-                // if(bib === '101') console.log(`Bib ${bib} D3: L3Top=${l3TopMs}, RedCP=${redCpMs}, Elapsed=${d3ElapsedMs}`);
-
-                // Calculate Total Elapsed Time
-                const finishScanMs = getTimeMs(row[COL.FINISH_SCAN]);
-                const totalElapsedMs = (finishScanMs && finishScanMs > RACE_START_TIME_MS) ? (finishScanMs - RACE_START_TIME_MS) : null;
+                const bib = row[COL.BIB] || '';
+                const processed = [...row]; // Create a mutable copy
+                const l1BotMs = getTimeMs(row[COL.LOOP1_BOTTOM]); const l1TopMs = getTimeMs(row[COL.LOOP1_TOP]);
+                const l2BotMs = getTimeMs(row[COL.LOOP2_BOTTOM]); const l2TopMs = getTimeMs(row[COL.LOOP2_TOP]);
+                const l3BotMs = getTimeMs(row[COL.LOOP3_BOTTOM]); const l3TopMs = getTimeMs(row[COL.LOOP3_TOP]);
+                const redCpMs = getTimeMs(row[COL.RED_CP]); const finishScanMs = getTimeMs(row[COL.FINISH_SCAN]);
+                processed[COL.LOOP1_ELAPSED] = (l1BotMs && l1TopMs && l1TopMs > l1BotMs) ? (l1TopMs - l1BotMs) : null;
+                processed[COL.DESC1_ELAPSED] = (l1TopMs && l2BotMs && l2BotMs > l1TopMs) ? (l2BotMs - l1TopMs) : null;
+                processed[COL.LOOP2_ELAPSED] = (l2BotMs && l2TopMs && l2TopMs > l2BotMs) ? (l2TopMs - l2BotMs) : null;
+                processed[COL.DESC2_ELAPSED] = (l2TopMs && l3BotMs && l3BotMs > l2TopMs) ? (l3BotMs - l2TopMs) : null;
+                processed[COL.LOOP3_ELAPSED] = (l3BotMs && l3TopMs && l3TopMs > l3BotMs) ? (l3TopMs - l3BotMs) : null;
+                processed[COL.DESC3_ELAPSED] = (l3TopMs && redCpMs && redCpMs > l3TopMs) ? (redCpMs - l3TopMs) : null;
+                let totalElapsedMs = null;
+                if (finishScanMs && finishScanMs > RACE_START_TIME_MS) { totalElapsedMs = finishScanMs - RACE_START_TIME_MS; }
                 processed[COL.FINISH_ELAPSED] = totalElapsedMs; // Store calculated ms
-                // if(bib === '101') console.log(`Bib ${bib} Total: Finish=${finishScanMs}, Start=${RACE_START_TIME_MS}, Elapsed=${totalElapsedMs}`);
-
+                // console.log(`Bib ${bib}: FinishScanStr="${row[COL.FINISH_SCAN]}", FinishMs=${finishScanMs}, StartMs=${RACE_START_TIME_MS}, CalculatedTotalMs=${totalElapsedMs}`); // Keep for debug
                 return processed;
             });
         }
-        // ****** END UPDATED processData ******
 
-        function filterAndSortData() { /* ... same as before ... */ let filteredData = calculatedData; if (currentFilter) { const lowerCaseFilter = currentFilter.toLowerCase(); filteredData = calculatedData.filter(row => { const bib = String(row[COL.BIB] || '').toLowerCase(); const name = String(row[COL.NAME] || '').toLowerCase(); return bib.includes(lowerCaseFilter) || name.includes(lowerCaseFilter); }); } const { column, direction } = currentSort; const sortMultiplier = direction === 'asc' ? 1 : -1; filteredData.sort((a, b) => { let valA = a[COL[column.toUpperCase()]]; let valB = b[COL[column.toUpperCase()]]; if (column === 'bib') { valA = parseInt(valA || '0', 10); valB = parseInt(valB || '0', 10); } else if (column.includes('_cp') || column.includes('_scan')) { valA = getTimeMs(valA) ?? (direction === 'asc' ? Infinity : -Infinity); valB = getTimeMs(valB) ?? (direction === 'asc' ? Infinity : -Infinity); } else if (column.includes('_elapsed')) { valA = valA ?? (direction === 'asc' ? Infinity : -Infinity); valB = valB ?? (direction === 'asc' ? Infinity : -Infinity); } else { valA = String(valA || '').toLowerCase(); valB = String(valB || '').toLowerCase(); } if (valA < valB) return -1 * sortMultiplier; if (valA > valB) return 1 * sortMultiplier; return 0; }); return filteredData; }
+        // (filterAndSortData remains the same)
+        function filterAndSortData() { let filteredData = calculatedData; if (currentFilter) { const lowerCaseFilter = currentFilter.toLowerCase(); filteredData = calculatedData.filter(row => { const bib = String(row[COL.BIB] || '').toLowerCase(); const name = String(row[COL.NAME] || '').toLowerCase(); return bib.includes(lowerCaseFilter) || name.includes(lowerCaseFilter); }); } const { column, direction } = currentSort; const sortMultiplier = direction === 'asc' ? 1 : -1; filteredData.sort((a, b) => { let valA = a[COL[column.toUpperCase()]]; let valB = b[COL[column.toUpperCase()]]; if (column === 'bib') { valA = parseInt(valA || '0', 10); valB = parseInt(valB || '0', 10); } else if (column.includes('_cp') || column.includes('_scan')) { valA = getTimeMs(valA) ?? (direction === 'asc' ? Infinity : -Infinity); valB = getTimeMs(valB) ?? (direction === 'asc' ? Infinity : -Infinity); } else if (column.includes('_elapsed')) { valA = valA ?? (direction === 'asc' ? Infinity : -Infinity); valB = valB ?? (direction === 'asc' ? Infinity : -Infinity); } else { valA = String(valA || '').toLowerCase(); valB = String(valB || '').toLowerCase(); } if (valA < valB) return -1 * sortMultiplier; if (valA > valB) return 1 * sortMultiplier; return 0; }); return filteredData; }
 
         // --- UI Update Functions ---
-        // ****** UPDATED updateTable to use formatMillisecondsToDuration ******
+        // ****** UPDATED updateTable to use correct indices ******
         function updateTable() {
             const displayData = filterAndSortData();
             resultsBody.innerHTML = '';
@@ -217,15 +180,30 @@
             displayData.forEach(row => {
                 const tr = document.createElement('tr');
                 // Use formatMillisecondsToDuration for all calculated elapsed/descent times
+                // Ensure we are accessing the correct index from the 'processed' row array
                 tr.innerHTML = `
-                    <td>${row[COL.BIB] || ''}</td><td>${row[COL.NAME] || ''}</td><td><span class="${getStatusClass(row[COL.STATUS] || 'Active')}">${row[COL.STATUS] || 'Active'}</span></td>
-                    <td>${formatTime(row[COL.GREEN_CP])}</td><td>${createLoopSpan(row[COL.LOOP1_COLOR])}</td><td>${formatTime(row[COL.LOOP1_BOTTOM])}</td>
-                    <td>${formatTime(row[COL.LOOP1_TOP])}</td><td>${formatMillisecondsToDuration(row[COL.LOOP1_ELAPSED], 'LOOP1_ELAPSED')}</td><td>${formatMillisecondsToDuration(row[COL.DESC1_ELAPSED], 'DESC1_ELAPSED')}</td>
-                    <td>${createLoopSpan(row[COL.LOOP2_COLOR])}</td><td>${formatTime(row[COL.LOOP2_BOTTOM])}</td><td>${formatTime(row[COL.LOOP2_TOP])}</td>
-                    <td>${formatMillisecondsToDuration(row[COL.LOOP2_ELAPSED], 'LOOP2_ELAPSED')}</td><td>${formatMillisecondsToDuration(row[COL.DESC2_ELAPSED], 'DESC2_ELAPSED')}</td>
-                    <td>${createLoopSpan(row[COL.LOOP3_COLOR])}</td><td>${formatTime(row[COL.LOOP3_BOTTOM])}</td><td>${formatTime(row[COL.LOOP3_TOP])}</td>
-                    <td>${formatMillisecondsToDuration(row[COL.LOOP3_ELAPSED], 'LOOP3_ELAPSED')}</td><td>${formatMillisecondsToDuration(row[COL.DESC3_ELAPSED], 'DESC3_ELAPSED')}</td>
-                    <td>${formatTime(row[COL.RED_CP])}</td><td>${formatTime(row[COL.FINISH_SCAN])}</td><td>${formatMillisecondsToDuration(row[COL.FINISH_ELAPSED], 'FINISH_ELAPSED')}</td>
+                    <td>${row[COL.BIB] || ''}</td>
+                    <td>${row[COL.NAME] || ''}</td>
+                    <td><span class="${getStatusClass(row[COL.STATUS] || 'Active')}">${row[COL.STATUS] || 'Active'}</span></td>
+                    <td>${formatTime(row[COL.GREEN_CP])}</td>
+                    <td>${createLoopSpan(row[COL.LOOP1_COLOR])}</td>
+                    <td>${formatTime(row[COL.LOOP1_BOTTOM])}</td>
+                    <td>${formatTime(row[COL.LOOP1_TOP])}</td>
+                    <td>${formatMillisecondsToDuration(row[COL.LOOP1_ELAPSED], 'LOOP1_ELAPSED')}</td>
+                    <td>${formatMillisecondsToDuration(row[COL.DESC1_ELAPSED], 'DESC1_ELAPSED')}</td>
+                    <td>${createLoopSpan(row[COL.LOOP2_COLOR])}</td>
+                    <td>${formatTime(row[COL.LOOP2_BOTTOM])}</td>
+                    <td>${formatTime(row[COL.LOOP2_TOP])}</td>
+                    <td>${formatMillisecondsToDuration(row[COL.LOOP2_ELAPSED], 'LOOP2_ELAPSED')}</td>
+                    <td>${formatMillisecondsToDuration(row[COL.DESC2_ELAPSED], 'DESC2_ELAPSED')}</td>
+                    <td>${createLoopSpan(row[COL.LOOP3_COLOR])}</td>
+                    <td>${formatTime(row[COL.LOOP3_BOTTOM])}</td>
+                    <td>${formatTime(row[COL.LOOP3_TOP])}</td>
+                    <td>${formatMillisecondsToDuration(row[COL.LOOP3_ELAPSED], 'LOOP3_ELAPSED')}</td>
+                    <td>${formatMillisecondsToDuration(row[COL.DESC3_ELAPSED], 'DESC3_ELAPSED')}</td>
+                    <td>${formatTime(row[COL.RED_CP])}</td>
+                    <td>${formatTime(row[COL.FINISH_SCAN])}</td>
+                    <td>${formatMillisecondsToDuration(row[COL.FINISH_ELAPSED], 'FINISH_ELAPSED')}</td>
                 `;
                 resultsBody.appendChild(tr);
             });
@@ -240,25 +218,8 @@
         function handleFilterInput() { currentFilter = searchInput.value.trim(); console.log(`Filtering by: ${currentFilter}`); updateTable(); }
 
         // --- Data Fetching ---
-        // ****** UPDATED fetchData to process data ******
-        async function fetchData() {
-            if (isFetching) { console.log("Fetch already in progress, skipping."); return; }
-            isFetching = true; console.log("Fetching data...");
-            if (loadingSpinner) loadingSpinner.classList.remove('hidden'); errorMessage.classList.add('hidden');
-            if (!SPREADSHEET_URL || SPREADSHEET_URL === 'YOUR_PUBLISHED_50K_RESULTS_CSV_URL_HERE') { console.error("Spreadsheet URL is not configured."); errorMessage.textContent = "Error: Spreadsheet URL not configured."; errorDetails.textContent = ""; errorMessage.classList.remove('hidden'); loadingMessage.classList.add('hidden'); resultsTableContainer.classList.remove('hidden'); isFetching = false; if (loadingSpinner) loadingSpinner.classList.add('hidden'); return; }
-            try {
-                const url = `${SPREADSHEET_URL}&t=${Date.now()}`; const response = await fetch(url); if (!response.ok) throw new Error(`Network response error: ${response.status} ${response.statusText}`);
-                const csvData = await response.text();
-                allData = parseCSV(csvData); // Store raw CSV data
-                calculatedData = processData(allData); // Process raw data to calculate times
-                updateTable(); // Render table using calculatedData
-                updateSortIcons();
-                resultsTableContainer.classList.remove('hidden'); loadingMessage.classList.add('hidden'); errorMessage.classList.add('hidden');
-                lastUpdatedElement.textContent = new Date().toLocaleTimeString();
-            } catch (error) { console.error('Error fetching/processing data:', error); errorMessage.textContent = "Error loading results. Displaying previous data."; errorDetails.textContent = `Details: ${error.message}`; errorMessage.classList.remove('hidden'); }
-            finally { isFetching = false; if (loadingSpinner) loadingSpinner.classList.add('hidden'); }
-        }
-        // ****** END UPDATED fetchData ******
+        // (fetchData remains the same - calls processData)
+        async function fetchData() { if (isFetching) { console.log("Fetch already in progress, skipping."); return; } isFetching = true; console.log("Fetching data..."); if (loadingSpinner) loadingSpinner.classList.remove('hidden'); errorMessage.classList.add('hidden'); if (!SPREADSHEET_URL || SPREADSHEET_URL === 'YOUR_PUBLISHED_50K_RESULTS_CSV_URL_HERE') { console.error("Spreadsheet URL is not configured."); errorMessage.textContent = "Error: Spreadsheet URL not configured."; errorDetails.textContent = ""; errorMessage.classList.remove('hidden'); loadingMessage.classList.add('hidden'); resultsTableContainer.classList.remove('hidden'); isFetching = false; if (loadingSpinner) loadingSpinner.classList.add('hidden'); return; } try { const url = `${SPREADSHEET_URL}&t=${Date.now()}`; const response = await fetch(url); if (!response.ok) throw new Error(`Network response error: ${response.status} ${response.statusText}`); const csvData = await response.text(); allData = parseCSV(csvData); calculatedData = processData(allData); updateTable(); updateSortIcons(); resultsTableContainer.classList.remove('hidden'); loadingMessage.classList.add('hidden'); errorMessage.classList.add('hidden'); lastUpdatedElement.textContent = new Date().toLocaleTimeString(); } catch (error) { console.error('Error fetching/processing data:', error); errorMessage.textContent = "Error loading results. Displaying previous data."; errorDetails.textContent = `Details: ${error.message}`; errorMessage.classList.remove('hidden'); } finally { isFetching = false; if (loadingSpinner) loadingSpinner.classList.add('hidden'); } }
 
         // --- Initial Setup ---
         searchInput.addEventListener('input', handleFilterInput);
