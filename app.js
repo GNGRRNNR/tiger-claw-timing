@@ -1,6 +1,6 @@
     // --- Configuration ---
     // Google Apps Script Web App URL (Points to script bound to "2025 TIGER CLAW SCANS + RESULTS")
-    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby5mkZeOMnpgfP0i8fPuOV9TKmpeiKPzCFM31zcHbizePbHmyg3ABKLuDcFMI8EsT0/exec'; // <-- PASTE LATEST URL HERE!
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzPFT4ObO3PIwrKNzv6NEsOW9HRWWfjrs2MdtF9l_fxPBA6BWr1AsG2s_dOWSEnRnY/exec'; // <-- PASTE LATEST URL HERE!
     const SCAN_THROTTLE_MS = 1500;
     const SYNC_INTERVAL_MS = 30000;
     const MAX_RECENT_SCANS = 5;
@@ -22,7 +22,6 @@
     const recentScansListElement = document.getElementById('recentScansList');
     const installButton = document.getElementById('installButton');
     const statsDisplayElement = document.getElementById('statsDisplay');
-    const iosInstallInstructionsElement = document.getElementById('iosInstallInstructions');
     const refreshStatsButton = document.getElementById('refreshStatsButton');
     const appContainerElement = document.getElementById('appContainer'); // Main app container
     const flashOverlayElement = document.getElementById('flashOverlay'); // Get the overlay element
@@ -119,38 +118,7 @@
     // --- PWA & Service Worker ---
     function setupServiceWorker() { if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').then(reg => console.log('SW registered:', reg.scope)).catch(err => console.error('SW registration failed:', err)); } }
     function isIOS() { return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
-    function setupInstallButton() {
-         if (isIOS()) {
-             if (iosInstallInstructionsElement) {
-                 iosInstallInstructionsElement.innerHTML = `To add to Home Screen: Tap the Share button <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-box-arrow-up" viewBox="0 0 16 16" style="display: inline; height: 1.1em; vertical-align: text-bottom; margin: 0 0.1em;"><path fill-rule="evenodd" d="M.5 9.9a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1H1.707l3.147 3.146a.5.5 0 0 1-.708.708L1 11.707V14.5a.5.5 0 0 1-1 0v-5z"/><path fill-rule="evenodd" d="M15.5 9.4a.5.5 0 0 1 0-1h-4a.5.5 0 0 1 0-1h4a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0V9.9H1.5a.5.5 0 0 1-.5-.5zM7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/></svg>, then scroll down and tap 'Add to Home Screen'.`;
-                 iosInstallInstructionsElement.classList.remove('hidden');
-                 console.log('iOS detected, showing install instructions.');
-             } else { console.error("iOS instructions element not found."); }
-             if (installButton) installButton.classList.add('hidden');
-         } else {
-             window.addEventListener('beforeinstallprompt', (event) => {
-                event.preventDefault(); deferredInstallPrompt = event;
-                if (installButton) installButton.classList.remove('hidden');
-                if (iosInstallInstructionsElement) iosInstallInstructionsElement.classList.add('hidden');
-                console.log('beforeinstallprompt fired.');
-            });
-            if (installButton) {
-                installButton.addEventListener('click', async () => {
-                    if (!deferredInstallPrompt) { console.log('Install prompt not available.'); return; }
-                    deferredInstallPrompt.prompt();
-                    const { outcome } = await deferredInstallPrompt.userChoice;
-                    console.log(`User response: ${outcome}`);
-                    deferredInstallPrompt = null; installButton.classList.add('hidden');
-                });
-            } else { console.error("Install button element not found."); }
-         }
-         window.addEventListener('appinstalled', () => {
-            console.log('PWA installed');
-            if (installButton) installButton.classList.add('hidden');
-            if (iosInstallInstructionsElement) iosInstallInstructionsElement.classList.add('hidden');
-            deferredInstallPrompt = null;
-        });
-    }
+    
 
 
     // --- Network & Syncing ---
