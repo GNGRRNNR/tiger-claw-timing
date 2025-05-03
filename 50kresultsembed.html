@@ -10,16 +10,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
-        /* Added border-right for vertical lines */
-        th, td {
-            padding: 0.5rem 0.5rem; text-align: left;
-            border-bottom: 1px solid #e5e7eb;
-            border-right: 1px solid #f3f4f6; /* Soft vertical line */
-            white-space: nowrap;
-        }
-        th:last-child, td:last-child {
-             border-right: none; /* Remove border from last column */
-        }
+        th, td { padding: 0.5rem 0.5rem; text-align: left; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #f3f4f6; white-space: nowrap; }
+        th:last-child, td:last-child { border-right: none; }
         th { background-color: #f9fafb; font-weight: 600; cursor: pointer; user-select: none; }
         th .sort-icon { display: inline-block; width: 1em; height: 1em; margin-left: 0.3em; opacity: 0.3; vertical-align: middle;}
         th.sort-asc .sort-icon::after { content: ' ▲'; }
@@ -32,18 +24,18 @@
         .loop-yellow { background-color: #fef9c3; color: #713f12; padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-size: 0.75rem; display: inline-block; margin: 0.1rem; }
         #loadingMessage { text-align: center; padding: 1rem; font-weight: 500; }
         #errorMessage { text-align: center; padding: 1rem; font-weight: 500; color: #dc2626; }
-        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #4f46e5; border-radius: 50%; width: 1em; height: 1em; /* Smaller spinner */ animation: spin 1s linear infinite; display: inline-block; margin: 0 0.5rem; vertical-align: middle; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #4f46e5; border-radius: 50%; width: 1em; height: 1em; animation: spin 1s linear infinite; display: inline-block; margin: 0 0.5rem; vertical-align: middle; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .time-small { font-size: 0.8rem; color: #6b7280; }
-        thead th { position: sticky; top: 0; z-index: 10; background-color: #f9fafb; /* Ensure sticky header has background */ }
+        thead th { position: sticky; top: 0; z-index: 10; background-color: #f9fafb; }
         .hidden { display: none; }
     </style>
 </head>
 <body class="bg-gray-100 p-4 md:p-8">
 
     <div class="container mx-auto bg-white p-6 rounded-lg shadow-lg">
-        <h1 class="text-3xl font-bold text-center text-gray-800 mb-2">2025 Tiger Claw 50k</h1>
-        <p class="text-center text-gray-600 mb-4">Live Results (Unofficial)</p>
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-1">2025 Tiger Claw 50k</h1>
+        <p class="text-lg text-center text-gray-600 mb-4">Live Results (Unofficial)</p>
         <p class="text-center text-xs text-gray-500 mb-6">
             Last Updated: <span id="lastUpdated">Never</span>
             <span id="loadingSpinner" class="spinner hidden"></span> </p>
@@ -99,10 +91,8 @@
         // --- Configuration ---
         const SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTHGEvgy3yNGS0uV48XNrMGnbbZNorOFTx6YO0Q7dwrGkgvCkAYt2p6644uScSDqee14uVB8-0xhSGy/pub?gid=1613674231&single=true&output=csv';
         const REFRESH_INTERVAL_MS = 45 * 1000;
-        // Define Race Start Time (using UTC for consistency)
         // May 10, 2025 7:00 AM PST is May 10, 2025 14:00:00 UTC
         const RACE_START_TIME_MS = Date.UTC(2025, 4, 10, 14, 0, 0); // Month is 0-indexed (4=May)
-
         const COL = { BIB: 0, NAME: 1, STATUS: 2, GREEN_CP: 3, LOOP1_COLOR: 4, LOOP1_BOTTOM: 5, LOOP1_TOP: 6, LOOP1_ELAPSED: 7, DESC1_ELAPSED: 8, LOOP2_COLOR: 9, LOOP2_BOTTOM: 10, LOOP2_TOP: 11, LOOP2_ELAPSED: 12, DESC2_ELAPSED: 13, LOOP3_COLOR: 14, LOOP3_BOTTOM: 15, LOOP3_TOP: 16, LOOP3_ELAPSED: 17, DESC3_ELAPSED: 18, RED_CP: 19, FINISH_SCAN: 20, FINISH_ELAPSED: 21 };
         // --- End Configuration ---
 
@@ -127,58 +117,50 @@
         function parseCSV(csvText) { if (!csvText || typeof csvText !== 'string') return []; const lines = csvText.trim().split('\n'); return lines.slice(1).map(line => line.split(',').map(field => field.trim())); }
         function formatTime(dateTimeString) { if (!dateTimeString || dateTimeString.trim() === "") return ""; try { const date = new Date(dateTimeString); if (isNaN(date.getTime()) || date.getFullYear() < 1900) return ""; return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }); } catch (e) { console.error("Error formatting time:", dateTimeString, e); return "Invalid"; } }
 
-        // ****** UPDATED formatDuration (More Robust) ******
+        // ****** REVISED formatDuration ******
         function formatDuration(durationInput, columnName = "Unknown") {
             if (durationInput === undefined || durationInput === null) return "";
             const durationString = String(durationInput).trim();
-            // Immediately return blank if empty or clearly negative string
             if (durationString === "" || durationString.startsWith('-')) {
-                 console.log(`Formatting Duration - Column: ${columnName}, Input: "${durationString}" -> Blank or Negative string, returning blank.`);
-                 return "";
+                // console.log(`Formatting Duration - Column: ${columnName}, Input: "${durationString}" -> Blank or Negative string, returning blank.`);
+                return "";
             }
 
-            // console.log(`Formatting Duration - Column: ${columnName}, Input: "${durationString}", Type: ${typeof durationInput}`); // Keep for debugging if needed
+            // console.log(`Formatting Duration - Column: ${columnName}, Input: "${durationString}", Type: ${typeof durationInput}`);
 
-            // Try parsing as a number (fraction of a day) first
+            // Check if it's likely the numeric fraction-of-a-day format from Sheets
             const numericValue = parseFloat(durationString);
-            if (!isNaN(numericValue) && numericValue > 0) {
+            // Allow values slightly greater than 1 (e.g., for > 24hr races) but less than typical date numbers
+            if (!isNaN(numericValue) && numericValue > 0 && numericValue < 10) {
                 try {
                     const ms = numericValue * 24 * 60 * 60 * 1000;
-                    if (ms <= 0) return ""; // Should be caught by > 0 check
-                    const sec = Math.floor(ms / 1000);
-                    const h = Math.floor(sec / 3600);
-                    const m = Math.floor((sec % 3600) / 60);
-                    const s = sec % 60;
-                    const formatted = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-                    // console.log(` -> Formatted as numeric: ${formatted}`);
-                    return formatted;
+                    return formatMillisecondsToDuration(ms); // Use helper for formatting
                 } catch (e) {
                     console.error(`Error formatting numeric duration for ${columnName}:`, durationString, e);
                     return "Invalid";
                 }
             }
-            // Check if it looks like HH:MM:SS (positive only now)
-            else if (/^\d{1,3}:\d{2}:\d{2}(\.\d+)?$/.test(durationString)) { // Allow more digits for hours
+            // Check if it looks like HH:MM:SS (allow more digits for hours)
+            else if (/^\d{1,3}:\d{2}:\d{2}(\.\d+)?$/.test(durationString)) {
                  try {
+                     // If it already looks like HH:MM:SS, just return it after basic padding
                      const parts = durationString.split(':');
-                     const h = String(parts[0] || '0').padStart(2, '0'); // Pad hours too
+                     const h = String(parts[0] || '0').padStart(2, '0');
                      const m = String(parts[1] || '0').padStart(2, '0');
                      const s = String(Math.floor(parseFloat(parts[2] || '0'))).padStart(2, '0');
-                     const formatted = `${h}:${m}:${s}`;
-                     // console.log(` -> Formatted as string: ${formatted}`);
-                     return formatted;
+                     return `${h}:${m}:${s}`;
                  } catch(e) {
                       console.error(`Error parsing pre-formatted duration for ${columnName}:`, durationString, e);
                       return "Invalid";
                  }
             }
-            // If neither format works, return blank
+            // If neither format matches, return blank
             else {
-                console.log(` -> Column: ${columnName}, Input: "${durationString}" -> Not a valid positive number or HH:MM:SS format (returning blank)`);
+                console.warn(` -> Column: ${columnName}, Input: "${durationString}" -> Unrecognized format (returning blank)`);
                 return "";
             }
         }
-        // ****** END UPDATED formatDuration ******
+        // ****** END REVISED formatDuration ******
 
         function formatMillisecondsToDuration(ms) {
             if (isNaN(ms) || ms <= 0) return "";
