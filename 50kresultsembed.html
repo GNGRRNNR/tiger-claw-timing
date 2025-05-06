@@ -126,8 +126,8 @@
         const RESULTS_50K_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTHGEvgy3yNGS0uV48XNrMGnbbZNorOFTx6YO0Q7dwrGkgvCkAYt2p6644uScSDqee14uVB8-0xhSGy/pub?gid=1613674231&single=true&output=csv';
         const RESULTS_ASCENT_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTHGEvgy3yNGS0uV48XNrMGnbbZNorOFTx6YO0Q7dwrGkgvCkAYt2p6644uScSDqee14uVB8-0xhSGy/pub?gid=619464822&single=true&output=csv';
         const REFRESH_INTERVAL_MS = 45 * 1000;
-        const RACE_START_TIME_50K_MS = Date.UTC(2025, 4, 10, 14, 0, 0); // May 10, 2025 7:00 AM PST
-        const RACE_START_TIME_ASCENT_MS = Date.UTC(2025, 4, 9, 18 + 7, 0, 0); // May 9, 2025 6:00 PM PST (PST=UTC-7 during DST)
+        const RACE_START_TIME_50K_MS = Date.UTC(2025, 3, 30, 14, 0, 0); // May 10, 2025 7:00 AM PST
+        const RACE_START_TIME_ASCENT_MS = Date.UTC(2025, 3, 29, 18 + 7, 0, 0); // May 9, 2025 6:00 PM PST (PST=UTC-7 during DST)
         const COL_50K = { BIB: 0, NAME: 1, STATUS: 2, GREEN_CP: 3, LOOP1_COLOR: 4, LOOP1_BOTTOM: 5, LOOP1_TOP: 6, LOOP1_ELAPSED: 7, DESC1_ELAPSED: 8, LOOP2_COLOR: 9, LOOP2_BOTTOM: 10, LOOP2_TOP: 11, LOOP2_ELAPSED: 12, DESC2_ELAPSED: 13, LOOP3_COLOR: 14, LOOP3_BOTTOM: 15, LOOP3_TOP: 16, LOOP3_ELAPSED: 17, DESC3_ELAPSED: 18, RED_CP: 19, FINISH_SCAN: 20, FINISH_ELAPSED: 21 };
         const COL_ASCENT = { BIB: 0, NAME: 1, STATUS: 2, FINISH_SCAN: 3, FINISH_ELAPSED: 4 }; // Maps to published Ascent Results CSV
         // --- End Configuration ---
@@ -200,86 +200,44 @@
             });
 
             // Process Ascent Data (combines runner list with results CSV)
-            calculatedAscentData = allAscentRunnerList.map(runner => {
-                const resultRow = Array(5).fill(''); // Bib, Name, Status, Finish Scan, Finish Elapsed
-                resultRow[COL_ASCENT.BIB] = runner.bib;
-                resultRow[COL_ASCENT.NAME] = runner.name;
+            calculatedAscentData = allAscentRunnerList.map(runnerFromList => {
+                const resultEntry = Array(Object.keys(COL_ASCENT).length).fill('');
+                resultEntry[COL_ASCENT.BIB] = runnerFromList.bib;
+                resultEntry[COL_ASCENT.NAME] = runnerFromList.name;
 
                 // Find this runner in the Ascent results CSV (finishers)
-                const finisherData = allAscentResultsFromCSV.find(csvRow => String(csvRow[COL_ASCENT.BIB]).trim() === String(runner.bib).trim());
+                const finisherData = allAscentResultsFromCSV.find(csvRow => String(csvRow[COL_ASCENT.BIB]).trim() === String(runnerFromList.bib).trim());
 
                 let finishScanTime = null;
-                let finishElapsedMs = null;
+                let finishElapsedMs = null; // This will store milliseconds
 
                 if (finisherData) {
                     finishScanTime = finisherData[COL_ASCENT.FINISH_SCAN]; // Get from CSV
-                    // Try to use pre-calculated elapsed from CSV, otherwise calculate
-                    const csvElapsed = finisherData[COL_ASCENT.FINISH_ELAPSED];
-                    if (csvElapsed && !String(csvElapsed).startsWith('-')) { // If CSV has a positive duration
-                         // We will format this using formatDurationFromCSV later
-                         resultRow[COL_ASCENT.FINISH_ELAPSED] = csvElapsed;
-                    } else { // Calculate if CSV elapsed is missing or negative
-                        const finishScanMsFromCSV = getTimeMs(finishScanTime);
-                        if (finishScanMsFromCSV && finishScanMsFromCSV > RACE_START_TIME_ASCENT_MS) {
-                            finishElapsedMs = finishScanMsFromCSV - RACE_START_TIME_ASCENT_MS;
-                            resultRow[COL_ASCENT.FINISH_ELAPSED] = finishElapsedMs; // Store ms for formatMillisecondsToDuration
-                        }
+                    resultEntry[COL_ASCENT.FINISH_SCAN] = finishScanTime; // Store raw scan time
+
+                    // Calculate elapsed time in JS
+                    const finishScanMsFromCSV = getTimeMs(finishScanTime);
+                    if (finishScanMsFromCSV && finishScanMsFromCSV > RACE_START_TIME_ASCENT_MS) {
+                        finishElapsedMs = finishScanMsFromCSV - RACE_START_TIME_ASCENT_MS;
                     }
-                    resultRow[COL_ASCENT.FINISH_SCAN] = finishScanTime;
-                }
-
-
-                // Determine Status
-                if (runner.status && runner.status.toUpperCase() === "DNS") {
-                    resultRow[COL_ASCENT.STATUS] = "DNS";
-                } else if (runner.status && runner.status.toUpperCase() === "DNF") {
-                    resultRow[COL_ASCENT.STATUS] = "DNF";
-                } else if (finishScanTime && formatTime(finishScanTime)) { // Check if there's a valid finish scan time
-                    resultRow[COL_ASCENT.STATUS] = "FINISHED";
+                    resultEntry[COL_ASCENT.FINISH_ELAPSED] = finishElapsedMs; // Store calculated ms
+                    resultEntry[COL_ASCENT.STATUS] = "FINISHED"; // If in results CSV, they finished
                 } else {
-                    resultRow[COL_ASCENT.STATUS] = "Active";
+                    // If not in results CSV, use status from runner list
+                    resultEntry[COL_ASCENT.STATUS] = runnerFromList.status || "Active";
                 }
-                return resultRow;
+                 // Override with DNS/DNF if present in runner list (takes precedence)
+                if (runnerFromList.status && (runnerFromList.status.toUpperCase() === "DNS" || runnerFromList.status.toUpperCase() === "DNF")) {
+                    resultEntry[COL_ASCENT.STATUS] = runnerFromList.status.toUpperCase();
+                }
+                return resultEntry;
             });
             console.log("Finished processing all data.");
         }
         // ****** END UPDATED processData ******
 
-        function identifyDualRunners() {
-            dualRunnerNames.clear();
-            const ascentNames = new Set(allAscentRunnerList.map(r => normalizeName(r.name)));
-            const fiftyKNames = new Set(all50kRunnerList.map(r => normalizeName(r.name)));
-
-            if (fiftyKNames.size > 0 && ascentNames.size > 0) {
-                fiftyKNames.forEach(name => {
-                    if (ascentNames.has(name)) {
-                        dualRunnerNames.add(name);
-                    }
-                });
-            }
-            console.log(`50k Runner Names Set Count: ${fiftyKNames.size}`);
-            console.log(`Ascent Runner Names Set Count: ${ascentNames.size}`);
-            console.log(`Identified ${dualRunnerNames.size} dual runners (by name):`, dualRunnerNames);
-        }
-
-        function filterAndSortData() {
-            const sourceData = (activeTab === '50k') ? calculated50kData : calculatedAscentData;
-            const cols = (activeTab === '50k') ? COL_50K : COL_ASCENT;
-            let filteredData = sourceData;
-            if (currentFilter) { const lowerCaseFilter = currentFilter.toLowerCase(); filteredData = sourceData.filter(row => { const bib = String(row[cols.BIB] || '').toLowerCase(); const name = String(row[cols.NAME] || '').toLowerCase(); return bib.includes(lowerCaseFilter) || name.includes(lowerCaseFilter); }); }
-            const { column, direction } = currentSort; const sortMultiplier = direction === 'asc' ? 1 : -1;
-            const sortColIndex = cols[column.toUpperCase()];
-            if (sortColIndex === undefined) { console.warn(`Sort column ${column} not found for ${activeTab}, defaulting to bib.`); currentSort.column = 'bib'; return filterAndSortData(); }
-            filteredData.sort((a, b) => {
-                let valA = a[sortColIndex]; let valB = b[sortColIndex];
-                if (column === 'bib') { valA = parseInt(valA || '0', 10); valB = parseInt(valB || '0', 10); }
-                else if (column.includes('_cp') || column.includes('_scan')) { valA = getTimeMs(valA) ?? (direction === 'asc' ? Infinity : -Infinity); valB = getTimeMs(valB) ?? (direction === 'asc' ? Infinity : -Infinity); }
-                else if (column.includes('_elapsed')) { valA = valA ?? (direction === 'asc' ? Infinity : -Infinity); valB = valB ?? (direction === 'asc' ? Infinity : -Infinity); } // These are now ms
-                else { valA = String(valA || '').toLowerCase(); valB = String(valB || '').toLowerCase(); }
-                if (valA < valB) return -1 * sortMultiplier; if (valA > valB) return 1 * sortMultiplier; return 0;
-            });
-            return filteredData;
-        }
+        function identifyDualRunners() { /* ... same as before ... */ dualRunnerNames.clear(); if (all50kRunnerNames.size > 0 && allAscentRunnerNames.size > 0) { all50kRunnerNames.forEach(name => { if (allAscentRunnerNames.has(name)) { dualRunnerNames.add(name); } }); } console.log(`50k Runner Names Set Count: ${all50kRunnerNames.size}`); console.log(`Ascent Runner Names Set Count: ${allAscentRunnerNames.size}`); console.log(`Identified ${dualRunnerNames.size} dual runners (by name):`, dualRunnerNames); }
+        function filterAndSortData() { const sourceData = (activeTab === '50k') ? calculated50kData : calculatedAscentData; const cols = (activeTab === '50k') ? COL_50K : COL_ASCENT; let filteredData = sourceData; if (currentFilter) { const lowerCaseFilter = currentFilter.toLowerCase(); filteredData = sourceData.filter(row => { const bib = String(row[cols.BIB] || '').toLowerCase(); const name = String(row[cols.NAME] || '').toLowerCase(); return bib.includes(lowerCaseFilter) || name.includes(lowerCaseFilter); }); } const { column, direction } = currentSort; const sortMultiplier = direction === 'asc' ? 1 : -1; const sortColIndex = cols[column.toUpperCase()]; if (sortColIndex === undefined) { console.warn(`Sort column ${column} not found for ${activeTab}, defaulting to bib.`); currentSort.column = 'bib'; return filterAndSortData(); } filteredData.sort((a, b) => { let valA = a[sortColIndex]; let valB = b[sortColIndex]; if (column === 'bib') { valA = parseInt(valA || '0', 10); valB = parseInt(valB || '0', 10); } else if (column.includes('_cp') || column.includes('_scan')) { valA = getTimeMs(valA) ?? (direction === 'asc' ? Infinity : -Infinity); valB = getTimeMs(valB) ?? (direction === 'asc' ? Infinity : -Infinity); } else if (column.includes('_elapsed')) { valA = valA ?? (direction === 'asc' ? Infinity : -Infinity); valB = valB ?? (direction === 'asc' ? Infinity : -Infinity); } else { valA = String(valA || '').toLowerCase(); valB = String(valB || '').toLowerCase(); } if (valA < valB) return -1 * sortMultiplier; if (valA > valB) return 1 * sortMultiplier; return 0; }); return filteredData; }
 
         // --- UI Update Functions ---
         function updateTable() {
@@ -391,16 +349,27 @@
 
                     if (finisherData) {
                         resultEntry[COL_ASCENT.FINISH_SCAN] = finisherData[COL_ASCENT.FINISH_SCAN];
-                        // Calculate elapsed time in JS, ignore CSV value for consistency
-                        const finishScanMs = getTimeMs(finisherData[COL_ASCENT.FINISH_SCAN]);
-                        if (finishScanMs && finishScanMs > RACE_START_TIME_ASCENT_MS) {
-                            resultEntry[COL_ASCENT.FINISH_ELAPSED] = finishScanMs - RACE_START_TIME_ASCENT_MS;
+                        // Calculate elapsed time in JS, using the value from CSV if it's a valid duration string, otherwise calculate
+                        const csvElapsed = finisherData[COL_ASCENT.FINISH_ELAPSED];
+                        let finishElapsedMs = null;
+                        if (csvElapsed && !String(csvElapsed).startsWith('-') && /^\d{1,3}:\d{2}:\d{2}(\.\d+)?$/.test(String(csvElapsed).trim())) {
+                            // If CSV provides a valid HH:MM:SS, parse that to ms for consistency in calculatedData
+                            try {
+                                const parts = String(csvElapsed).trim().split(':');
+                                finishElapsedMs = ((+parts[0])*3600 + (+parts[1])*60 + (+parseFloat(parts[2] || 0))) * 1000;
+                            } catch (e) { finishElapsedMs = null; }
                         }
-                        resultEntry[COL_ASCENT.STATUS] = "FINISHED"; // If in results CSV, they finished
+                        if (finishElapsedMs === null) { // Fallback to calculating from scan time
+                            const finishScanMsFromCSV = getTimeMs(resultEntry[COL_ASCENT.FINISH_SCAN]);
+                            if (finishScanMsFromCSV && finishScanMsFromCSV > RACE_START_TIME_ASCENT_MS) {
+                                finishElapsedMs = finishScanMsFromCSV - RACE_START_TIME_ASCENT_MS;
+                            }
+                        }
+                        resultEntry[COL_ASCENT.FINISH_ELAPSED] = finishElapsedMs;
+                        resultEntry[COL_ASCENT.STATUS] = "FINISHED";
                     } else {
-                        resultEntry[COL_ASCENT.STATUS] = runnerFromList.status || "Active"; // From runner list
+                        resultEntry[COL_ASCENT.STATUS] = runnerFromList.status || "Active";
                     }
-                     // Override with DNS/DNF if present in runner list
                     if (runnerFromList.status && (runnerFromList.status.toUpperCase() === "DNS" || runnerFromList.status.toUpperCase() === "DNF")) {
                         resultEntry[COL_ASCENT.STATUS] = runnerFromList.status.toUpperCase();
                     }
