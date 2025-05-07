@@ -20,12 +20,10 @@ const loadingSpinnerElement = document.getElementById('loadingSpinner');
 const manualBibInput = document.getElementById('manualBibInput');
 const manualSubmitButton = document.getElementById('manualSubmitButton');
 const recentScansListElement = document.getElementById('recentScansList');
-// const installButton = document.getElementById('installButton'); // REMOVED
 const statsDisplayElement = document.getElementById('statsDisplay');
-// const iosInstallInstructionsElement = document.getElementById('iosInstallInstructions'); // REMOVED
+const flashOverlayElement = document.getElementById('flashOverlay');
 const refreshStatsButton = document.getElementById('refreshStatsButton');
-// const appContainerElement = document.getElementById('appContainer'); // REMOVED - Using overlay flash
-const flashOverlayElement = document.getElementById('flashOverlay'); // Using overlay again
+const scanSoundElement = document.getElementById('scanSound'); // Added audio element
 
 // --- App State ---
 let html5QrCode = null;
@@ -40,7 +38,7 @@ let recentScans = [];
 let syncIntervalId = null;
 let runnerRefreshIntervalId = null;
 // let deferredInstallPrompt = null; // REMOVED
-let toneJsStarted = false;
+let toneJsStarted = false; // Keep for potential future use or if Tone.start() is still needed for iOS audio policy
 let isFetchingScanCount = false;
 let isFetchingRunners = false;
 
@@ -48,7 +46,7 @@ let isFetchingRunners = false;
 window.addEventListener('load', async () => {
     showStatus('Initializing application...', 'info');
     setupServiceWorker();
-    // setupInstallButton(); // REMOVED Call <-- This line is removed
+    // setupInstallButton(); // REMOVED Call
     handleOnlineStatus();
     window.addEventListener('online', handleOnlineStatus);
     window.addEventListener('offline', handleOnlineStatus);
@@ -89,13 +87,22 @@ window.addEventListener('load', async () => {
     // --- Setup Event Listeners ---
     if (scanButton) {
         scanButton.addEventListener('click', () => {
-            startToneContext();
+            // For iOS, audio context often needs to be started by a user gesture
+            // even if not using Tone.js directly for playback.
+            if (typeof Tone !== 'undefined' && Tone.context.state !== 'running') {
+                Tone.start().then(() => console.log("Audio context started by scan button."));
+            }
             if (isScanning) stopScanning(); else startScanning();
         });
     } else { console.error("Scan button not found!"); }
 
     if (manualSubmitButton) {
-        manualSubmitButton.addEventListener('click', handleManualSubmit);
+        manualSubmitButton.addEventListener('click', () => {
+            if (typeof Tone !== 'undefined' && Tone.context.state !== 'running') {
+                Tone.start().then(() => console.log("Audio context started by manual submit."));
+            }
+            handleManualSubmit();
+        });
     } else { console.error("Manual submit button not found!"); }
 
     if (refreshStatsButton) {
@@ -117,8 +124,6 @@ window.addEventListener('load', async () => {
 
 // --- PWA & Service Worker ---
 function setupServiceWorker() { if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').then(reg => console.log('SW registered:', reg.scope)).catch(err => console.error('SW registration failed:', err)); } }
-// function isIOS() { ... } // REMOVED
-// function setupInstallButton() { ... } // REMOVED
 
 
 // --- Network & Syncing ---
@@ -164,7 +169,10 @@ function onScanSuccess(decodedText, decodedResult) {
 // --- Manual Entry Handler ---
 // ****** UPDATED handleManualSubmit ******
 function handleManualSubmit() {
-    startToneContext();
+    // For iOS, audio context often needs to be started by a user gesture
+    if (typeof Tone !== 'undefined' && Tone.context.state !== 'running') {
+        Tone.start().then(() => console.log("Audio context started by manual submit."));
+    }
     const bibNumber = manualBibInput.value.trim();
     if (!bibNumber) { showStatus('Please enter a Bib Number.', 'error'); return; }
     if (!/^\d+$/.test(bibNumber)) { showStatus('Invalid Bib Number format.', 'error'); return; }
@@ -177,8 +185,8 @@ function handleManualSubmit() {
     playSound();
 
     // --- Process Scan ---
-    processScanData(bibNumber, timestamp, null);
-    manualBibInput.value = '';
+    processScanData(bibNumber, timestamp, null); // Call existing processing function
+    manualBibInput.value = ''; // Clear input after processing
 }
 // ****** END UPDATED handleManualSubmit ******
 
@@ -228,24 +236,45 @@ function addScanToRecentList(bib, timestamp, name) { const timeString = new Date
 function updateRecentScansUI() { recentScansListElement.innerHTML = ''; if (recentScans.length === 0) { recentScansListElement.innerHTML = '<li class="p-2 text-gray-500 italic">No scans yet.</li>'; return; } recentScans.forEach(scan => { const li = document.createElement('li'); li.className = 'p-2 border-b border-gray-200 last:border-b-0'; const nameText = scan.name && scan.name !== 'Unknown' ? ` (${scan.name})` : ''; li.textContent = `Bib: ${scan.bib}${nameText} at ${scan.time}`; recentScansListElement.appendChild(li); }); }
 
 // --- Flash Feedback ---
-// ****** UPDATED triggerFlashFeedback to use OVERLAY ******
 function triggerFlashFeedback() {
-    if (!flashOverlayElement) {
-        console.warn("Flash overlay element not found");
-        return;
-    }
+    if (!flashOverlayElement) { console.warn("Flash overlay element not found"); return; }
     flashOverlayElement.classList.add('visible');
-    setTimeout(() => {
-        flashOverlayElement.classList.remove('visible');
-    }, FLASH_DURATION_MS);
+    setTimeout(() => { flashOverlayElement.classList.remove('visible'); }, FLASH_DURATION_MS);
 }
-// ****** END UPDATED triggerFlashFeedback ******
-
 
 // --- Audio Handling ---
-// (startToneContext and playSound functions remain the same)
-async function startToneContext() { if (!toneJsStarted && typeof Tone !== 'undefined' && Tone.context.state !== 'running') { console.log('Attempting to start Tone.js Audio Context...'); try { await Tone.start(); toneJsStarted = true; console.log('Tone.js Audio Context started.'); } catch (e) { console.error('Failed to start Tone.js context:', e); showStatus('Warning: Could not enable audio chime.', 'warning'); } } }
-function playSound() { if (!toneJsStarted || typeof Tone === 'undefined' || Tone.context.state !== 'running') { console.warn("Cannot play sound: Context not ready."); return; } try { const synth = new Tone.Synth().toDestination(); synth.triggerAttackRelease("C5", "8n", Tone.now()); setTimeout(() => { if (synth && !synth.disposed) synth.dispose(); }, 500); } catch (soundError) { console.warn("Could not play sound:", soundError); } }
+// ****** UPDATED playSound to use HTML Audio Element ******
+async function startToneContext() {
+    // This function might still be useful if Tone.js is needed for other things
+    // or to help ensure audio can play on iOS after a user gesture.
+    if (!toneJsStarted && typeof Tone !== 'undefined' && Tone.context.state !== 'running') {
+        console.log('Attempting to start Tone.js Audio Context (for general audio readiness)...');
+        try {
+            await Tone.start();
+            toneJsStarted = true;
+            console.log('Tone.js Audio Context started.');
+        } catch (e) {
+            console.error('Failed to start Tone.js context:', e);
+        }
+    }
+}
+
+function playSound() {
+    if (scanSoundElement) {
+        scanSoundElement.currentTime = 0; // Rewind to start
+        scanSoundElement.play().catch(error => {
+            console.warn("Error playing custom sound:", error);
+            // Fallback to Tone.js synth if custom sound fails (optional)
+            // if (toneJsStarted && typeof Tone !== 'undefined' && Tone.context.state === 'running') {
+            // try { const synth = new Tone.Synth().toDestination(); synth.triggerAttackRelease("C5", "8n", Tone.now()); setTimeout(() => { if (synth && !synth.disposed) synth.dispose(); }, 500); }
+            // catch (soundError) { console.warn("Fallback Tone.js sound failed:", soundError); }
+            // }
+        });
+    } else {
+        console.warn("Scan sound element not found.");
+    }
+}
+// ****** END UPDATED playSound ******
 
 
 // --- Event Listeners ---
