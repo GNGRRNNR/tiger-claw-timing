@@ -3,7 +3,7 @@
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbznjmZnmSIhxIjpcAey4veFhYiP7-KR5lnbBR8VfkrwrOxk_lIzZ31BK62AvdAmli8/exec'; // <-- PASTE LATEST URL HERE!
 const SCAN_THROTTLE_MS = 1500;
 const SYNC_INTERVAL_MS = 30000;
-const MAX_RECENT_SCANS = 5;
+const MAX_RECENT_SCANS = 10; // ****** Increased recent scans shown ******
 const RUNNER_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const FLASH_DURATION_MS = 350;
 // --- End Configuration ---
@@ -23,7 +23,10 @@ const recentScansListElement = document.getElementById('recentScansList');
 const statsDisplayElement = document.getElementById('statsDisplay');
 const flashOverlayElement = document.getElementById('flashOverlay');
 const refreshStatsButton = document.getElementById('refreshStatsButton');
-const scanSoundElement = document.getElementById('scanSound'); // Added audio element
+const scanSoundElement = document.getElementById('scanSound');
+const muteButton = document.getElementById('muteButton'); // Mute button
+const speakerIcon = document.getElementById('speakerIcon'); // Speaker icon
+const mutedIcon = document.getElementById('mutedIcon'); // Muted icon
 
 // --- App State ---
 let html5QrCode = null;
@@ -37,16 +40,17 @@ let currentScanCount = 0;
 let recentScans = [];
 let syncIntervalId = null;
 let runnerRefreshIntervalId = null;
-// let deferredInstallPrompt = null; // REMOVED
-let toneJsStarted = false; // Keep for potential future use or if Tone.start() is still needed for iOS audio policy
+let toneJsStarted = false; // Still potentially needed for iOS audio policy activation
 let isFetchingScanCount = false;
 let isFetchingRunners = false;
+let isMuted = false; // Mute state
 
 // --- Initialization ---
 window.addEventListener('load', async () => {
     showStatus('Initializing application...', 'info');
     setupServiceWorker();
-    // setupInstallButton(); // REMOVED Call
+    loadMuteState(); // Load mute state from storage
+    updateMuteButtonIcon(); // Set initial icon state
     handleOnlineStatus();
     window.addEventListener('online', handleOnlineStatus);
     window.addEventListener('offline', handleOnlineStatus);
@@ -87,36 +91,34 @@ window.addEventListener('load', async () => {
     // --- Setup Event Listeners ---
     if (scanButton) {
         scanButton.addEventListener('click', () => {
-            // For iOS, audio context often needs to be started by a user gesture
-            // even if not using Tone.js directly for playback.
-            if (typeof Tone !== 'undefined' && Tone.context.state !== 'running') {
-                Tone.start().then(() => console.log("Audio context started by scan button."));
-            }
+            startToneContext(); // Ensure audio context is ready
             if (isScanning) stopScanning(); else startScanning();
         });
     } else { console.error("Scan button not found!"); }
 
     if (manualSubmitButton) {
         manualSubmitButton.addEventListener('click', () => {
-            if (typeof Tone !== 'undefined' && Tone.context.state !== 'running') {
-                Tone.start().then(() => console.log("Audio context started by manual submit."));
-            }
-            handleManualSubmit();
+             startToneContext(); // Ensure audio context is ready on manual submit too
+             handleManualSubmit();
         });
     } else { console.error("Manual submit button not found!"); }
 
     if (refreshStatsButton) {
         refreshStatsButton.addEventListener('click', handleRefreshStatsClick);
     } else { console.error("Refresh stats button not found!"); }
+
+    // ****** Add Mute Button Listener ******
+    if (muteButton) {
+         muteButton.addEventListener('click', toggleMute);
+    } else { console.error("Mute button not found!"); }
+    // *************************************
+
     // --- End Setup Event Listeners ---
 
 
     if (currentCheckpoint && currentRace) {
         showStatus('Ready. Enter Manual Bib or Start Scan.', 'info');
-        if (html5QrCode) { // Check if scanner initialized
-             scanButton.disabled = false;
-             scanButton.textContent = 'Start QR Code Scan';
-        }
+        if (html5QrCode) { scanButton.disabled = false; scanButton.textContent = 'Start QR Code Scan'; }
     } else {
         showStatus('Initialization incomplete due to config error.', 'error', true);
     }
@@ -160,19 +162,15 @@ function onScanSuccess(decodedText, decodedResult) {
     // --- Feedback ---
     triggerFlashFeedback(); // Trigger flash overlay
     if (navigator.vibrate) navigator.vibrate(150);
-    playSound();
+    playSound(); // Play sound (respects mute state)
 
     // --- Process Scan ---
     processScanData(bibNumber, timestamp, nameFromQR);
 }
 
 // --- Manual Entry Handler ---
-// ****** UPDATED handleManualSubmit ******
 function handleManualSubmit() {
-    // For iOS, audio context often needs to be started by a user gesture
-    if (typeof Tone !== 'undefined' && Tone.context.state !== 'running') {
-        Tone.start().then(() => console.log("Audio context started by manual submit."));
-    }
+    // startToneContext(); // Already called by event listener
     const bibNumber = manualBibInput.value.trim();
     if (!bibNumber) { showStatus('Please enter a Bib Number.', 'error'); return; }
     if (!/^\d+$/.test(bibNumber)) { showStatus('Invalid Bib Number format.', 'error'); return; }
@@ -182,13 +180,12 @@ function handleManualSubmit() {
     // --- Feedback ---
     triggerFlashFeedback(); // Trigger flash overlay
     if (navigator.vibrate) navigator.vibrate(100);
-    playSound();
+    playSound(); // Play sound (respects mute state)
 
     // --- Process Scan ---
-    processScanData(bibNumber, timestamp, null); // Call existing processing function
-    manualBibInput.value = ''; // Clear input after processing
+    processScanData(bibNumber, timestamp, null);
+    manualBibInput.value = '';
 }
-// ****** END UPDATED handleManualSubmit ******
 
 
 // --- Data Processing & Storage ---
@@ -243,38 +240,61 @@ function triggerFlashFeedback() {
 }
 
 // --- Audio Handling ---
-// ****** UPDATED playSound to use HTML Audio Element ******
 async function startToneContext() {
-    // This function might still be useful if Tone.js is needed for other things
-    // or to help ensure audio can play on iOS after a user gesture.
+    // Still useful for iOS audio policy activation
     if (!toneJsStarted && typeof Tone !== 'undefined' && Tone.context.state !== 'running') {
         console.log('Attempting to start Tone.js Audio Context (for general audio readiness)...');
-        try {
-            await Tone.start();
-            toneJsStarted = true;
-            console.log('Tone.js Audio Context started.');
-        } catch (e) {
-            console.error('Failed to start Tone.js context:', e);
-        }
+        try { await Tone.start(); toneJsStarted = true; console.log('Tone.js Audio Context started.'); }
+        catch (e) { console.error('Failed to start Tone.js context:', e); }
     }
 }
 
+// ****** UPDATED playSound to check mute state ******
 function playSound() {
+    if (isMuted) { // Check mute state first
+        console.log("Sound muted.");
+        return;
+    }
     if (scanSoundElement) {
         scanSoundElement.currentTime = 0; // Rewind to start
         scanSoundElement.play().catch(error => {
             console.warn("Error playing custom sound:", error);
-            // Fallback to Tone.js synth if custom sound fails (optional)
-            // if (toneJsStarted && typeof Tone !== 'undefined' && Tone.context.state === 'running') {
-            // try { const synth = new Tone.Synth().toDestination(); synth.triggerAttackRelease("C5", "8n", Tone.now()); setTimeout(() => { if (synth && !synth.disposed) synth.dispose(); }, 500); }
-            // catch (soundError) { console.warn("Fallback Tone.js sound failed:", soundError); }
-            // }
         });
     } else {
         console.warn("Scan sound element not found.");
     }
 }
 // ****** END UPDATED playSound ******
+
+// ****** NEW Mute Functionality ******
+function toggleMute() {
+    isMuted = !isMuted;
+    localStorage.setItem('scannerMuted', isMuted ? 'true' : 'false'); // Save state
+    updateMuteButtonIcon();
+    console.log(`Sound ${isMuted ? 'muted' : 'unmuted'}.`);
+    // Optionally provide feedback
+    showStatus(`Sound ${isMuted ? 'muted' : 'unmuted'}`, 'info');
+}
+
+function updateMuteButtonIcon() {
+    if (!muteButton || !speakerIcon || !mutedIcon) return;
+    if (isMuted) {
+        speakerIcon.classList.add('hidden');
+        mutedIcon.classList.remove('hidden');
+        muteButton.title = "Unmute Sound";
+    } else {
+        speakerIcon.classList.remove('hidden');
+        mutedIcon.classList.add('hidden');
+        muteButton.title = "Mute Sound";
+    }
+}
+
+function loadMuteState() {
+    const savedMuteState = localStorage.getItem('scannerMuted');
+    isMuted = savedMuteState === 'true'; // Default to false if not found or invalid
+    console.log(`Loaded mute state: ${isMuted}`);
+}
+// ****** END NEW Mute Functionality ******
 
 
 // --- Event Listeners ---
