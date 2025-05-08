@@ -3,7 +3,7 @@
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbznjmZnmSIhxIjpcAey4veFhYiP7-KR5lnbBR8VfkrwrOxk_lIzZ31BK62AvdAmli8/exec'; // <-- PASTE LATEST URL HERE!
 const SCAN_THROTTLE_MS = 1500;
 const SYNC_INTERVAL_MS = 30000;
-const MAX_RECENT_SCANS = 10; // ****** Increased recent scans shown ******
+const MAX_RECENT_SCANS = 10; // Increased recent scans shown
 const RUNNER_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const FLASH_DURATION_MS = 350;
 // --- End Configuration ---
@@ -40,7 +40,7 @@ let currentScanCount = 0;
 let recentScans = [];
 let syncIntervalId = null;
 let runnerRefreshIntervalId = null;
-let toneJsStarted = false; // Still potentially needed for iOS audio policy activation
+let toneJsStarted = false;
 let isFetchingScanCount = false;
 let isFetchingRunners = false;
 let isMuted = false; // Mute state
@@ -91,14 +91,14 @@ window.addEventListener('load', async () => {
     // --- Setup Event Listeners ---
     if (scanButton) {
         scanButton.addEventListener('click', () => {
-            startToneContext(); // Ensure audio context is ready
+            startToneContext();
             if (isScanning) stopScanning(); else startScanning();
         });
     } else { console.error("Scan button not found!"); }
 
     if (manualSubmitButton) {
         manualSubmitButton.addEventListener('click', () => {
-             startToneContext(); // Ensure audio context is ready on manual submit too
+             startToneContext();
              handleManualSubmit();
         });
     } else { console.error("Manual submit button not found!"); }
@@ -107,12 +107,9 @@ window.addEventListener('load', async () => {
         refreshStatsButton.addEventListener('click', handleRefreshStatsClick);
     } else { console.error("Refresh stats button not found!"); }
 
-    // ****** Add Mute Button Listener ******
     if (muteButton) {
          muteButton.addEventListener('click', toggleMute);
     } else { console.error("Mute button not found!"); }
-    // *************************************
-
     // --- End Setup Event Listeners ---
 
 
@@ -130,7 +127,7 @@ function setupServiceWorker() { if ('serviceWorker' in navigator) { navigator.se
 
 // --- Network & Syncing ---
 // (handleOnlineStatus, fetchRunnerData, fetchScanCount, syncOfflineScans remain the same)
-function handleOnlineStatus() { if (navigator.onLine) { connectionStatusElement.textContent = 'Online'; connectionStatusElement.className = 'absolute top-2 right-2 text-xs font-semibold px-2 py-1 rounded bg-green-100 text-green-800'; console.log('Status: Online'); if (currentCheckpoint && currentRace) { showStatus('Connection restored. Syncing & refreshing...', 'info'); syncOfflineScans(); fetchRunnerData(true); fetchScanCount(true); if (refreshStatsButton) refreshStatsButton.disabled = false; } else { showStatus('Online, but Checkpoint/Race missing in URL.', 'warning'); if (refreshStatsButton) refreshStatsButton.disabled = true; } } else { connectionStatusElement.textContent = 'Offline'; connectionStatusElement.className = 'absolute top-2 right-2 text-xs font-semibold px-2 py-1 rounded bg-yellow-100 text-yellow-800'; showStatus('Connection lost. Scans saved locally.', 'warning'); console.log('Status: Offline'); if (refreshStatsButton) refreshStatsButton.disabled = true; } }
+function handleOnlineStatus() { if (navigator.onLine) { connectionStatusElement.textContent = 'Online'; connectionStatusElement.className = 'text-xs font-semibold px-2 py-1 rounded bg-green-100 text-green-800'; console.log('Status: Online'); if (currentCheckpoint && currentRace) { showStatus('Connection restored. Syncing & refreshing...', 'info'); syncOfflineScans(); fetchRunnerData(true); fetchScanCount(true); if (refreshStatsButton) refreshStatsButton.disabled = false; } else { showStatus('Online, but Checkpoint/Race missing in URL.', 'warning'); if (refreshStatsButton) refreshStatsButton.disabled = true; } } else { connectionStatusElement.textContent = 'Offline'; connectionStatusElement.className = 'text-xs font-semibold px-2 py-1 rounded bg-yellow-100 text-yellow-800'; showStatus('Connection lost. Scans saved locally.', 'warning'); console.log('Status: Offline'); if (refreshStatsButton) refreshStatsButton.disabled = true; } }
 async function fetchRunnerData(force = false) { if (!currentRace || isFetchingRunners) return; if (!force && !navigator.onLine) return; isFetchingRunners = true; console.log(`Fetching runner data (force=${force})...`); if (force && refreshStatsButton && !isFetchingScanCount) refreshStatsButton.disabled = true; if (force) loadingSpinnerElement.classList.remove('hidden'); try { const getUrl = `${SCRIPT_URL}?action=getRunners&race=${encodeURIComponent(currentRace)}&t=${Date.now()}`; const response = await fetch(getUrl); if (!response.ok) { const errorText = await response.text(); console.error(`Error response (getRunners): ${errorText}`); showStatus(`Warning: Could not refresh runner list (${response.status}).`, 'warning'); return; } const data = await response.json(); if (data.status === 'success' && Array.isArray(data.runners)) { runnerData = data.runners; totalActiveRunners = runnerData.filter(r => !r.status || (r.status.toUpperCase() !== 'DNS' && r.status.toUpperCase() !== 'DNF')).length; console.log(`Refreshed runner data: ${runnerData.length} total, ${totalActiveRunners} active.`); updateStatsUI(); } else { console.error(`Invalid data format (getRunners): ${data.message || JSON.stringify(data)}`); showStatus(`Warning: Invalid runner data received.`, 'warning'); } } catch (error) { console.error('Error fetching runner data:', error); showStatus(`Error refreshing runners: ${error.message}.`, 'error'); } finally { isFetchingRunners = false; if (force && navigator.onLine && !isFetchingScanCount) refreshStatsButton.disabled = false; if (force) loadingSpinnerElement.classList.add('hidden'); } }
 async function fetchScanCount(force = false) { if (!currentRace || !currentCheckpoint || isFetchingScanCount) return; if (!force && !navigator.onLine) return; isFetchingScanCount = true; console.log(`Fetching scan count (force=${force})...`); if (force && refreshStatsButton && !isFetchingRunners) refreshStatsButton.disabled = true; if (force) loadingSpinnerElement.classList.remove('hidden'); try { const getUrl = `${SCRIPT_URL}?action=getScanCount&race=${encodeURIComponent(currentRace)}&checkpoint=${encodeURIComponent(currentCheckpoint)}&t=${Date.now()}`; const response = await fetch(getUrl); if (!response.ok) { const errorText = await response.text(); console.error(`Error response (getScanCount): ${errorText}`); showStatus(`Warning: Could not refresh scan count (${response.status}).`, 'warning'); return; } const data = await response.json(); if (data.status === 'success' && typeof data.scanCount === 'number') { currentScanCount = data.scanCount; console.log(`Refreshed scan count: ${currentScanCount}`); updateStatsUI(); } else { console.error(`Invalid data format (getScanCount): ${data.message || JSON.stringify(data)}`); showStatus(`Warning: Invalid scan count data received.`, 'warning'); } } catch (error) { console.error('Error fetching scan count:', error); showStatus(`Error refreshing scan count: ${error.message}.`, 'error'); } finally { isFetchingScanCount = false; if (force && navigator.onLine && !isFetchingRunners) refreshStatsButton.disabled = false; if (force) loadingSpinnerElement.classList.add('hidden'); } }
 async function syncOfflineScans() { if (!navigator.onLine) { console.log("Offline, skipping sync."); return; } try { const unsynced = await db.getUnsyncedScans(); if (unsynced.length === 0) { console.log("No unsynced scans."); return; } showStatus(`Syncing ${unsynced.length} saved scan(s)...`, 'info'); console.log("Attempting to sync:", unsynced); let allSynced = true; let successfullySyncedCount = 0; for (const scan of unsynced) { const success = await sendDataToSheet(scan.bib, scan.checkpoint, scan.timestamp, scan.race, scan.name); if (success) { await db.updateScanStatus(scan.id, 'synced'); console.log(`Synced scan ID: ${scan.id}`); successfullySyncedCount++; } else { allSynced = false; console.warn(`Failed to sync scan ID: ${scan.id}. Will retry later.`); break; } } if (allSynced && unsynced.length > 0) showStatus('Sync complete. All saved scans sent.', 'success'); else if (!allSynced) showStatus('Sync incomplete. Some scans failed to send. Will retry later.', 'warning'); /* Don't auto-fetch count: if (successfullySyncedCount > 0) fetchScanCount(true); */ } catch (error) { console.error('Error during sync process:', error); showStatus(`Error during sync: ${error.message}`, 'error'); } }
@@ -240,39 +237,24 @@ function triggerFlashFeedback() {
 }
 
 // --- Audio Handling ---
-async function startToneContext() {
-    // Still useful for iOS audio policy activation
-    if (!toneJsStarted && typeof Tone !== 'undefined' && Tone.context.state !== 'running') {
-        console.log('Attempting to start Tone.js Audio Context (for general audio readiness)...');
-        try { await Tone.start(); toneJsStarted = true; console.log('Tone.js Audio Context started.'); }
-        catch (e) { console.error('Failed to start Tone.js context:', e); }
-    }
-}
+async function startToneContext() { if (!toneJsStarted && typeof Tone !== 'undefined' && Tone.context.state !== 'running') { console.log('Attempting to start Tone.js Audio Context...'); try { await Tone.start(); toneJsStarted = true; console.log('Tone.js Audio Context started.'); } catch (e) { console.error('Failed to start Tone.js context:', e); } } }
 
 // ****** UPDATED playSound to check mute state ******
 function playSound() {
-    if (isMuted) { // Check mute state first
-        console.log("Sound muted.");
-        return;
-    }
+    if (isMuted) { console.log("Sound muted."); return; } // Check mute state
     if (scanSoundElement) {
-        scanSoundElement.currentTime = 0; // Rewind to start
-        scanSoundElement.play().catch(error => {
-            console.warn("Error playing custom sound:", error);
-        });
-    } else {
-        console.warn("Scan sound element not found.");
-    }
+        scanSoundElement.currentTime = 0;
+        scanSoundElement.play().catch(error => { console.warn("Error playing custom sound:", error); });
+    } else { console.warn("Scan sound element not found."); }
 }
 // ****** END UPDATED playSound ******
 
 // ****** NEW Mute Functionality ******
 function toggleMute() {
     isMuted = !isMuted;
-    localStorage.setItem('scannerMuted', isMuted ? 'true' : 'false'); // Save state
+    localStorage.setItem('scannerMuted', isMuted ? 'true' : 'false');
     updateMuteButtonIcon();
     console.log(`Sound ${isMuted ? 'muted' : 'unmuted'}.`);
-    // Optionally provide feedback
     showStatus(`Sound ${isMuted ? 'muted' : 'unmuted'}`, 'info');
 }
 
@@ -291,7 +273,7 @@ function updateMuteButtonIcon() {
 
 function loadMuteState() {
     const savedMuteState = localStorage.getItem('scannerMuted');
-    isMuted = savedMuteState === 'true'; // Default to false if not found or invalid
+    isMuted = savedMuteState === 'true';
     console.log(`Loaded mute state: ${isMuted}`);
 }
 // ****** END NEW Mute Functionality ******
