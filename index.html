@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#16a34a"/>
     <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="https://placehold.co/192x192/16a34a/ffffff?text=Icon"> <title>2025 TIGER CLAW TIMING</title>
+    <link rel="apple-touch-icon" href="https://placehold.co/192x192/16a34a/ffffff?text=Icon"> <title>TIGER CLAW TIMING</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
@@ -40,6 +40,13 @@
         #refreshStatsButton { background-color: #f3f4f6; color: #374151; border: 1px solid #d1d5db; padding: 0.3rem 0.8rem; font-size: 0.75rem; margin-left: 0.5rem; vertical-align: middle; border-radius: 0.375rem; }
         #refreshStatsButton:hover { background-color: #e5e7eb; }
         #refreshStatsButton:disabled { opacity: 0.5; cursor: not-allowed; }
+        /* Mute button style */
+        #muteButton {
+            background: none; border: none; padding: 0.25rem; cursor: pointer;
+            position: absolute; top: 0.5rem; right: 6rem; /* Adjust positioning */
+        }
+        #muteButton svg { width: 1.25rem; height: 1.25rem; fill: #6b7280; /* Gray */ }
+        #muteButton:hover svg { fill: #1f2937; /* Darker Gray */}
     </style>
 </head>
 <body class="bg-gray-100 flex flex-col items-center min-h-screen p-4">
@@ -47,9 +54,21 @@
     <div id="flashOverlay"></div>
 
     <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl relative transition-colors duration-200 ease-out">
-        <div id="connectionStatus" class="absolute top-2 right-2 text-xs font-semibold px-2 py-1 rounded"></div>
-        <h1 class="text-2xl font-bold text-center text-gray-800 mb-1">2025 TIGER CLAW TIMING</h1>
+        <div class="absolute top-2 right-2 flex items-center space-x-2">
+             <button id="muteButton" title="Toggle Sound">
+                 <svg id="speakerIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+                     <path d="M13.5 4.06c0-1.336-1.616-2.005-2.56-1.06l-4.5 4.5H4.508c-1.141 0-2.318.664-2.66 1.905A9.76 9.76 0 001.5 12c0 .898.121 1.768.348 2.595.341 1.24 1.518 1.905 2.66 1.905h1.932l4.5 4.5c.944.945 2.56.276 2.56-1.06V4.06zM18.584 5.106a.75.75 0 011.06 0c3.808 3.807 3.808 9.98 0 13.788a.75.75 0 11-1.06-1.06 8.25 8.25 0 000-11.668.75.75 0 010-1.06z" />
+                     <path d="M15.932 7.757a.75.75 0 011.061 0 6 6 0 010 8.486.75.75 0 01-1.06-1.061 4.5 4.5 0 000-6.364.75.75 0 010-1.06z" />
+                 </svg>
+                 <svg id="mutedIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 hidden">
+                     <path d="M13.5 4.06c0-1.336-1.616-2.005-2.56-1.06l-4.5 4.5H4.508c-1.141 0-2.318.664-2.66 1.905A9.76 9.76 0 001.5 12c0 .898.121 1.768.348 2.595.341 1.24 1.518 1.905 2.66 1.905h1.932l4.5 4.5c.944.945 2.56.276 2.56-1.06V4.06zM17.78 9.22a.75.75 0 10-1.06 1.06L18.44 12l-1.72 1.72a.75.75 0 101.06 1.06L19.5 13.06l1.72 1.72a.75.75 0 101.06-1.06L20.56 12l1.72-1.72a.75.75 0 10-1.06-1.06L19.5 10.94l-1.72-1.72z" />
+                 </svg>
+             </button>
+             <div id="connectionStatus" class="text-xs font-semibold px-2 py-1 rounded"></div>
+        </div>
+        <h1 class="text-2xl font-bold text-center text-gray-800 mb-1">TIGER CLAW TIMING</h1>
         <p id="checkpointDisplay" class="text-center text-lg font-semibold text-indigo-700 mb-4">Loading Checkpoint...</p>
+
         <div id="statsDisplay" class="text-center text-sm text-gray-600 mb-4 bg-gray-50 p-2 rounded-md">
             Runners Scanned: <span id="scannedCount" class="font-bold">?</span> / <span id="totalActiveRunners" class="font-bold">?</span>
             <span id="loadingSpinner" class="loader hidden"></span>
@@ -66,8 +85,7 @@
         <details class="mb-4 bg-gray-50 p-3 rounded-md border border-gray-200">
             <summary class="text-sm font-medium text-gray-700 cursor-pointer">Manual Bib Entry</summary>
             <div class="mt-3 flex items-center gap-2">
-                <label for="manualBibInput" class="sr-only">Bib Number:</label>
-                <input type="number" id="manualBibInput" placeholder="Bib #" class="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 w-24 flex-shrink">
+                <label for="manualBibInput" class="sr-only">Bib Number:</label> <input type="number" id="manualBibInput" placeholder="Bib #" class="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 w-24 flex-shrink">
                 <button id="manualSubmitButton" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md text-sm flex-shrink-0">
                     Submit
                 </button>
@@ -81,14 +99,14 @@
             <ul id="recentScansList" class="list-none p-0 m-0 max-h-40 overflow-y-auto bg-gray-50 border border-gray-200 rounded-md text-sm">
                 <li class="p-2 text-gray-500 italic">No scans yet.</li>
             </ul>
-             <p class="text-xs text-gray-500 mt-1">Shows the last 5 scans from this session.</p>
-        </div>
+             <p class="text-xs text-gray-500 mt-1">Shows the last 10 scans from this session.</p> </div>
     </div>
 
     <audio id="scanSound" preload="auto">
         <source src="sounds/tigerclawboop.wav" type="audio/wav">
         Your browser does not support the audio element.
     </audio>
+
     <script src="db.js"></script>
     <script src="app.js"></script>
 
