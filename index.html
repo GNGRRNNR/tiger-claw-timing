@@ -45,12 +45,10 @@
         /* Mute button style */
         #muteButton {
             background: none; border: none; padding: 0.25rem; cursor: pointer;
+            font-size: 1.25rem; /* Adjust emoji size */
+            line-height: 1; /* Prevent extra space */
         }
-        #muteButton svg { width: 1.25rem; height: 1.25rem; }
-        #muteButton .speaker-icon { fill: #6b7280; /* Gray */ }
-        #muteButton .muted-icon { fill: #ef4444; /* Red */ }
-        #muteButton:hover svg { fill: #1f2937; /* Darker Gray */}
-        /* Ensure main container is relative for absolute positioning inside */
+        /* Removed SVG specific styles */
         .main-container { position: relative; }
     </style>
 </head>
@@ -62,11 +60,7 @@
 
         <div class="absolute top-2 right-2 flex items-center space-x-2 z-10">
              <button id="muteButton" title="Toggle Sound">
-                 <svg id="speakerIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="speaker-icon">
-                     <path fill-rule="evenodd" clip-rule="evenodd" d="M13.293 3.293a1 1 0 0 1 1.414 0l6 6a1 1 0 0 1 0 1.414l-6 6a1 1 0 0 1-1.414-1.414L18.586 13H4a1 1 0 1 1 0-2h14.586l-4.293-4.293a1 1 0 0 1 0-1.414zM10 4a1 1 0 1 0-2 0v16a1 1 0 1 0 2 0V4z" fill="#6b7280"/> </svg>
-                 <svg id="mutedIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="muted-icon hidden">
-                     <path fill-rule="evenodd" clip-rule="evenodd" d="M10 4a1 1 0 1 0-2 0v16a1 1 0 1 0 2 0V4zm10.707 4.293a1 1 0 0 0-1.414-1.414L17 8.586l-2.293-2.293a1 1 0 0 0-1.414 1.414L15.586 10l-2.293 2.293a1 1 0 1 0 1.414 1.414L17 11.414l2.293 2.293a1 1 0 0 0 1.414-1.414L18.414 10l2.293-2.293z" fill="#ef4444"/> </svg>
-             </button>
+                 <span id="speakerIcon">🔊</span> <span id="mutedIcon" class="hidden">🔇</span> </button>
              <div id="connectionStatus" class="text-xs font-semibold px-2 py-1 rounded"></div>
         </div>
         <div class="pt-8">
