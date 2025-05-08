@@ -45,33 +45,32 @@
         /* Mute button style */
         #muteButton {
             background: none; border: none; padding: 0.25rem; cursor: pointer;
-            /* Position within the top-right container */
         }
         #muteButton svg { width: 1.25rem; height: 1.25rem; }
         #muteButton .speaker-icon { fill: #6b7280; /* Gray */ }
-        #muteButton .muted-icon { fill: #ef4444; /* Red for muted */ } /* Added red color */
+        #muteButton .muted-icon { fill: #ef4444; /* Red */ }
         #muteButton:hover svg { fill: #1f2937; /* Darker Gray */}
+        /* Ensure main container is relative for absolute positioning inside */
+        .main-container { position: relative; }
     </style>
 </head>
 <body class="bg-gray-100 flex flex-col items-center min-h-screen p-4">
 
     <div id="flashOverlay"></div>
 
-    <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl relative">
+    <div class="main-container bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl relative">
 
         <div class="absolute top-2 right-2 flex items-center space-x-2 z-10">
              <button id="muteButton" title="Toggle Sound">
                  <svg id="speakerIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="speaker-icon">
-                     <path d="M13.5 4.06c0-1.336-1.616-2.005-2.56-1.06l-4.5 4.5H4.508c-1.141 0-2.318.664-2.66 1.905A9.76 9.76 0 001.5 12c0 .898.121 1.768.348 2.595.341 1.24 1.518 1.905 2.66 1.905h1.932l4.5 4.5c.944.945 2.56.276 2.56-1.06V4.06zM18.584 5.106a.75.75 0 011.06 0c3.808 3.807 3.808 9.98 0 13.788a.75.75 0 11-1.06-1.06 8.25 8.25 0 000-11.668.75.75 0 010-1.06z" />
-                     <path d="M15.932 7.757a.75.75 0 011.061 0 6 6 0 010 8.486.75.75 0 01-1.06-1.061 4.5 4.5 0 000-6.364.75.75 0 010-1.06z" />
-                 </svg>
+                     <path fill-rule="evenodd" clip-rule="evenodd" d="M13.293 3.293a1 1 0 0 1 1.414 0l6 6a1 1 0 0 1 0 1.414l-6 6a1 1 0 0 1-1.414-1.414L18.586 13H4a1 1 0 1 1 0-2h14.586l-4.293-4.293a1 1 0 0 1 0-1.414zM10 4a1 1 0 1 0-2 0v16a1 1 0 1 0 2 0V4z" fill="#6b7280"/> </svg>
                  <svg id="mutedIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="muted-icon hidden">
-                     <path fill-rule="evenodd" d="M9.97 4.06a2.25 2.25 0 00-2.56 1.06L2.907 9.627a.75.75 0 01-.53.223H.75a.75.75 0 00-.75.75v3.75c0 .414.336.75.75.75h1.627a.75.75 0 01.53.223l4.503 4.503a2.25 2.25 0 002.56 1.06V4.06zM14.06 9.44a.75.75 0 10-1.06 1.06L14.69 12l-1.69 1.69a.75.75 0 001.06 1.06L15.75 13.06l1.69 1.69a.75.75 0 101.06-1.06L16.81 12l1.69-1.69a.75.75 0 00-1.06-1.06L15.75 10.94l-1.69-1.69z" clip-rule="evenodd" />
-                 </svg>
+                     <path fill-rule="evenodd" clip-rule="evenodd" d="M10 4a1 1 0 1 0-2 0v16a1 1 0 1 0 2 0V4zm10.707 4.293a1 1 0 0 0-1.414-1.414L17 8.586l-2.293-2.293a1 1 0 0 0-1.414 1.414L15.586 10l-2.293 2.293a1 1 0 1 0 1.414 1.414L17 11.414l2.293 2.293a1 1 0 0 0 1.414-1.414L18.414 10l2.293-2.293z" fill="#ef4444"/> </svg>
              </button>
              <div id="connectionStatus" class="text-xs font-semibold px-2 py-1 rounded"></div>
         </div>
-        <div class="pt-8"> <h1 class="text-2xl font-bold text-center text-gray-800 mb-1">TIGER CLAW TIMING</h1>
+        <div class="pt-8">
+            <h1 class="text-2xl font-bold text-center text-gray-800 mb-1">TIGER CLAW TIMING</h1>
             <p id="checkpointDisplay" class="text-center text-lg font-semibold text-indigo-700 mb-4">Loading Checkpoint...</p>
 
             <div id="statsDisplay" class="text-center text-sm text-gray-600 mb-4 bg-gray-50 p-2 rounded-md">
