@@ -24,9 +24,9 @@ const statsDisplayElement = document.getElementById('statsDisplay');
 const flashOverlayElement = document.getElementById('flashOverlay');
 const refreshStatsButton = document.getElementById('refreshStatsButton');
 const scanSoundElement = document.getElementById('scanSound');
-const muteButton = document.getElementById('muteButton'); // Mute button
-const speakerIcon = document.getElementById('speakerIcon'); // Speaker icon
-const mutedIcon = document.getElementById('mutedIcon'); // Muted icon
+const muteButton = document.getElementById('muteButton');
+const speakerIcon = document.getElementById('speakerIcon'); // Speaker emoji span
+const mutedIcon = document.getElementById('mutedIcon'); // Muted emoji span
 
 // --- App State ---
 let html5QrCode = null;
@@ -40,7 +40,7 @@ let currentScanCount = 0;
 let recentScans = [];
 let syncIntervalId = null;
 let runnerRefreshIntervalId = null;
-let toneJsStarted = false; // Still potentially needed for iOS audio policy activation
+let toneJsStarted = false;
 let isFetchingScanCount = false;
 let isFetchingRunners = false;
 let isMuted = false; // Mute state
@@ -273,7 +273,7 @@ function updateMuteButtonIcon() {
 
 function loadMuteState() {
     const savedMuteState = localStorage.getItem('scannerMuted');
-    isMuted = savedMuteState === 'true';
+    isMuted = savedMuteState === 'true'; // Default to false if not found or invalid
     console.log(`Loaded mute state: ${isMuted}`);
 }
 // ****** END NEW Mute Functionality ******
