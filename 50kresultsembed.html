@@ -80,15 +80,18 @@
                                 <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lp 1</th>
                                 <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L1 Bot</th>
                                 <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L1 Top</th>
-                                <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L1 Elapsed</th> <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">D1 Elapsed</th>
+                                <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="loop1_elapsed">L1 Elapsed<span class="sort-icon"></span></th>
+                                <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">D1 Elapsed</th>
                                 <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lp 2</th>
                                 <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L2 Bot</th>
                                 <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L2 Top</th>
-                                <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L2 Elapsed</th> <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">D2 Elapsed</th>
+                                <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="loop2_elapsed">L2 Elapsed<span class="sort-icon"></span></th>
+                                <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">D2 Elapsed</th>
                                 <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lp 3</th>
                                 <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L3 Bot</th>
                                 <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L3 Top</th>
-                                <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L3 Elapsed</th> <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">D3 Elapsed</th>
+                                <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="loop3_elapsed">L3 Elapsed<span class="sort-icon"></span></th>
+                                <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">D3 Elapsed</th>
                                 <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="red_cp">Red CP<span class="sort-icon"></span></th>
                                 <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="finish_scan">Finish Scan<span class="sort-icon"></span></th>
                                 <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="finish_elapsed">Total Time<span class="sort-icon"></span></th>
@@ -151,7 +154,6 @@
         const COL_ASCENT = { BIB: 0, NAME: 1, STATUS: 2, FINISH_SCAN: 3, FINISH_ELAPSED: 4 };
         // --- End Configuration ---
 
-        // --- DOM Elements ---
         const resultsBody50k = document.getElementById('resultsBody50k');
         const resultsBodyAscent = document.getElementById('resultsBodyAscent');
         const resultsBodyBigCat = document.getElementById('resultsBodyBigCat');
@@ -177,7 +179,6 @@
         const resultsAscentDiv = document.getElementById('resultsAscent');
         const resultsBigCatDiv = document.getElementById('resultsBigCat');
 
-        // --- App State ---
         let refreshIntervalId = null;
         let all50kDataFromCSV = []; let allAscentResultsFromCSV = [];
         let calculated50kData = []; let calculatedAscentData = [];
@@ -295,7 +296,7 @@
         function filterAndSortData() { const sourceData = (activeTab === '50k') ? calculated50kData : (activeTab === 'Ascent' ? calculatedAscentData : calculatedBigCatData); const cols = (activeTab === '50k') ? COL_50K : (activeTab === 'Ascent' ? COL_ASCENT : null); let filteredData = sourceData; if (currentFilter) { const lowerCaseFilter = currentFilter.toLowerCase(); filteredData = sourceData.filter(row => { const bib = String(activeTab !== 'BigCat' ? row[cols.BIB] : '').toLowerCase(); const name = String(row.name || (activeTab !== 'BigCat' ? row[cols.NAME] : '') || '').toLowerCase(); return bib.includes(lowerCaseFilter) || name.includes(lowerCaseFilter); }); } const { column, direction } = currentSort; const sortMultiplier = direction === 'asc' ? 1 : -1; filteredData.sort((a, b) => { let valA, valB; if (activeTab === 'BigCat') { valA = a[column]; valB = b[column]; } else { const sortColIndex = cols[column.toUpperCase()]; if (sortColIndex === undefined) { currentSort.column = 'bib'; return filterAndSortData(); } valA = a[sortColIndex]; valB = b[sortColIndex]; } if (column === 'bib') { valA = parseInt(valA || '0', 10); valB = parseInt(valB || '0', 10); } else if (column.includes('_cp') || column.includes('_scan')) { valA = getTimeMs(valA) ?? (direction === 'asc' ? Infinity : -Infinity); valB = getTimeMs(valB) ?? (direction === 'asc' ? Infinity : -Infinity); } else if (column.includes('_elapsed')) { valA = valA ?? (direction === 'asc' ? Infinity : -Infinity); valB = valB ?? (direction === 'asc' ? Infinity : -Infinity); } else { valA = String(valA || '').toLowerCase(); valB = String(valB || '').toLowerCase(); } if (valA < valB) return -1 * sortMultiplier; if (valA > valB) return 1 * sortMultiplier; return 0; }); return filteredData; }
 
         // --- UI Update Functions ---
-        // ****** updateTable now uses formatMillisecondsToDuration for all elapsed ******
+        // ****** UPDATED updateTable to use formatMillisecondsToDuration for all elapsed ******
         function updateTable() {
             const displayData = filterAndSortData();
             const is50k = activeTab === '50k'; const isAscent = activeTab === 'Ascent'; const isBigCat = activeTab === 'BigCat';
@@ -349,8 +350,44 @@
         function handleTabClick(event) { const clickedTab = event.currentTarget; const targetId = clickedTab.getAttribute('data-target'); tabButton50k.classList.toggle('active', targetId === 'results50k'); tabButtonAscent.classList.toggle('active', targetId === 'resultsAscent'); tabButtonBigCat.classList.toggle('active', targetId === 'resultsBigCat'); results50kDiv.classList.toggle('hidden', targetId !== 'results50k'); resultsAscentDiv.classList.toggle('hidden', targetId !== 'resultsAscent'); resultsBigCatDiv.classList.toggle('hidden', targetId !== 'resultsBigCat'); const newActiveTab = targetId.replace('results', ''); if (newActiveTab !== activeTab) { activeTab = newActiveTab; currentSort = (activeTab === 'BigCat') ? { column: 'cumulative_elapsed', direction: 'asc' } : { column: 'bib', direction: 'asc' }; console.log(`Switched to tab: ${activeTab}, reset sort to ${currentSort.column}`); } updateTable(); updateSortIcons(); }
 
         // --- Data Fetching ---
-        // (fetchAllData remains the same - calls processData and processBigCatData)
-        async function fetchAllData() { if (isFetching) { console.log("Fetch already in progress."); return; } isFetching = true; console.log("Fetching all data..."); if (loadingSpinner) loadingSpinner.classList.remove('hidden'); errorMessage.classList.add('hidden'); if (!RESULTS_50K_CSV_URL || RESULTS_50K_CSV_URL.includes('YOUR_PUBLISHED') || !RESULTS_ASCENT_CSV_URL || RESULTS_ASCENT_CSV_URL.includes('YOUR_PUBLISHED') || !APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('PASTE_APPS_SCRIPT')) { console.error("One or more URLs are not configured."); errorMessage.textContent = "Error: Required URLs not configured."; errorDetails.textContent = ""; errorMessage.classList.remove('hidden'); loadingMessage.classList.add('hidden'); resultsTableContainer50k.classList.add('hidden'); resultsTableContainerAscent.classList.add('hidden'); resultsTableContainerBigCat.classList.add('hidden'); isFetching = false; if (loadingSpinner) loadingSpinner.classList.add('hidden'); return; } try { const [res50kCSV, resAscentCSV, runners50kRes, runnersAscentRes] = await Promise.allSettled([ fetch(`${RESULTS_50K_CSV_URL}&t=${Date.now()}`), fetch(`${RESULTS_ASCENT_CSV_URL}&t=${Date.now()}`), fetch(`${APPS_SCRIPT_URL}?action=getRunners&race=50k&t=${Date.now()}`), fetch(`${APPS_SCRIPT_URL}?action=getRunners&race=Ascent&t=${Date.now()}`) ]); all50kRunnerList = []; all50kRunnerNames = new Set(); if (runners50kRes.status === 'fulfilled' && runners50kRes.value.ok) { const data = await runners50kRes.value.json(); if (data.status === 'success' && Array.isArray(data.runners)) { all50kRunnerList = data.runners.map(r => ({ bib: String(r.bib).trim(), name: String(r.name).trim(), status: String(r.status || '').trim() })); all50kRunnerNames = new Set(all50kRunnerList.map(r => normalizeName(r.name))); } else { console.error("Invalid 50k runner list data format"); } } else { console.error("Failed to fetch 50k runner list:", runners50kRes.reason || runners50kRes.value?.statusText); } allAscentRunnerList = []; allAscentRunnerNames = new Set(); if (runnersAscentRes.status === 'fulfilled' && runnersAscentRes.value.ok) { const data = await runnersAscentRes.value.json(); if (data.status === 'success' && Array.isArray(data.runners)) { allAscentRunnerList = data.runners.map(r => ({ bib: String(r.bib).trim(), name: String(r.name).trim(), status: String(r.status || '').trim() })); allAscentRunnerNames = new Set(allAscentRunnerList.map(r => normalizeName(r.name))); } else { console.error("Invalid Ascent runner list data format"); } } else { console.error("Failed to fetch Ascent runner list:", runnersAscentRes.reason || runnersAscentRes.value?.statusText); } identifyDualRunners(); if (res50kCSV.status === 'fulfilled' && res50kCSV.value.ok) { const csvData = await res50kCSV.value.text(); all50kDataFromCSV = parseCSV(csvData); calculated50kData = processData(all50kDataFromCSV, '50k'); } else { console.error("Failed to fetch 50k results CSV:", res50kCSV.reason || res50kCSV.value?.statusText); errorMessage.textContent = "Error loading 50k results."; errorMessage.classList.remove('hidden'); } if (resAscentCSV.status === 'fulfilled' && resAscentCSV.value.ok) { const csvData = await resAscentCSV.value.text(); allAscentResultsFromCSV = parseCSV(csvData); calculatedAscentData = processData(allAscentResultsFromCSV, 'Ascent'); } else { console.error("Failed to fetch Ascent results CSV:", resAscentCSV.reason || resAscentCSV.value?.statusText); errorMessage.textContent = "Error loading Ascent results."; errorMessage.classList.remove('hidden'); } processBigCatData(); updateTable(); updateSortIcons(); resultsTableContainer50k.classList.remove('hidden'); resultsTableContainerAscent.classList.remove('hidden'); resultsTableContainerBigCat.classList.remove('hidden'); loadingMessage.classList.add('hidden'); if (res50kCSV.status === 'fulfilled' && resAscentCSV.status === 'fulfilled' && runners50kRes.status === 'fulfilled' && runnersAscentRes.status === 'fulfilled') { errorMessage.classList.add('hidden'); } lastUpdatedElement.textContent = new Date().toLocaleTimeString(); } catch (error) { console.error('Error fetching/processing data:', error); errorMessage.textContent = "Error loading results. Displaying previous data."; errorDetails.textContent = `Details: ${error.message}`; errorMessage.classList.remove('hidden'); if (resultsTableContainer50k.classList.contains('hidden') && resultsTableContainerAscent.classList.contains('hidden')) { loadingMessage.classList.remove('hidden'); } } finally { isFetching = false; if (loadingSpinner) loadingSpinner.classList.add('hidden'); } }
+        // ****** UPDATED fetchAllData to use processData correctly ******
+        async function fetchAllData() {
+            if (isFetching) { console.log("Fetch already in progress."); return; }
+            isFetching = true; console.log("Fetching all data...");
+            if (loadingSpinner) loadingSpinner.classList.remove('hidden'); errorMessage.classList.add('hidden');
+            if (!RESULTS_50K_CSV_URL || RESULTS_50K_CSV_URL.includes('YOUR_PUBLISHED') || !RESULTS_ASCENT_CSV_URL || RESULTS_ASCENT_CSV_URL.includes('YOUR_PUBLISHED') || !APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('PASTE_APPS_SCRIPT')) { console.error("One or more URLs are not configured."); errorMessage.textContent = "Error: Required URLs not configured."; errorDetails.textContent = ""; errorMessage.classList.remove('hidden'); loadingMessage.classList.add('hidden'); resultsTableContainer50k.classList.add('hidden'); resultsTableContainerAscent.classList.add('hidden'); resultsTableContainerBigCat.classList.add('hidden'); isFetching = false; if (loadingSpinner) loadingSpinner.classList.add('hidden'); return; }
+
+            try {
+                const [res50kCSV, resAscentCSV, runners50kRes, runnersAscentRes] = await Promise.allSettled([
+                    fetch(`${RESULTS_50K_CSV_URL}&t=${Date.now()}`),
+                    fetch(`${RESULTS_ASCENT_CSV_URL}&t=${Date.now()}`),
+                    fetch(`${APPS_SCRIPT_URL}?action=getRunners&race=50k&t=${Date.now()}`),
+                    fetch(`${APPS_SCRIPT_URL}?action=getRunners&race=Ascent&t=${Date.now()}`)
+                ]);
+
+                all50kRunnerList = []; all50kRunnerNames = new Set();
+                if (runners50kRes.status === 'fulfilled' && runners50kRes.value.ok) { const data = await runners50kRes.value.json(); if (data.status === 'success' && Array.isArray(data.runners)) { all50kRunnerList = data.runners.map(r => ({ bib: String(r.bib).trim(), name: String(r.name).trim(), status: String(r.status || '').trim() })); all50kRunnerNames = new Set(all50kRunnerList.map(r => normalizeName(r.name))); } else { console.error("Invalid 50k runner list data format"); } } else { console.error("Failed to fetch 50k runner list:", runners50kRes.reason || runners50kRes.value?.statusText); }
+                allAscentRunnerList = []; allAscentRunnerNames = new Set();
+                if (runnersAscentRes.status === 'fulfilled' && runnersAscentRes.value.ok) { const data = await runnersAscentRes.value.json(); if (data.status === 'success' && Array.isArray(data.runners)) { allAscentRunnerList = data.runners.map(r => ({ bib: String(r.bib).trim(), name: String(r.name).trim(), status: String(r.status || '').trim() })); allAscentRunnerNames = new Set(allAscentRunnerList.map(r => normalizeName(r.name))); } else { console.error("Invalid Ascent runner list data format"); } } else { console.error("Failed to fetch Ascent runner list:", runnersAscentRes.reason || runnersAscentRes.value?.statusText); }
+
+                identifyDualRunners();
+
+                if (res50kCSV.status === 'fulfilled' && res50kCSV.value.ok) { const csvData = await res50kCSV.value.text(); all50kDataFromCSV = parseCSV(csvData); calculated50kData = processData(all50kDataFromCSV, '50k'); }
+                else { console.error("Failed to fetch 50k results CSV:", res50kCSV.reason || res50kCSV.value?.statusText); errorMessage.textContent = "Error loading 50k results."; errorMessage.classList.remove('hidden'); }
+
+                if (resAscentCSV.status === 'fulfilled' && resAscentCSV.value.ok) { const csvData = await resAscentCSV.value.text(); allAscentResultsFromCSV = parseCSV(csvData); calculatedAscentData = processData(allAscentResultsFromCSV, 'Ascent'); }
+                else { console.error("Failed to fetch Ascent results CSV:", resAscentCSV.reason || resAscentCSV.value?.statusText); errorMessage.textContent = "Error loading Ascent results."; errorMessage.classList.remove('hidden'); }
+
+                processBigCatData();
+                updateTable(); updateSortIcons();
+                resultsTableContainer50k.classList.remove('hidden'); resultsTableContainerAscent.classList.remove('hidden'); resultsTableContainerBigCat.classList.remove('hidden');
+                loadingMessage.classList.add('hidden');
+                if (res50kCSV.status === 'fulfilled' && resAscentCSV.status === 'fulfilled' && runners50kRes.status === 'fulfilled' && runnersAscentRes.status === 'fulfilled') { errorMessage.classList.add('hidden'); }
+                lastUpdatedElement.textContent = new Date().toLocaleTimeString();
+            } catch (error) { console.error('Error fetching/processing data:', error); errorMessage.textContent = "Error loading results. Displaying previous data."; errorDetails.textContent = `Details: ${error.message}`; errorMessage.classList.remove('hidden'); if (resultsTableContainer50k.classList.contains('hidden') && resultsTableContainerAscent.classList.contains('hidden')) { loadingMessage.classList.remove('hidden'); } }
+            finally { isFetching = false; if (loadingSpinner) loadingSpinner.classList.add('hidden'); }
+        }
+        // ****** END UPDATED fetchAllData ******
 
         // --- Initial Setup ---
         searchInput.addEventListener('input', handleFilterInput);
