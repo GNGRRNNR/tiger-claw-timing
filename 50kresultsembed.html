@@ -10,7 +10,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
-        /* Common table styles */
         th, td { padding: 0.5rem 0.5rem; text-align: left; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #f3f4f6; white-space: nowrap; }
         th:last-child, td:last-child { border-right: none; }
         th { background-color: #f9fafb; font-weight: 600; user-select: none; }
@@ -20,14 +19,12 @@
         th.sort-desc .sort-icon::after { content: ' ▼'; }
         tbody tr:nth-child(even) { background-color: #f9fafb; }
         tbody tr:hover { background-color: #f0f9ff; }
-        /* Status/Loop styles */
         .status-active { color: #059669; font-weight: 500; } .status-finished { color: #1d4ed8; font-weight: 500; } .status-dnf, .status-dns { color: #dc2626; font-weight: 500; }
         .loop-pink { background-color: #fce7f3; color: #831843; padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-size: 0.75rem; display: inline-block; margin: 0.1rem; }
         .loop-white { background-color: #f1f5f9; color: #1e293b; padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-size: 0.75rem; display: inline-block; margin: 0.1rem; border: 1px solid #cbd5e1;}
         .loop-yellow { background-color: #fef9c3; color: #713f12; padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-size: 0.75rem; display: inline-block; margin: 0.1rem; }
-        /* Utility styles */
         #loadingMessage, #errorMessage { text-align: center; padding: 1rem; font-weight: 500; }
-        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #4f46e5; border-radius: 50%; width: 1em; height: 1em; /* Smaller spinner */ animation: spin 1s linear infinite; display: inline-block; margin: 0 0.5rem; vertical-align: middle; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #4f46e5; border-radius: 50%; width: 1em; height: 1em; animation: spin 1s linear infinite; display: inline-block; margin: 0 0.5rem; vertical-align: middle; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         thead th { position: sticky; top: 0; z-index: 10; background-color: #f9fafb; }
         .hidden { display: none; }
@@ -56,6 +53,7 @@
                 <button id="tabButtonBigCat" type="button" class="tab-button" data-target="resultsBigCat">Big Cat</button>
             </nav>
         </div>
+
         <div class="mb-4">
             <label for="searchInput" class="sr-only">Search by Bib or Name:</label>
             <input type="text" id="searchInput" placeholder="Search by Bib or Name..." class="w-full md:w-1/2 lg:w-1/3 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
@@ -187,51 +185,85 @@
         let all50kRunnerList = []; let allAscentRunnerList = [];
         let all50kRunnerNames = new Set(); let allAscentRunnerNames = new Set();
         let dualRunnerNames = new Set();
-        let currentSort = { column: 'bib', direction: 'asc' }; // Default sort for initial tab
+        let currentSort = { column: 'bib', direction: 'asc' };
         let currentFilter = '';
         let isFetching = false;
-        let activeTab = '50k'; // Start with 50k tab
+        let activeTab = '50k';
 
         // --- Utility Functions ---
-        // (parseCSV, formatTime, formatMillisecondsToDuration, getStatusClass, createLoopSpan, getTimeMs, normalizeName remain the same)
         function parseCSV(csvText) { if (!csvText || typeof csvText !== 'string') return []; const lines = csvText.trim().split('\n'); return lines.slice(1).map(line => line.split(',').map(field => field.trim())); }
         function formatTime(dateTimeString) { if (!dateTimeString || dateTimeString.trim() === "") return ""; try { const date = new Date(dateTimeString); if (isNaN(date.getTime()) || date.getFullYear() < 1900) return ""; return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }); } catch (e) { return ""; } }
         function formatMillisecondsToDuration(ms) { if (ms === undefined || ms === null || isNaN(Number(ms)) || Number(ms) < 0) return ""; try { const totalMilliseconds = Number(ms); if (totalMilliseconds < 500) return "00:00:00"; const totalSeconds = Math.floor(totalMilliseconds / 1000); const hours = Math.floor(totalSeconds / 3600); const minutes = Math.floor((totalSeconds % 3600) / 60); const seconds = totalSeconds % 60; return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`; } catch (e) { console.error("Error formatting milliseconds:", ms, e); return "Invalid"; } }
-        function formatDurationFromCSV(durationInput) { if (durationInput === undefined || durationInput === null) return ""; const durationString = String(durationInput).trim(); if (durationString === "" || durationString.startsWith('-')) { return ""; } const numericValue = parseFloat(durationString); if (!isNaN(numericValue) && numericValue > 0 && numericValue < 100) { try { const ms = numericValue * 24 * 60 * 60 * 1000; return formatMillisecondsToDuration(ms); } catch (e) { return "Invalid"; } } else if (/^\d{1,3}:\d{2}:\d{2}(\.\d+)?$/.test(durationString)) { try { const parts = durationString.split(':'); const h = String(parts[0] || '0').padStart(2, '0'); const m = String(parts[1] || '0').padStart(2, '0'); const s = String(Math.floor(parseFloat(parts[2] || '0'))).padStart(2, '0'); return `${h}:${m}:${s}`; } catch(e) { return "Invalid"; } } else { return ""; } }
+        // This function now primarily expects a numeric fraction of a day from the CSV for loop/descent elapsed
+        function formatDurationFromCSV(durationInput, columnName = "Unknown") {
+            if (durationInput === undefined || durationInput === null) return "";
+            const durationString = String(durationInput).trim();
+            if (durationString === "" || durationString.startsWith('-')) { return ""; }
+
+            // console.log(`Formatting Duration from CSV - Column: ${columnName}, Input: "${durationString}", Type: ${typeof durationInput}`);
+            const numericValue = parseFloat(durationString);
+            if (!isNaN(numericValue) && numericValue > 0 && numericValue < 100) { // Check if numeric (fraction of day)
+                try { const ms = numericValue * 24 * 60 * 60 * 1000; return formatMillisecondsToDuration(ms); }
+                catch (e) { console.error(`Error formatting numeric duration from CSV for ${columnName}:`, durationString, e); return "Invalid"; }
+            }
+            // Fallback for pre-formatted HH:MM:SS strings (less expected for script-calculated values)
+            else if (/^\d{1,3}:\d{2}:\d{2}(\.\d+)?$/.test(durationString)) {
+                 try { const parts = durationString.split(':'); const h = String(parts[0] || '0').padStart(2, '0'); const m = String(parts[1] || '0').padStart(2, '0'); const s = String(Math.floor(parseFloat(parts[2] || '0'))).padStart(2, '0'); return `${h}:${m}:${s}`; }
+                 catch(e) { console.error(`Error parsing pre-formatted duration from CSV for ${columnName}:`, durationString, e); return "Invalid"; }
+            }
+            else { return ""; }
+        }
         function getStatusClass(status) { status = status.toUpperCase(); if (status === 'FINISHED') return 'status-finished'; if (status === 'DNF' || status === 'DNS') return 'status-dnf'; if (status === 'ACTIVE') return 'status-active'; return ''; }
         function createLoopSpan(color) { if (!color) return ''; color = color.toUpperCase(); let className = ''; if (color === 'PINK') className = 'loop-pink'; else if (color === 'WHITE') className = 'loop-white'; else if (color === 'YELLOW') className = 'loop-yellow'; else return ''; return `<span class="${className}">${color.substring(0,1)}</span>`; }
         function getTimeMs(dateString) { if (!dateString) return null; try { const date = new Date(dateString); return isNaN(date.getTime()) ? null : date.getTime(); } catch { return null; } }
         function normalizeName(name) { return String(name || '').trim().toUpperCase(); }
 
-
         // --- Data Processing Functions ---
-        // ****** UPDATED processData to handle both races ******
+        // ****** RESTORED processData to calculate all durations in JS ******
         function processData(rawData, raceType) {
-             console.log(`Processing ${raceType} raw data...`);
+             console.log(`Processing ${raceType} raw data (JS will calculate all durations)...`);
              const COL_MAP = raceType === '50k' ? COL_50K : COL_ASCENT;
              const START_TIME = raceType === '50k' ? RACE_START_TIME_50K_MS : RACE_START_TIME_ASCENT_MS;
 
              return rawData.map(row => {
                 const bib = row[COL_MAP.BIB] || '';
-                const processed = [...row]; // Create a mutable copy
-                const finishScanMs = getTimeMs(row[COL_MAP.FINISH_SCAN]);
+                // Create a new array for processed data, matching the structure of COL_MAP
+                const processed = Array(Object.keys(COL_MAP).length).fill(null);
 
-                // Calculate total elapsed time in ms ONLY
+                // Copy over non-calculated fields directly
+                processed[COL_MAP.BIB] = row[COL_MAP.BIB];
+                processed[COL_MAP.NAME] = row[COL_MAP.NAME];
+                processed[COL_MAP.STATUS] = row[COL_MAP.STATUS]; // Status from CSV
+                if (raceType === '50k') {
+                    processed[COL_MAP.GREEN_CP] = row[COL_MAP.GREEN_CP];
+                    processed[COL_MAP.LOOP1_COLOR] = row[COL_MAP.LOOP1_COLOR];
+                    processed[COL_MAP.LOOP1_BOTTOM] = row[COL_MAP.LOOP1_BOTTOM];
+                    processed[COL_MAP.LOOP1_TOP] = row[COL_MAP.LOOP1_TOP];
+                    processed[COL_MAP.LOOP2_COLOR] = row[COL_MAP.LOOP2_COLOR];
+                    processed[COL_MAP.LOOP2_BOTTOM] = row[COL_MAP.LOOP2_BOTTOM];
+                    processed[COL_MAP.LOOP2_TOP] = row[COL_MAP.LOOP2_TOP];
+                    processed[COL_MAP.LOOP3_COLOR] = row[COL_MAP.LOOP3_COLOR];
+                    processed[COL_MAP.LOOP3_BOTTOM] = row[COL_MAP.LOOP3_BOTTOM];
+                    processed[COL_MAP.LOOP3_TOP] = row[COL_MAP.LOOP3_TOP];
+                    processed[COL_MAP.RED_CP] = row[COL_MAP.RED_CP];
+                }
+                processed[COL_MAP.FINISH_SCAN] = row[COL_MAP.FINISH_SCAN];
+
+
+                // Calculate durations in Milliseconds
+                const finishScanMs = getTimeMs(row[COL_MAP.FINISH_SCAN]);
                 let totalElapsedMs = null;
                 if (finishScanMs && finishScanMs > START_TIME) {
                     totalElapsedMs = finishScanMs - START_TIME;
                 }
-                // Store calculated ms at the FINISH_ELAPSED index
-                // This overwrites the value from CSV if it existed
                 processed[COL_MAP.FINISH_ELAPSED] = totalElapsedMs;
 
-                // Only process loop/descent times for 50k
                 if (raceType === '50k') {
                     const l1BotMs = getTimeMs(row[COL_MAP.LOOP1_BOTTOM]); const l1TopMs = getTimeMs(row[COL_MAP.LOOP1_TOP]);
                     const l2BotMs = getTimeMs(row[COL_MAP.LOOP2_BOTTOM]); const l2TopMs = getTimeMs(row[COL_MAP.LOOP2_TOP]);
                     const l3BotMs = getTimeMs(row[COL_MAP.LOOP3_BOTTOM]); const l3TopMs = getTimeMs(row[COL_MAP.LOOP3_TOP]);
                     const redCpMs = getTimeMs(row[COL_MAP.RED_CP]);
-                    // Store calculated ms values, overwriting CSV values
+
                     processed[COL_MAP.LOOP1_ELAPSED] = (l1BotMs && l1TopMs && l1TopMs > l1BotMs) ? (l1TopMs - l1BotMs) : null;
                     processed[COL_MAP.DESC1_ELAPSED] = (l1TopMs && l2BotMs && l2BotMs > l1TopMs) ? (l2BotMs - l1TopMs) : null;
                     processed[COL_MAP.LOOP2_ELAPSED] = (l2BotMs && l2TopMs && l2TopMs > l2BotMs) ? (l2TopMs - l2BotMs) : null;
@@ -239,85 +271,34 @@
                     processed[COL_MAP.LOOP3_ELAPSED] = (l3BotMs && l3TopMs && l3TopMs > l3BotMs) ? (l3TopMs - l3BotMs) : null;
                     processed[COL_MAP.DESC3_ELAPSED] = (l3TopMs && redCpMs && redCpMs > l3TopMs) ? (redCpMs - l3TopMs) : null;
                 }
-                // console.log(`Bib ${bib} Processed: FinishElapsedMs=${processed[COL_MAP.FINISH_ELAPSED]}`); // Optional debug
+                // console.log(`Bib ${bib} (JS Processed): L1_E_ms=${processed[COL_50K.LOOP1_ELAPSED]}, Total_E_ms=${processed[COL_50K.FINISH_ELAPSED]}`);
                 return processed;
             });
         }
         // ****** END UPDATED processData ******
 
-        // (identifyDualRunners remains the same)
-        function identifyDualRunners() { dualRunnerNames.clear(); if (all50kRunnerNames.size > 0 && allAscentRunnerNames.size > 0) { all50kRunnerNames.forEach(name => { if (allAscentRunnerNames.has(name)) { dualRunnerNames.add(name); } }); } console.log(`50k Runner Names Set Count: ${all50kRunnerNames.size}`); console.log(`Ascent Runner Names Set Count: ${allAscentRunnerNames.size}`); console.log(`Identified ${dualRunnerNames.size} dual runners (by name):`, dualRunnerNames); }
-
-        // (processBigCatData remains the same - uses calculatedData)
+        function identifyDualRunners() { /* ... same as before ... */ dualRunnerNames.clear(); if (all50kRunnerNames.size > 0 && allAscentRunnerNames.size > 0) { all50kRunnerNames.forEach(name => { if (allAscentRunnerNames.has(name)) { dualRunnerNames.add(name); } }); } console.log(`50k Runner Names Set Count: ${all50kRunnerNames.size}`); console.log(`Ascent Runner Names Set Count: ${allAscentRunnerNames.size}`); console.log(`Identified ${dualRunnerNames.size} dual runners (by name):`, dualRunnerNames); }
         function processBigCatData() {
-            console.log("Processing Big Cat data...");
-            calculatedBigCatData = [];
+            console.log("Processing Big Cat data..."); calculatedBigCatData = [];
             dualRunnerNames.forEach(name => {
                 const ascentResult = calculatedAscentData.find(row => normalizeName(row[COL_ASCENT.NAME]) === name);
                 const fiftyKResult = calculated50kData.find(row => normalizeName(row[COL_50K.NAME]) === name);
                 if (ascentResult && fiftyKResult) {
-                    const ascentTimeMs = ascentResult[COL_ASCENT.FINISH_ELAPSED]; // Use calculated ms
-                    const fiftyKTimeMs = fiftyKResult[COL_50K.FINISH_ELAPSED]; // Use calculated ms
+                    const ascentTimeMs = ascentResult[COL_ASCENT.FINISH_ELAPSED]; const fiftyKTimeMs = fiftyKResult[COL_50K.FINISH_ELAPSED];
                     let cumulativeMs = null; let status = "In Progress";
                     if (ascentTimeMs && fiftyKTimeMs) { cumulativeMs = ascentTimeMs + fiftyKTimeMs; status = "FINISHED"; }
                     else if ((ascentResult[COL_ASCENT.STATUS] === 'DNF' || ascentResult[COL_ASCENT.STATUS] === 'DNS') || (fiftyKResult[COL_50K.STATUS] === 'DNF' || fiftyKResult[COL_50K.STATUS] === 'DNS')) { status = "DNF/DNS"; }
                     calculatedBigCatData.push({ name: ascentResult[COL_ASCENT.NAME], ascent_elapsed: ascentTimeMs, fiftyk_elapsed: fiftyKTimeMs, cumulative_elapsed: cumulativeMs, status: status });
                 } else { console.warn(`Could not find matching results for dual runner: ${name}`); }
-            });
-             console.log(`Processed ${calculatedBigCatData.length} Big Cat runners.`);
+            }); console.log(`Processed ${calculatedBigCatData.length} Big Cat runners.`);
         }
-
-        // ****** UPDATED filterAndSortData ******
-        function filterAndSortData() {
-            let sourceData, cols;
-            if (activeTab === '50k') { sourceData = calculated50kData; cols = COL_50K; }
-            else if (activeTab === 'Ascent') { sourceData = calculatedAscentData; cols = COL_ASCENT; }
-            else { sourceData = calculatedBigCatData; cols = null; } // Big Cat uses object keys
-
-            let filteredData = sourceData;
-            if (currentFilter) {
-                const lowerCaseFilter = currentFilter.toLowerCase();
-                filteredData = sourceData.filter(row => {
-                    const bib = String(activeTab !== 'BigCat' ? row[cols.BIB] : '').toLowerCase(); // Big Cat doesn't have bib
-                    const name = String(row.name || (activeTab !== 'BigCat' ? row[cols.NAME] : '') || '').toLowerCase();
-                    return bib.includes(lowerCaseFilter) || name.includes(lowerCaseFilter);
-                });
-            }
-
-            const { column, direction } = currentSort;
-            const sortMultiplier = direction === 'asc' ? 1 : -1;
-
-            filteredData.sort((a, b) => {
-                let valA, valB;
-                // Get values based on active tab and column key
-                if (activeTab === 'BigCat') {
-                    valA = a[column]; valB = b[column]; // Access directly by key
-                } else {
-                    const sortColIndex = cols[column.toUpperCase()];
-                    if (sortColIndex === undefined) { currentSort.column = 'bib'; return filterAndSortData(); }
-                    valA = a[sortColIndex]; valB = b[sortColIndex];
-                }
-
-                // Apply sorting logic
-                if (column === 'bib') { valA = parseInt(valA || '0', 10); valB = parseInt(valB || '0', 10); }
-                else if (column.includes('_cp') || column.includes('_scan')) { valA = getTimeMs(valA) ?? (direction === 'asc' ? Infinity : -Infinity); valB = getTimeMs(valB) ?? (direction === 'asc' ? Infinity : -Infinity); }
-                else if (column.includes('_elapsed')) { valA = valA ?? (direction === 'asc' ? Infinity : -Infinity); valB = valB ?? (direction === 'asc' ? Infinity : -Infinity); } // Sort by ms
-                else { valA = String(valA || '').toLowerCase(); valB = String(valB || '').toLowerCase(); }
-
-                if (valA < valB) return -1 * sortMultiplier; if (valA > valB) return 1 * sortMultiplier; return 0;
-            });
-            return filteredData;
-        }
-        // ****** END UPDATED filterAndSortData ******
+        function filterAndSortData() { const sourceData = (activeTab === '50k') ? calculated50kData : (activeTab === 'Ascent' ? calculatedAscentData : calculatedBigCatData); const cols = (activeTab === '50k') ? COL_50K : (activeTab === 'Ascent' ? COL_ASCENT : null); let filteredData = sourceData; if (currentFilter) { const lowerCaseFilter = currentFilter.toLowerCase(); filteredData = sourceData.filter(row => { const bib = String(activeTab !== 'BigCat' ? row[cols.BIB] : '').toLowerCase(); const name = String(row.name || (activeTab !== 'BigCat' ? row[cols.NAME] : '') || '').toLowerCase(); return bib.includes(lowerCaseFilter) || name.includes(lowerCaseFilter); }); } const { column, direction } = currentSort; const sortMultiplier = direction === 'asc' ? 1 : -1; filteredData.sort((a, b) => { let valA, valB; if (activeTab === 'BigCat') { valA = a[column]; valB = b[column]; } else { const sortColIndex = cols[column.toUpperCase()]; if (sortColIndex === undefined) { currentSort.column = 'bib'; return filterAndSortData(); } valA = a[sortColIndex]; valB = b[sortColIndex]; } if (column === 'bib') { valA = parseInt(valA || '0', 10); valB = parseInt(valB || '0', 10); } else if (column.includes('_cp') || column.includes('_scan')) { valA = getTimeMs(valA) ?? (direction === 'asc' ? Infinity : -Infinity); valB = getTimeMs(valB) ?? (direction === 'asc' ? Infinity : -Infinity); } else if (column.includes('_elapsed')) { valA = valA ?? (direction === 'asc' ? Infinity : -Infinity); valB = valB ?? (direction === 'asc' ? Infinity : -Infinity); } else { valA = String(valA || '').toLowerCase(); valB = String(valB || '').toLowerCase(); } if (valA < valB) return -1 * sortMultiplier; if (valA > valB) return 1 * sortMultiplier; return 0; }); return filteredData; }
 
         // --- UI Update Functions ---
-        // ****** UPDATED updateTable ******
+        // ****** updateTable now uses formatMillisecondsToDuration for all elapsed ******
         function updateTable() {
             const displayData = filterAndSortData();
-            const is50k = activeTab === '50k';
-            const isAscent = activeTab === 'Ascent';
-            const isBigCat = activeTab === 'BigCat';
-
+            const is50k = activeTab === '50k'; const isAscent = activeTab === 'Ascent'; const isBigCat = activeTab === 'BigCat';
             const tableBody = is50k ? resultsBody50k : (isAscent ? resultsBodyAscent : resultsBodyBigCat);
             const rowCountEl = is50k ? rowCount50kElement : (isAscent ? rowCountAscentElement : rowCountBigCatElement);
             const cols = is50k ? COL_50K : (isAscent ? COL_ASCENT : null);
@@ -329,16 +310,8 @@
             displayData.forEach(row => {
                 const tr = document.createElement('tr');
                 let name, normalizedName, isDual, nameHtml;
-
-                if (is50k || isAscent) {
-                     name = row[cols.NAME] || '';
-                     normalizedName = normalizeName(name);
-                     isDual = dualRunnerNames.has(normalizedName);
-                     nameHtml = `${name}${isDual ? ' <span title="Big Cat Challenge (Ascent + 50k)">🐅</span>' : ''}`;
-                } else { // Big Cat
-                    name = row.name || '';
-                    nameHtml = `${name} <span title="Big Cat Challenge (Ascent + 50k)">🐅</span>`;
-                }
+                if (is50k || isAscent) { name = row[cols.NAME] || ''; normalizedName = normalizeName(name); isDual = dualRunnerNames.has(normalizedName); nameHtml = `${name}${isDual ? ' <span title="Big Cat Challenge (Ascent + 50k)">🐅</span>' : ''}`; }
+                else { name = row.name || ''; nameHtml = `${name} <span title="Big Cat Challenge (Ascent + 50k)">🐅</span>`; }
 
                 if (is50k) {
                     tr.innerHTML = `
@@ -354,16 +327,12 @@
                 } else if (isAscent) {
                      tr.innerHTML = `
                         <td>${row[cols.BIB] || ''}</td><td>${nameHtml}</td><td><span class="${getStatusClass(row[cols.STATUS] || 'Active')}">${row[cols.STATUS] || 'Active'}</span></td>
-                        <td>${formatTime(row[cols.FINISH_SCAN])}</td>
-                        <td>${formatMillisecondsToDuration(row[cols.FINISH_ELAPSED])}</td>
+                        <td>${formatTime(row[cols.FINISH_SCAN])}</td><td>${formatMillisecondsToDuration(row[cols.FINISH_ELAPSED])}</td>
                     `;
                 } else { // Big Cat
                      tr.innerHTML = `
-                        <td>${nameHtml}</td>
-                        <td>${formatMillisecondsToDuration(row.ascent_elapsed)}</td>
-                        <td>${formatMillisecondsToDuration(row.fiftyk_elapsed)}</td>
-                        <td>${formatMillisecondsToDuration(row.cumulative_elapsed)}</td>
-                         <td><span class="${getStatusClass(row.status)}">${row.status}</span></td>
+                        <td>${nameHtml}</td><td>${formatMillisecondsToDuration(row.ascent_elapsed)}</td><td>${formatMillisecondsToDuration(row.fiftyk_elapsed)}</td>
+                        <td>${formatMillisecondsToDuration(row.cumulative_elapsed)}</td><td><span class="${getStatusClass(row.status)}">${row.status}</span></td>
                     `;
                 }
                 tableBody.appendChild(tr);
