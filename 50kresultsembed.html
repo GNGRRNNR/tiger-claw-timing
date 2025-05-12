@@ -19,7 +19,14 @@
         th.sort-desc .sort-icon::after { content: ' ▼'; }
         tbody tr:nth-child(even) { background-color: #f9fafb; }
         tbody tr:hover { background-color: #f0f9ff; }
-        .status-active { color: #059669; font-weight: 500; } .status-finished { color: #1d4ed8; font-weight: 500; } .status-dnf, .status-dns { color: #dc2626; font-weight: 500; } .status-inprogress { color: #ca8a04; /* Amber */ font-weight: 500;}
+        /* ****** UPDATED Status Colors ****** */
+        .status-active { color: #059669; font-weight: 500; } /* Emerald Green for Active/In Progress */
+        .status-finished { color: #1d4ed8; font-weight: 500; } /* Blue for FINISHED */
+        .status-dnf { color: #dc2626; font-weight: 500; } /* Red for DNF */
+        .status-dns { color: #ca8a04; font-weight: 500; } /* Yellow/Amber for DNS */
+        .status-tbd { color: #6b7280; font-weight: 500; } /* Grey for TBD */
+        .status-inprogress { color: #059669; font-weight: 500; } /* Same as active for now */
+        /* *********************************** */
         .loop-pink { background-color: #fce7f3; color: #831843; padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-size: 0.75rem; display: inline-block; margin: 0.1rem; }
         .loop-white { background-color: #f1f5f9; color: #1e293b; padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-size: 0.75rem; display: inline-block; margin: 0.1rem; border: 1px solid #cbd5e1;}
         .loop-yellow { background-color: #fef9c3; color: #713f12; padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-size: 0.75rem; display: inline-block; margin: 0.1rem; }
@@ -194,67 +201,25 @@
         // --- Utility Functions ---
         function parseCSV(csvText) { if (!csvText || typeof csvText !== 'string') return []; const lines = csvText.trim().split('\n'); return lines.slice(1).map(line => line.split(',').map(field => field.trim())); }
         function formatTime(dateTimeString) { if (!dateTimeString || dateTimeString.trim() === "") return ""; try { const date = new Date(dateTimeString); if (isNaN(date.getTime()) || date.getFullYear() < 1900) return ""; return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }); } catch (e) { return ""; } }
-        function formatMillisecondsToDuration(ms) {
-            if (ms === undefined || ms === null || isNaN(Number(ms)) || Number(ms) < 0) {
-                // console.log(`formatMillisecondsToDuration received invalid ms: ${ms}, returning blank.`);
-                return "";
-            }
-            try {
-                const totalMilliseconds = Number(ms);
-                if (totalMilliseconds < 500) { // Treat less than half a second as 00:00:00
-                    // console.log(`formatMillisecondsToDuration ms < 500: ${totalMilliseconds}, returning 00:00:00.`);
-                    return "00:00:00";
-                }
-                const totalSeconds = Math.floor(totalMilliseconds / 1000);
-                const hours = Math.floor(totalSeconds / 3600);
-                const minutes = Math.floor((totalSeconds % 3600) / 60);
-                const seconds = totalSeconds % 60;
-                const formatted = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-                // console.log(`formatMillisecondsToDuration formatted ${ms} to ${formatted}`);
-                return formatted;
-            } catch (e) {
-                console.error("Error formatting milliseconds:", ms, e);
-                return "Invalid";
-            }
-        }
+        function formatMillisecondsToDuration(ms) { if (ms === undefined || ms === null || isNaN(Number(ms)) || Number(ms) < 0) return ""; try { const totalMilliseconds = Number(ms); if (totalMilliseconds < 500) return "00:00:00"; const totalSeconds = Math.floor(totalMilliseconds / 1000); const hours = Math.floor(totalSeconds / 3600); const minutes = Math.floor((totalSeconds % 3600) / 60); const seconds = totalSeconds % 60; return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`; } catch (e) { console.error("Error formatting milliseconds:", ms, e); return "Invalid"; } }
         // ****** REVERTED formatDurationFromCSV to handle CSV values correctly ******
         function formatDurationFromCSV(durationInput, columnName = "Unknown") {
             if (durationInput === undefined || durationInput === null) return "";
             const durationString = String(durationInput).trim();
-            if (durationString === "" || durationString.startsWith('-')) {
-                // console.log(`formatDurationFromCSV - Column: ${columnName}, Input: "${durationString}" -> Blank or Negative string, returning blank.`);
-                return "";
-            }
-            // console.log(`formatDurationFromCSV - Column: ${columnName}, Input: "${durationString}", Type: ${typeof durationInput}`);
+            if (durationString === "" || durationString.startsWith('-')) { return ""; }
+
+            // console.log(`Formatting Duration from CSV - Column: ${columnName}, Input: "${durationString}", Type: ${typeof durationInput}`);
 
             const numericValue = parseFloat(durationString);
             if (!isNaN(numericValue) && numericValue > 0 && numericValue < 100) { // Check if numeric (fraction of day)
-                try {
-                    const ms = numericValue * 24 * 60 * 60 * 1000;
-                    // console.log(` -> Numeric value ${numericValue} converted to ms: ${ms}`);
-                    return formatMillisecondsToDuration(ms, `Numeric ${columnName}`);
-                } catch (e) {
-                    console.error(`Error formatting numeric duration from CSV for ${columnName}:`, durationString, e);
-                    return "Invalid";
-                }
+                try { const ms = numericValue * 24 * 60 * 60 * 1000; return formatMillisecondsToDuration(ms); }
+                catch (e) { console.error(`Error formatting numeric duration from CSV for ${columnName}:`, durationString, e); return "Invalid"; }
             }
             else if (/^\d{1,3}:\d{2}:\d{2}(\.\d+)?$/.test(durationString)) { // Check if HH:MM:SS string
-                 try {
-                    //  console.log(` -> Attempting to parse as HH:MM:SS string: ${durationString}`);
-                     const parts = durationString.split(':');
-                     const h = String(parts[0] || '0').padStart(2, '0');
-                     const m = String(parts[1] || '0').padStart(2, '0');
-                     const s = String(Math.floor(parseFloat(parts[2] || '0'))).padStart(2, '0');
-                     return `${h}:${m}:${s}`;
-                 } catch(e) {
-                      console.error(`Error parsing pre-formatted duration from CSV for ${columnName}:`, durationString, e);
-                      return "Invalid";
-                 }
+                 try { const parts = durationString.split(':'); const h = String(parts[0] || '0').padStart(2, '0'); const m = String(parts[1] || '0').padStart(2, '0'); const s = String(Math.floor(parseFloat(parts[2] || '0'))).padStart(2, '0'); return `${h}:${m}:${s}`; }
+                 catch(e) { console.error(`Error parsing pre-formatted duration from CSV for ${columnName}:`, durationString, e); return "Invalid"; }
             }
-            else {
-                // console.warn(` -> Column: ${columnName}, Input: "${durationString}" -> Unrecognized duration format (returning blank)`);
-                return "";
-            }
+            else { return ""; }
         }
         // ****** END REVERTED formatDurationFromCSV ******
         function getStatusClass(status) { status = String(status || '').toUpperCase(); if (status === 'FINISHED') return 'status-finished'; if (status.includes('DNF')) return 'status-dnf'; if (status.includes('DNS')) return 'status-dns'; if (status === 'ACTIVE' || status === 'IN PROGRESS' || status.includes('TBD') || status.includes('/')) return 'status-active'; return ''; }
@@ -263,7 +228,7 @@
         function normalizeName(name) { return String(name || '').trim().toUpperCase(); }
 
         // --- Data Processing Functions ---
-        // ****** processData now calculates all durations in JS ******
+        // ****** processData calculates all durations in JS and stores them as MS ******
         function processData(rawData, raceType) {
              console.log(`Processing ${raceType} raw data (JS will calculate all durations)...`);
              const COL_MAP = raceType === '50k' ? COL_50K : COL_ASCENT;
@@ -297,9 +262,25 @@
                 });
              } else { // For 50k
                  return rawData.map(row => {
-                    const processed = [...row]; // Start with a copy of the CSV row
-                    const bib = row[COL_MAP.BIB] || '';
+                    const processed = Array(Object.keys(COL_50K).length).fill(null);
+                    // Copy essential non-calculated data
+                    processed[COL_50K.BIB] = row[COL_50K.BIB];
+                    processed[COL_50K.NAME] = row[COL_50K.NAME];
+                    processed[COL_50K.STATUS] = row[COL_50K.STATUS];
+                    processed[COL_50K.GREEN_CP] = row[COL_50K.GREEN_CP];
+                    processed[COL_50K.LOOP1_COLOR] = row[COL_50K.LOOP1_COLOR];
+                    processed[COL_50K.LOOP1_BOTTOM] = row[COL_50K.LOOP1_BOTTOM];
+                    processed[COL_50K.LOOP1_TOP] = row[COL_50K.LOOP1_TOP];
+                    processed[COL_50K.LOOP2_COLOR] = row[COL_50K.LOOP2_COLOR];
+                    processed[COL_50K.LOOP2_BOTTOM] = row[COL_50K.LOOP2_BOTTOM];
+                    processed[COL_50K.LOOP2_TOP] = row[COL_50K.LOOP2_TOP];
+                    processed[COL_50K.LOOP3_COLOR] = row[COL_50K.LOOP3_COLOR];
+                    processed[COL_50K.LOOP3_BOTTOM] = row[COL_50K.LOOP3_BOTTOM];
+                    processed[COL_50K.LOOP3_TOP] = row[COL_50K.LOOP3_TOP];
+                    processed[COL_50K.RED_CP] = row[COL_50K.RED_CP];
+                    processed[COL_50K.FINISH_SCAN] = row[COL_50K.FINISH_SCAN];
 
+                    const bib = row[COL_MAP.BIB] || '';
                     const finishScanMs = getTimeMs(row[COL_MAP.FINISH_SCAN]);
                     processed[COL_MAP.FINISH_ELAPSED] = (finishScanMs && finishScanMs > START_TIME) ? (finishScanMs - START_TIME) : null;
 
@@ -314,7 +295,6 @@
                     processed[COL_MAP.DESC2_ELAPSED] = (l2TopMs && l3BotMs && l3BotMs > l2TopMs) ? (l3BotMs - l2TopMs) : null;
                     processed[COL_MAP.LOOP3_ELAPSED] = (l3BotMs && l3TopMs && l3TopMs > l3BotMs) ? (l3TopMs - l3BotMs) : null;
                     processed[COL_MAP.DESC3_ELAPSED] = (l3TopMs && redCpMs && redCpMs > l3TopMs) ? (redCpMs - l3TopMs) : null;
-
                     // console.log(`Bib ${bib} (50k JS Processed): L1_E_ms=${processed[COL_50K.LOOP1_ELAPSED]}, Total_E_ms=${processed[COL_50K.FINISH_ELAPSED]}`);
                     return processed;
                 });
@@ -391,7 +371,7 @@
         function filterAndSortData() { const sourceData = (activeTab === '50k') ? calculated50kData : (activeTab === 'Ascent' ? calculatedAscentData : calculatedBigCatData); const cols = (activeTab === '50k') ? COL_50K : (activeTab === 'Ascent' ? COL_ASCENT : null); let filteredData = sourceData; if (currentFilter) { const lowerCaseFilter = currentFilter.toLowerCase(); filteredData = sourceData.filter(row => { const bib = String(activeTab !== 'BigCat' ? row[cols.BIB] : '').toLowerCase(); const name = String(row.name || (activeTab !== 'BigCat' ? row[cols.NAME] : '') || '').toLowerCase(); return bib.includes(lowerCaseFilter) || name.includes(lowerCaseFilter); }); } const { column, direction } = currentSort; const sortMultiplier = direction === 'asc' ? 1 : -1; filteredData.sort((a, b) => { let valA, valB; if (activeTab === 'BigCat') { valA = a[column]; valB = b[column]; } else { const sortColIndex = cols[column.toUpperCase()]; if (sortColIndex === undefined) { currentSort.column = 'bib'; return filterAndSortData(); } valA = a[sortColIndex]; valB = b[sortColIndex]; } if (column === 'bib') { valA = parseInt(valA || '0', 10); valB = parseInt(valB || '0', 10); } else if (column.includes('_cp') || column.includes('_scan')) { valA = getTimeMs(valA) ?? (direction === 'asc' ? Infinity : -Infinity); valB = getTimeMs(valB) ?? (direction === 'asc' ? Infinity : -Infinity); } else if (column.includes('_elapsed')) { valA = valA ?? (direction === 'asc' ? Infinity : -Infinity); valB = valB ?? (direction === 'asc' ? Infinity : -Infinity); } else { valA = String(valA || '').toLowerCase(); valB = String(valB || '').toLowerCase(); } if (valA < valB) return -1 * sortMultiplier; if (valA > valB) return 1 * sortMultiplier; return 0; }); return filteredData; }
 
         // --- UI Update Functions ---
-        // ****** UPDATED updateTable ******
+        // ****** UPDATED updateTable to use formatMillisecondsToDuration for all calculated durations ******
         function updateTable() {
             const displayData = filterAndSortData();
             const is50k = activeTab === '50k'; const isAscent = activeTab === 'Ascent'; const isBigCat = activeTab === 'BigCat';
@@ -410,7 +390,6 @@
                 else { name = row.name || ''; nameHtml = `${name} <span title="Big Cat Challenge (Ascent + 50k)">🐅</span>`; }
 
                 if (is50k) {
-                    // All elapsed times are now stored as MS in `row` by `processData`
                     tr.innerHTML = `
                         <td>${row[cols.BIB] || ''}</td><td>${nameHtml}</td><td><span class="${getStatusClass(row[cols.STATUS] || 'Active')}">${row[cols.STATUS] || 'Active'}</span></td>
                         <td>${formatTime(row[cols.GREEN_CP])}</td><td>${createLoopSpan(row[cols.LOOP1_COLOR])}</td><td>${formatTime(row[cols.LOOP1_BOTTOM])}</td>
