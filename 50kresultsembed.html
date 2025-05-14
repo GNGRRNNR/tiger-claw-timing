@@ -44,11 +44,15 @@
         .tab-button { padding: 0.5rem 1rem; margin-right: 0.5rem; border: 1px solid transparent; border-bottom: none; border-radius: 0.375rem 0.375rem 0 0; cursor: pointer; background-color: #e5e7eb; color: #4b5563; }
         .tab-button.active { background-color: white; color: #1f2937; border-color: #e5e7eb; font-weight: 600; }
         .tab-content { border: 1px solid #e5e7eb; border-top: none; padding-top: 1rem; }
-        #loopOrderChartContainer { max-width: 600px; margin: 1.5rem auto; }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom:1.5rem;}
+        #loopOrderChartContainer { max-width: 450px; margin: 1rem auto; }
+        #averageTimesChartContainer { max-width: 600px; margin: 1rem auto; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom:1.5rem;}
         .stat-card { background-color: #f9fafb; padding: 1rem; border-radius: 0.5rem; border: 1px solid #e5e7eb;}
         .stat-card h3 { font-size: 1.1rem; font-weight:600; margin-bottom:0.5rem; color: #1f2937;}
-        .stat-card p { font-size: 0.9rem; color: #4b5563;}
+        .stat-card p, .stat-card li { font-size: 0.85rem; color: #4b5563; line-height: 1.4;}
+        .fastest-times-list { list-style-type: none; padding-left: 0; }
+        .fastest-times-list li { margin-bottom: 0.3rem; }
+        .fastest-times-list strong { color: #111827; }
     </style>
 </head>
 <body class="bg-gray-100 p-4 md:p-8">
@@ -77,18 +81,30 @@
                 <p><strong>Pink Loop:</strong> ~5 Miles, 2800ft gain</p>
                 <p><strong>White Loop:</strong> ~3 Miles, 2700ft gain</p>
                 <p><strong>Yellow Loop:</strong> ~6 Miles, 3000ft gain</p>
+                <p><strong>Blue Descents (approx):</strong> ~3 Miles, 2700ft descent (each)</p>
             </div>
             <div class="stat-card">
                 <h3>Runner Stats</h3>
                 <p><strong>50k Starters:</strong> <span id="50kStartersCount">--</span></p>
                 <p><strong>Ascent Starters:</strong> <span id="ascentStartersCount">--</span></p>
             </div>
+            <div class="stat-card"> <h3 class="text-lg font-semibold mb-2">Fastest Segments (50k)</h3>
+                <ul id="fastestTimesList" class="fastest-times-list">
+                    </ul>
+            </div>
         </div>
 
-        <div id="loopOrderChartContainer" class="mb-6">
-             <h2 class="text-xl font-semibold text-center text-gray-700 mb-2">50k Loop Order Distribution</h2>
-             <canvas id="loopOrderChart"></canvas>
+        <div class="grid md:grid-cols-2 gap-6 mb-6">
+            <div id="loopOrderChartContainer">
+                 <h2 class="text-xl font-semibold text-center text-gray-700 mb-2">50k Loop Order Distribution</h2>
+                 <canvas id="loopOrderChart"></canvas>
+            </div>
+            <div id="averageTimesChartContainer">
+                <h2 class="text-xl font-semibold text-center text-gray-700 mb-2">Average Segment Times (50k)</h2>
+                <canvas id="averageTimesChart"></canvas>
+            </div>
         </div>
+
         <div class="mb-4 border-b border-gray-200">
             <nav class="-mb-px flex flex-wrap" aria-label="Tabs">
                 <button id="tabButton50k" type="button" class="tab-button active" data-target="results50k">50k</button>
@@ -129,12 +145,12 @@
                                 <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L2 Bot</th>
                                 <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L2 Top</th>
                                 <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="loop2_elapsed">L2 Elapsed<span class="sort-icon"></span></th>
-                                <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">D2 Elapsed</th>
+                                <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="desc2_elapsed">D2 Elapsed<span class="sort-icon"></span></th>
                                 <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lp 3</th>
                                 <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L3 Bot</th>
                                 <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">L3 Top</th>
                                 <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="loop3_elapsed">L3 Elapsed<span class="sort-icon"></span></th>
-                                <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">D3 Elapsed</th>
+                                <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="desc3_elapsed">D3 Elapsed<span class="sort-icon"></span></th>
                                 <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="red_cp">Red CP<span class="sort-icon"></span></th>
                                 <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="finish_scan">Finish Scan<span class="sort-icon"></span></th>
                                 <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" data-sort="finish_elapsed">Total Time<span class="sort-icon"></span></th>
@@ -225,6 +241,9 @@
         let loopOrderChartInstance = null;
         const fiftyKStartersElement = document.getElementById('50kStartersCount');
         const ascentStartersElement = document.getElementById('ascentStartersCount');
+        const fastestTimesListElement = document.getElementById('fastestTimesList');
+        const averageTimesChartCanvas = document.getElementById('averageTimesChart');
+        let averageTimesChartInstance = null;
 
 
         let refreshIntervalId = null;
@@ -243,44 +262,30 @@
         function parseCSV(csvText) { if (!csvText || typeof csvText !== 'string') return []; const lines = csvText.trim().split('\n'); return lines.slice(1).map(line => line.split(',').map(field => field.trim())); }
         function formatTime(dateTimeString) { if (!dateTimeString || dateTimeString.trim() === "") return ""; try { const date = new Date(dateTimeString); if (isNaN(date.getTime()) || date.getFullYear() < 1900) return ""; return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }); } catch (e) { return ""; } }
         function formatMillisecondsToDuration(ms) { if (ms === undefined || ms === null || isNaN(Number(ms)) || Number(ms) < 0) return ""; try { const totalMilliseconds = Number(ms); if (totalMilliseconds < 500) return "00:00:00"; const totalSeconds = Math.floor(totalMilliseconds / 1000); const hours = Math.floor(totalSeconds / 3600); const minutes = Math.floor((totalSeconds % 3600) / 60); const seconds = totalSeconds % 60; return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`; } catch (e) { console.error("Error formatting milliseconds:", ms, e); return "Invalid"; } }
-        // This function now primarily expects a numeric fraction of a day from the CSV for loop/descent elapsed
         function formatDurationFromCSV(durationInput, columnName = "Unknown") {
             if (durationInput === undefined || durationInput === null) return "";
             const durationString = String(durationInput).trim();
             if (durationString === "" || durationString.startsWith('-')) { return ""; }
-
-            // console.log(`Formatting Duration from CSV - Column: ${columnName}, Input: "${durationString}", Type: ${typeof durationInput}`);
             const numericValue = parseFloat(durationString);
-            if (!isNaN(numericValue) && numericValue > 0 && numericValue < 100) { // Check if numeric (fraction of day)
+            if (!isNaN(numericValue) && numericValue > 0 && numericValue < 100) {
                 try { const ms = numericValue * 24 * 60 * 60 * 1000; return formatMillisecondsToDuration(ms); }
                 catch (e) { console.error(`Error formatting numeric duration from CSV for ${columnName}:`, durationString, e); return "Invalid"; }
             }
-            // Fallback for pre-formatted HH:MM:SS strings
             else if (/^\d{1,3}:\d{2}:\d{2}(\.\d+)?$/.test(durationString)) {
                  try { const parts = durationString.split(':'); const h = String(parts[0] || '0').padStart(2, '0'); const m = String(parts[1] || '0').padStart(2, '0'); const s = String(Math.floor(parseFloat(parts[2] || '0'))).padStart(2, '0'); return `${h}:${m}:${s}`; }
                  catch(e) { console.error(`Error parsing pre-formatted duration from CSV for ${columnName}:`, durationString, e); return "Invalid"; }
             }
             else { return ""; }
         }
-        // ****** UPDATED getStatusClass ******
-        function getStatusClass(status) {
-            status = String(status || '').toUpperCase();
-            if (status === 'FINISHED') return 'status-finished';
-            if (status.includes('DNF')) return 'status-dnf';
-            if (status.includes('DNS')) return 'status-dns';
-            if (status.includes('TBD')) return 'status-tbd';
-            if (status === 'ACTIVE' || status === 'IN PROGRESS' || status.includes('/')) return 'status-active';
-            return ''; // Default
-        }
-        // **********************************
+        function getStatusClass(status) { status = String(status || '').toUpperCase(); if (status === 'FINISHED') return 'status-finished'; if (status.includes('DNF')) return 'status-dnf'; if (status.includes('DNS')) return 'status-dns'; if (status.includes('TBD')) return 'status-tbd'; if (status === 'ACTIVE' || status === 'IN PROGRESS' || status.includes('/')) return 'status-active'; return ''; }
         function createLoopSpan(color) { if (!color) return ''; color = color.toUpperCase(); let className = ''; if (color === 'PINK') className = 'loop-pink'; else if (color === 'WHITE') className = 'loop-white'; else if (color === 'YELLOW') className = 'loop-yellow'; else return ''; return `<span class="${className}">${color.substring(0,1)}</span>`; }
         function getTimeMs(dateString) { if (!dateString) return null; try { const date = new Date(dateString); return isNaN(date.getTime()) ? null : date.getTime(); } catch { return null; } }
         function normalizeName(name) { return String(name || '').trim().toUpperCase(); }
 
         // --- Data Processing Functions ---
-        // (processData remains the same)
+        // ****** REVISED processData to calculate all durations in JS and store as MS ******
         function processData(rawData, raceType) {
-             console.log(`Processing ${raceType} raw data...`);
+             console.log(`Processing ${raceType} raw data (JS will calculate all durations)...`);
              const COL_MAP = raceType === '50k' ? COL_50K : COL_ASCENT;
              const START_TIME = raceType === '50k' ? RACE_START_TIME_50K_MS : RACE_START_TIME_ASCENT_MS;
              const sourceRunnerList = raceType === '50k' ? all50kRunnerList : allAscentRunnerList;
@@ -298,11 +303,15 @@
                         resultEntry[COL_ASCENT.FINISH_SCAN] = finisherDataCSVRow[COL_ASCENT.FINISH_SCAN];
                         const csvStatus = String(finisherDataCSVRow[COL_ASCENT.STATUS] || '').toUpperCase();
                         if (csvStatus === "FINISHED" || csvStatus === "DNF" || csvStatus === "DNS") { resultEntry[COL_ASCENT.STATUS] = csvStatus; }
+
                         const finishScanMs = getTimeMs(finisherDataCSVRow[COL_ASCENT.FINISH_SCAN]);
-                        if (finishScanMs && finishScanMs > START_TIME) { resultEntry[COL_ASCENT.FINISH_ELAPSED] = finishScanMs - START_TIME; }
-                        else { const csvElapsedString = finisherDataCSVRow[COL_ASCENT.FINISH_ELAPSED]; if (csvElapsedString && !String(csvElapsedString).startsWith('-')) { const numericCsvElapsed = parseFloat(csvElapsedString); if (!isNaN(numericCsvElapsed) && numericCsvElapsed > 0) { resultEntry[COL_ASCENT.FINISH_ELAPSED] = numericCsvElapsed * 24 * 60 * 60 * 1000; } else if (/^\d{1,3}:\d{2}:\d{2}(\.\d+)?$/.test(csvElapsedString)) { try { const p = csvElapsedString.split(':'); resultEntry[COL_ASCENT.FINISH_ELAPSED] = ((+p[0])*3600 + (+p[1])*60 + (+parseFloat(p[2] || 0))) * 1000; } catch(e){ /* ignore */ } } } }
+                        if (finishScanMs && finishScanMs > START_TIME) {
+                            resultEntry[COL_ASCENT.FINISH_ELAPSED] = finishScanMs - START_TIME;
+                        }
                     }
-                    if (runnerFromList.status && (runnerFromList.status.toUpperCase() === "DNS" || runnerFromList.status.toUpperCase() === "DNF")) { resultEntry[COL_ASCENT.STATUS] = runnerFromList.status.toUpperCase(); }
+                    if (runnerFromList.status && (runnerFromList.status.toUpperCase() === "DNS" || runnerFromList.status.toUpperCase() === "DNF")) {
+                        resultEntry[COL_ASCENT.STATUS] = runnerFromList.status.toUpperCase();
+                    }
                     return resultEntry;
                 });
              } else { // For 50k
@@ -325,83 +334,41 @@
                 });
             }
         }
+        // ****** END UPDATED processData ******
+
         function identifyDualRunners() { /* ... same as before ... */ dualRunnerNames.clear(); if (all50kRunnerNames.size > 0 && allAscentRunnerNames.size > 0) { all50kRunnerNames.forEach(name => { if (allAscentRunnerNames.has(name)) { dualRunnerNames.add(name); } }); } /* console.log(`Identified ${dualRunnerNames.size} dual runners (by name):`, dualRunnerNames); */ }
-        // ****** UPDATED processBigCatData ******
+        // (processBigCatData remains the same)
         function processBigCatData() {
-            console.log("Processing Big Cat data...");
-            calculatedBigCatData = [];
+            console.log("Processing Big Cat data..."); calculatedBigCatData = [];
             dualRunnerNames.forEach(name => {
                 const ascentResult = calculatedAscentData.find(row => normalizeName(row[COL_ASCENT.NAME]) === name);
                 const fiftyKResult = calculated50kData.find(row => normalizeName(row[COL_50K.NAME]) === name);
-
                 if (ascentResult && fiftyKResult) {
                     const ascentStatus = String(ascentResult[COL_ASCENT.STATUS] || 'TBD').toUpperCase();
                     const fiftyKStatus = String(fiftyKResult[COL_50K.STATUS] || 'TBD').toUpperCase();
-
-                    const ascentTimeMs = ascentResult[COL_ASCENT.FINISH_ELAPSED];
-                    const fiftyKTimeMs = fiftyKResult[COL_50K.FINISH_ELAPSED];
-
+                    const ascentTimeMs = ascentResult[COL_ASCENT.FINISH_ELAPSED]; const fiftyKTimeMs = fiftyKResult[COL_50K.FINISH_ELAPSED];
                     let ascentTimeDisplay = (ascentStatus === 'DNS' || ascentStatus === 'DNF') ? ascentStatus : formatMillisecondsToDuration(ascentTimeMs);
                     if (!ascentTimeDisplay && ascentStatus !== 'DNS' && ascentStatus !== 'DNF' && ascentStatus !== 'FINISHED') ascentTimeDisplay = "TBD";
-
                     let fiftyKTimeDisplay = (fiftyKStatus === 'DNS' || fiftyKStatus === 'DNF') ? fiftyKStatus : formatMillisecondsToDuration(fiftyKTimeMs);
-                     if (!fiftyKTimeDisplay && fiftyKStatus !== 'DNS' && fiftyKStatus !== 'DNF' && fiftyKStatus !== 'FINISHED') fiftyKTimeDisplay = ""; // Blank if not DNS/DNF and no time
-
-                    let cumulativeMs = null;
-                    let bigCatOverallStatus = "";
-
-                    if (ascentStatus === 'FINISHED' && fiftyKStatus === 'FINISHED') {
-                        bigCatOverallStatus = "FINISHED";
-                        if (ascentTimeMs !== null && fiftyKTimeMs !== null) {
-                            cumulativeMs = ascentTimeMs + fiftyKTimeMs;
-                        }
-                    } else if (ascentStatus === 'DNS' && fiftyKStatus === 'DNS') {
-                        bigCatOverallStatus = "DNS / DNS";
-                    } else if (ascentStatus === 'DNF' && fiftyKStatus === 'DNF') {
-                        bigCatOverallStatus = "DNF / DNF";
-                    } else if (ascentStatus === 'DNS' && fiftyKStatus === 'DNF') {
-                        bigCatOverallStatus = "DNS / DNF";
-                    } else if (ascentStatus === 'DNF' && fiftyKStatus === 'DNS') {
-                        bigCatOverallStatus = "DNF / DNS";
-                    }
-                    else if (ascentStatus === 'DNS') {
-                        bigCatOverallStatus = `DNS / ${fiftyKStatus === 'ACTIVE' || fiftyKStatus === 'TBD' ? 'TBD' : (fiftyKStatus === 'FINISHED' ? 'Fin' : fiftyKStatus)}`;
-                    } else if (fiftyKStatus === 'DNS') {
-                        bigCatOverallStatus = `${ascentStatus === 'ACTIVE' || ascentStatus === 'TBD' ? 'TBD' : (ascentStatus === 'FINISHED' ? 'Fin' : ascentStatus)} / DNS`;
-                    }
-                    else if (ascentStatus === 'DNF') {
-                        bigCatOverallStatus = `DNF / ${fiftyKStatus === 'ACTIVE' || fiftyKStatus === 'TBD' ? 'TBD' : (fiftyKStatus === 'FINISHED' ? 'Fin' : fiftyKStatus)}`;
-                    } else if (fiftyKStatus === 'DNF') {
-                        bigCatOverallStatus = `${ascentStatus === 'ACTIVE' || ascentStatus === 'TBD' ? 'TBD' : (ascentStatus === 'FINISHED' ? 'Fin' : ascentStatus)} / DNF`;
-                    }
-                    else if (ascentStatus === 'TBD' || fiftyKStatus === 'TBD' || ascentStatus === 'ACTIVE' || fiftyKStatus === 'ACTIVE') {
-                        bigCatOverallStatus = `${ascentStatus === 'FINISHED' ? 'Fin' : (ascentStatus === 'DNS' || ascentStatus === 'DNF' ? ascentStatus : 'TBD')} / ${fiftyKStatus === 'FINISHED' ? 'Fin' : (fiftyKStatus === 'DNS' || fiftyKStatus === 'DNF' ? fiftyKStatus : 'TBD')}`;
-                        if (bigCatOverallStatus.includes("ACTIVE")) bigCatOverallStatus = "In Progress";
-                        if (bigCatOverallStatus === "TBD / TBD" && !(ascentStatus === 'DNS' || ascentStatus === 'DNF' || fiftyKStatus === 'DNS' || fiftyKStatus === 'DNF')) bigCatOverallStatus = "TBD / TBD";
-                    }
-                     else {
-                        bigCatOverallStatus = "In Progress";
-                    }
-
-                    calculatedBigCatData.push({
-                        name: ascentResult[COL_ASCENT.NAME],
-                        ascent_elapsed_display: ascentTimeDisplay,
-                        fiftyk_elapsed_display: fiftyKTimeDisplay,
-                        ascent_elapsed: ascentTimeMs,
-                        fiftyk_elapsed: fiftyKTimeMs,
-                        cumulative_elapsed: cumulativeMs,
-                        status: bigCatOverallStatus
-                    });
+                     if (!fiftyKTimeDisplay && fiftyKStatus !== 'DNS' && fiftyKStatus !== 'DNF' && fiftyKStatus !== 'FINISHED') fiftyKTimeDisplay = "";
+                    let cumulativeMs = null; let bigCatOverallStatus = "";
+                    if (ascentStatus === 'FINISHED' && fiftyKStatus === 'FINISHED') { bigCatOverallStatus = "FINISHED"; if (ascentTimeMs !== null && fiftyKTimeMs !== null) { cumulativeMs = ascentTimeMs + fiftyKTimeMs; } }
+                    else if (ascentStatus === 'DNS' && fiftyKStatus === 'DNS') { bigCatOverallStatus = "DNS / DNS"; } else if (ascentStatus === 'DNF' && fiftyKStatus === 'DNF') { bigCatOverallStatus = "DNF / DNF"; }
+                    else if (ascentStatus === 'DNS' && fiftyKStatus === 'DNF') { bigCatOverallStatus = "DNS / DNF"; } else if (ascentStatus === 'DNF' && fiftyKStatus === 'DNS') { bigCatOverallStatus = "DNF / DNS"; }
+                    else if (ascentStatus === 'DNS') { bigCatOverallStatus = `DNS / ${fiftyKStatus === 'ACTIVE' || fiftyKStatus === 'TBD' ? 'TBD' : (fiftyKStatus === 'FINISHED' ? 'Fin' : fiftyKStatus)}`; }
+                    else if (fiftyKStatus === 'DNS') { bigCatOverallStatus = `${ascentStatus === 'ACTIVE' || ascentStatus === 'TBD' ? 'TBD' : (ascentStatus === 'FINISHED' ? 'Fin' : ascentStatus)} / DNS`; }
+                    else if (ascentStatus === 'DNF') { bigCatOverallStatus = `DNF / ${fiftyKStatus === 'ACTIVE' || fiftyKStatus === 'TBD' ? 'TBD' : (fiftyKStatus === 'FINISHED' ? 'Fin' : fiftyKStatus)}`; }
+                    else if (fiftyKStatus === 'DNF') { bigCatOverallStatus = `${ascentStatus === 'ACTIVE' || ascentStatus === 'TBD' ? 'TBD' : (ascentStatus === 'FINISHED' ? 'Fin' : ascentStatus)} / DNF`; }
+                    else if (ascentStatus === 'TBD' || fiftyKStatus === 'TBD' || ascentStatus === 'ACTIVE' || fiftyKStatus === 'ACTIVE') { bigCatOverallStatus = `${ascentStatus === 'FINISHED' ? 'Fin' : (ascentStatus === 'DNS' || ascentStatus === 'DNF' ? ascentStatus : 'TBD')} / ${fiftyKStatus === 'FINISHED' ? 'Fin' : (fiftyKStatus === 'DNS' || fiftyKStatus === 'DNF' ? fiftyKStatus : 'TBD')}`; if (bigCatOverallStatus.includes("ACTIVE")) bigCatOverallStatus = "In Progress"; if (bigCatOverallStatus === "TBD / TBD" && !(ascentStatus === 'DNS' || ascentStatus === 'DNF' || fiftyKStatus === 'DNS' || fiftyKStatus === 'DNF')) bigCatOverallStatus = "TBD / TBD"; }
+                     else { bigCatOverallStatus = "In Progress"; }
+                    calculatedBigCatData.push({ name: ascentResult[COL_ASCENT.NAME], ascent_elapsed_display: ascentTimeDisplay, fiftyk_elapsed_display: fiftyKTimeDisplay, ascent_elapsed: ascentTimeMs, fiftyk_elapsed: fiftyKTimeMs, cumulative_elapsed: cumulativeMs, status: bigCatOverallStatus });
                 } else { console.warn(`Could not find matching results for dual runner: ${name}`); }
-            });
-             console.log(`Processed ${calculatedBigCatData.length} Big Cat runners.`);
+            }); console.log(`Processed ${calculatedBigCatData.length} Big Cat runners.`);
         }
-        // ****** END UPDATED processBigCatData ******
-
         function filterAndSortData() { const sourceData = (activeTab === '50k') ? calculated50kData : (activeTab === 'Ascent' ? calculatedAscentData : calculatedBigCatData); const cols = (activeTab === '50k') ? COL_50K : (activeTab === 'Ascent' ? COL_ASCENT : null); let filteredData = sourceData; if (currentFilter) { const lowerCaseFilter = currentFilter.toLowerCase(); filteredData = sourceData.filter(row => { const bib = String(activeTab !== 'BigCat' ? row[cols.BIB] : '').toLowerCase(); const name = String(row.name || (activeTab !== 'BigCat' ? row[cols.NAME] : '') || '').toLowerCase(); return bib.includes(lowerCaseFilter) || name.includes(lowerCaseFilter); }); } const { column, direction } = currentSort; const sortMultiplier = direction === 'asc' ? 1 : -1; filteredData.sort((a, b) => { let valA, valB; if (activeTab === 'BigCat') { valA = a[column]; valB = b[column]; } else { const sortColIndex = cols[column.toUpperCase()]; if (sortColIndex === undefined) { currentSort.column = 'bib'; return filterAndSortData(); } valA = a[sortColIndex]; valB = b[sortColIndex]; } if (column === 'bib') { valA = parseInt(valA || '0', 10); valB = parseInt(valB || '0', 10); } else if (column.includes('_cp') || column.includes('_scan')) { valA = getTimeMs(valA) ?? (direction === 'asc' ? Infinity : -Infinity); valB = getTimeMs(valB) ?? (direction === 'asc' ? Infinity : -Infinity); } else if (column.includes('_elapsed')) { valA = valA ?? (direction === 'asc' ? Infinity : -Infinity); valB = valB ?? (direction === 'asc' ? Infinity : -Infinity); } else { valA = String(valA || '').toLowerCase(); valB = String(valB || '').toLowerCase(); } if (valA < valB) return -1 * sortMultiplier; if (valA > valB) return 1 * sortMultiplier; return 0; }); return filteredData; }
 
         // --- UI Update Functions ---
-        // ****** UPDATED updateTable ******
+        // ****** UPDATED updateTable to use formatMillisecondsToDuration for all calculated durations ******
         function updateTable() {
             const displayData = filterAndSortData();
             const is50k = activeTab === '50k'; const isAscent = activeTab === 'Ascent'; const isBigCat = activeTab === 'BigCat';
@@ -458,16 +425,17 @@
         function handleTabClick(event) { const clickedTab = event.currentTarget; const targetId = clickedTab.getAttribute('data-target'); tabButton50k.classList.toggle('active', targetId === 'results50k'); tabButtonAscent.classList.toggle('active', targetId === 'resultsAscent'); tabButtonBigCat.classList.toggle('active', targetId === 'resultsBigCat'); results50kDiv.classList.toggle('hidden', targetId !== 'results50k'); resultsAscentDiv.classList.toggle('hidden', targetId !== 'resultsAscent'); resultsBigCatDiv.classList.toggle('hidden', targetId !== 'resultsBigCat'); const newActiveTab = targetId.replace('results', ''); if (newActiveTab !== activeTab) { activeTab = newActiveTab; currentSort = (activeTab === 'BigCat') ? { column: 'cumulative_elapsed', direction: 'asc' } : { column: 'bib', direction: 'asc' }; console.log(`Switched to tab: ${activeTab}, reset sort to ${currentSort.column}`); } updateTable(); updateSortIcons(); }
 
         // --- Data Fetching ---
-        // (fetchAllData remains the same - calls processData and processBigCatData)
+        // ****** UPDATED fetchAllData ******
         async function fetchAllData() {
             if (isFetching) { console.log("Fetch already in progress."); return; }
             isFetching = true; console.log("Fetching all data...");
             if (loadingSpinner) loadingSpinner.classList.remove('hidden');
-            if (fiftyKStartersElement) fiftyKStartersElement.textContent = "..."; // Indicate loading
+            if (fiftyKStartersElement) fiftyKStartersElement.textContent = "...";
             if (ascentStartersElement) ascentStartersElement.textContent = "...";
-
             errorMessage.classList.add('hidden');
-            if (!RESULTS_50K_CSV_URL || RESULTS_50K_CSV_URL.includes('YOUR_PUBLISHED') || !RESULTS_ASCENT_CSV_URL || RESULTS_ASCENT_CSV_URL.includes('YOUR_PUBLISHED') || !APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('PASTE_APPS_SCRIPT')) { console.error("One or more URLs are not configured."); errorMessage.textContent = "Error: Required URLs not configured."; errorMessage.classList.remove('hidden'); loadingMessage.classList.add('hidden'); resultsTableContainer50k.classList.add('hidden'); resultsTableContainerAscent.classList.add('hidden'); resultsTableContainerBigCat.classList.add('hidden'); isFetching = false; if (loadingSpinner) loadingSpinner.classList.add('hidden'); return; }
+
+            if (!RESULTS_50K_CSV_URL || RESULTS_50K_CSV_URL.includes('YOUR_PUBLISHED') || !RESULTS_ASCENT_CSV_URL || RESULTS_ASCENT_CSV_URL.includes('YOUR_PUBLISHED') || !APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('PASTE_APPS_SCRIPT')) { console.error("One or more URLs are not configured."); errorMessage.textContent = "Error: Required URLs not configured."; errorDetails.textContent = ""; errorMessage.classList.remove('hidden'); loadingMessage.classList.add('hidden'); resultsTableContainer50k.classList.add('hidden'); resultsTableContainerAscent.classList.add('hidden'); resultsTableContainerBigCat.classList.add('hidden'); isFetching = false; if (loadingSpinner) loadingSpinner.classList.add('hidden'); return; }
+
             try {
                 const [res50kCSV, resAscentCSV, runners50kRes, runnersAscentRes] = await Promise.allSettled([
                     fetch(`${RESULTS_50K_CSV_URL}&t=${Date.now()}`),
@@ -492,7 +460,8 @@
                 processBigCatData();
                 updateTable();
                 updateSortIcons();
-                updateLoopOrderChart(calculated50kData); // Update chart data
+                updateLoopOrderChart(calculated50kData);
+                updateLoopStatsDisplay(calculated50kData);
 
                 resultsTableContainer50k.classList.remove('hidden'); resultsTableContainerAscent.classList.remove('hidden'); resultsTableContainerBigCat.classList.remove('hidden');
                 loadingMessage.classList.add('hidden');
@@ -505,7 +474,7 @@
 
         // ****** NEW updateLoopOrderChart function ******
         function updateLoopOrderChart(data50k) {
-            if (!loopOrderChartCanvas) return;
+            if (!loopOrderChartCanvas || !data50k || !Chart) return;
             const loopOrders = {};
             data50k.forEach(row => {
                 const l1 = row[COL_50K.LOOP1_COLOR] ? row[COL_50K.LOOP1_COLOR].charAt(0).toUpperCase() : '';
@@ -526,38 +495,131 @@
                 loopOrderChartInstance.update();
             } else {
                 loopOrderChartInstance = new Chart(loopOrderChartCanvas, {
-                    type: 'bar',
+                    type: 'pie',
                     data: {
                         labels: labels,
                         datasets: [{
-                            label: 'Number of Runners',
-                            data: counts,
-                            backgroundColor: [
-                                'rgba(255, 99, 132, 0.7)', 'rgba(54, 162, 235, 0.7)',
-                                'rgba(255, 206, 86, 0.7)', 'rgba(75, 192, 192, 0.7)',
-                                'rgba(153, 102, 255, 0.7)', 'rgba(255, 159, 64, 0.7)'
-                            ],
-                            borderColor: [
-                                'rgba(255, 99, 132, 1)', 'rgba(54, 162, 235, 1)',
-                                'rgba(255, 206, 86, 1)', 'rgba(75, 192, 192, 1)',
-                                'rgba(153, 102, 255, 1)', 'rgba(255, 159, 64, 1)'
-                            ],
-                            borderWidth: 1
+                            label: 'Loop Order', data: counts,
+                            backgroundColor: [ 'rgba(255, 99, 132, 0.8)', 'rgba(54, 162, 235, 0.8)', 'rgba(255, 206, 86, 0.8)', 'rgba(75, 192, 192, 0.8)', 'rgba(153, 102, 255, 0.8)', 'rgba(255, 159, 64, 0.8)', 'rgba(236, 72, 153, 0.6)', 'rgba(59, 130, 246, 0.6)' ],
+                            borderColor: '#fff', borderWidth: 1
                         }]
                     },
-                    options: {
-                        indexAxis: 'y', // Horizontal bars
-                        responsive: true,
-                        maintainAspectRatio: true, // Adjust as needed
-                        scales: {
-                            x: { beginAtZero: true, ticks: { stepSize: 1 } }
-                        },
-                        plugins: { legend: { display: false } }
-                    }
+                    options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'top', }, tooltip: { callbacks: { label: function(context) { let label = context.label || ''; if (label) { label += ': '; } if (context.parsed !== null) { const total = context.dataset.data.reduce((a, b) => a + b, 0); const percentage = total > 0 ? ((context.parsed / total) * 100).toFixed(1) + '%' : '0%'; label += context.raw + ' (' + percentage + ')'; } return label; } } } } }
                 });
             }
         }
         // ****** END NEW updateLoopOrderChart function ******
+
+        // ****** NEW updateLoopStatsDisplay function ******
+        function updateLoopStatsDisplay(data50k) {
+            if (!fastestTimesListElement || !averageTimesChartCanvas || !data50k) return;
+
+            const segments = [
+                { name: 'Yellow Loop', key: 'LOOP_YELLOW_ELAPSED', color: 'rgba(255, 206, 86, 0.7)' },
+                { name: 'White Loop',  key: 'LOOP_WHITE_ELAPSED',  color: 'rgba(201, 203, 207, 0.7)' },
+                { name: 'Pink Loop',   key: 'LOOP_PINK_ELAPSED',   color: 'rgba(255, 99, 132, 0.7)' },
+                { name: 'Descent 1', key: COL_50K.DESC1_ELAPSED, color: 'rgba(54, 162, 235, 0.7)' },
+                { name: 'Descent 2', key: COL_50K.DESC2_ELAPSED, color: 'rgba(75, 192, 192, 0.7)' },
+                { name: 'Descent 3', key: COL_50K.DESC3_ELAPSED, color: 'rgba(153, 102, 255, 0.7)' }
+            ];
+            const fastestTimes = {
+                'LOOP_YELLOW_ELAPSED': { timeMs: Infinity, runnerName: '', bib: '' },
+                'LOOP_WHITE_ELAPSED': { timeMs: Infinity, runnerName: '', bib: '' },
+                'LOOP_PINK_ELAPSED': { timeMs: Infinity, runnerName: '', bib: '' },
+                [COL_50K.DESC1_ELAPSED]: { timeMs: Infinity, runnerName: '', bib: '' },
+                [COL_50K.DESC2_ELAPSED]: { timeMs: Infinity, runnerName: '', bib: '' },
+                [COL_50K.DESC3_ELAPSED]: { timeMs: Infinity, runnerName: '', bib: '' }
+            };
+            const segmentTotals = {
+                'LOOP_YELLOW_ELAPSED': { totalMs: 0, count: 0 },
+                'LOOP_WHITE_ELAPSED': { totalMs: 0, count: 0 },
+                'LOOP_PINK_ELAPSED': { totalMs: 0, count: 0 },
+                [COL_50K.DESC1_ELAPSED]: { totalMs: 0, count: 0 },
+                [COL_50K.DESC2_ELAPSED]: { totalMs: 0, count: 0 },
+                [COL_50K.DESC3_ELAPSED]: { totalMs: 0, count: 0 }
+            };
+
+            data50k.forEach(row => {
+                // Check Loop 1
+                const l1Color = row[COL_50K.LOOP1_COLOR];
+                const l1TimeMs = row[COL_50K.LOOP1_ELAPSED]; // Already in MS
+                if (l1Color && l1TimeMs !== null && l1TimeMs > 0) {
+                    const key = `LOOP_${l1Color.toUpperCase()}_ELAPSED`;
+                    if (segmentTotals[key]) {
+                        segmentTotals[key].totalMs += l1TimeMs;
+                        segmentTotals[key].count++;
+                        if (l1TimeMs < fastestTimes[key].timeMs) {
+                            fastestTimes[key] = { timeMs: l1TimeMs, runnerName: row[COL_50K.NAME], bib: row[COL_50K.BIB] };
+                        }
+                    }
+                }
+                // Check Loop 2
+                const l2Color = row[COL_50K.LOOP2_COLOR];
+                const l2TimeMs = row[COL_50K.LOOP2_ELAPSED];
+                if (l2Color && l2TimeMs !== null && l2TimeMs > 0) {
+                    const key = `LOOP_${l2Color.toUpperCase()}_ELAPSED`;
+                    if (segmentTotals[key]) {
+                        segmentTotals[key].totalMs += l2TimeMs;
+                        segmentTotals[key].count++;
+                        if (l2TimeMs < fastestTimes[key].timeMs) {
+                            fastestTimes[key] = { timeMs: l2TimeMs, runnerName: row[COL_50K.NAME], bib: row[COL_50K.BIB] };
+                        }
+                    }
+                }
+                // Check Loop 3
+                const l3Color = row[COL_50K.LOOP3_COLOR];
+                const l3TimeMs = row[COL_50K.LOOP3_ELAPSED];
+                if (l3Color && l3TimeMs !== null && l3TimeMs > 0) {
+                    const key = `LOOP_${l3Color.toUpperCase()}_ELAPSED`;
+                    if (segmentTotals[key]) {
+                        segmentTotals[key].totalMs += l3TimeMs;
+                        segmentTotals[key].count++;
+                        if (l3TimeMs < fastestTimes[key].timeMs) {
+                            fastestTimes[key] = { timeMs: l3TimeMs, runnerName: row[COL_50K.NAME], bib: row[COL_50K.BIB] };
+                        }
+                    }
+                }
+                // Descents
+                [COL_50K.DESC1_ELAPSED, COL_50K.DESC2_ELAPSED, COL_50K.DESC3_ELAPSED].forEach(descKey => {
+                    const timeMs = row[descKey];
+                    if (timeMs !== null && timeMs > 0) {
+                        segmentTotals[descKey].totalMs += timeMs;
+                        segmentTotals[descKey].count++;
+                        if (timeMs < fastestTimes[descKey].timeMs) {
+                            fastestTimes[descKey] = { timeMs: timeMs, runnerName: row[COL_50K.NAME], bib: row[COL_50K.BIB] };
+                        }
+                    }
+                });
+            });
+
+            fastestTimesListElement.innerHTML = '';
+            segments.forEach(seg => {
+                const li = document.createElement('li');
+                let timeDisplay = "N/A"; let runnerDisplay = "";
+                if (fastestTimes[seg.key] && fastestTimes[seg.key].timeMs !== Infinity) { timeDisplay = formatMillisecondsToDuration(fastestTimes[seg.key].timeMs); runnerDisplay = ` - ${fastestTimes[seg.key].runnerName} (#${fastestTimes[seg.key].bib})`; }
+                li.innerHTML = `<strong>${seg.name}:</strong> ${timeDisplay}${runnerDisplay}`;
+                fastestTimesListElement.appendChild(li);
+            });
+
+            const avgLabels = segments.map(seg => seg.name);
+            const avgData = segments.map(seg => segmentTotals[seg.key].count > 0 ? (segmentTotals[seg.key].totalMs / segmentTotals[seg.key].count) : 0);
+            const backgroundColors = segments.map(seg => seg.color);
+
+            if (averageTimesChartInstance) {
+                averageTimesChartInstance.data.labels = avgLabels;
+                averageTimesChartInstance.data.datasets[0].data = avgData;
+                averageTimesChartInstance.data.datasets[0].backgroundColor = backgroundColors;
+                averageTimesChartInstance.data.datasets[0].borderColor = backgroundColors.map(c => c.replace('0.7', '1'));
+                averageTimesChartInstance.update();
+            } else {
+                averageTimesChartInstance = new Chart(averageTimesChartCanvas, {
+                    type: 'bar',
+                    data: { labels: avgLabels, datasets: [{ label: 'Average Time', data: avgData, backgroundColor: backgroundColors, borderColor: backgroundColors.map(c => c.replace('0.7', '1')), borderWidth: 1 }] },
+                    options: { responsive: true, maintainAspectRatio: true, scales: { y: { beginAtZero: true, ticks: { callback: function(value) { return formatMillisecondsToDuration(value); } } } }, plugins: { tooltip: { callbacks: { label: function(context) { let label = context.dataset.label || ''; if (label) { label += ': '; } if (context.parsed.y !== null) { label += formatMillisecondsToDuration(context.parsed.y); } return label; } } }, legend: { display: false } } }
+                });
+            }
+        }
+        // ****** END NEW updateLoopStatsDisplay function ******
 
 
         // --- Initial Setup ---
